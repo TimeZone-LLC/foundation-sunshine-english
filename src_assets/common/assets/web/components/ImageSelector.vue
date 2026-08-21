@@ -36,7 +36,7 @@
         @dragleave="handleDragLeave"
         @dragover.prevent
         @drop.prevent.stop="handleDrop"
-        placeholder="选择图片文件或拖拽到此处"
+        placeholder="Choose an image file or drag one here"
       />
       <button
         class="btn btn-outline-secondary"
@@ -51,10 +51,10 @@
     <!-- 图片预览 -->
     <div v-if="!isDesktopImage && imagePath" class="image-preview-container mt-3">
       <div class="image-preview">
-        <img :src="previewUrl" alt="图片预览" @error="handleImageError" />
+        <img :src="previewUrl" alt="Image preview" @error="handleImageError" />
       </div>
       <div class="image-preview-circle">
-        <img :src="previewUrl" alt="图片预览" @error="handleImageError" />
+        <img :src="previewUrl" alt="Image preview" @error="handleImageError" />
       </div>
     </div>
 
@@ -139,7 +139,7 @@ export default {
     handleDragEnter(event) {
       event.preventDefault()
       this.dragCounter++
-      this.$emit('image-error', '杂鱼~快放进来呀~')
+      this.$emit('image-error', 'Drop the image right here')
     },
 
     /**
@@ -162,7 +162,7 @@ export default {
 
       const file = event.dataTransfer.files[0]
       if (!file) {
-        this.$emit('image-error', '其他地方不可以！')
+        this.$emit('image-error', 'No image file was dropped')
         return
       }
 
@@ -180,13 +180,13 @@ export default {
       }
 
       try {
-        this.$emit('image-error', '正在上传图片...')
+        this.$emit('image-error', 'Uploading image...')
         const path = await this.uploadImageToSunshine(file)
         this.$emit('update-image', path)
         this.$emit('image-error', '')
       } catch (error) {
-        console.error('上传图片失败:', error)
-        this.$emit('image-error', `上传图片失败: ${error.message}`)
+        console.error('Image upload failed:', error)
+        this.$emit('image-error', `Image upload failed: ${error.message}`)
       }
     },
 
@@ -198,7 +198,7 @@ export default {
       const key = this.generateImageKey()
 
       const result = await apiPostJson('/api/covers/upload', { key, data: base64Data })
-      console.log('✅ Sunshine API 上传成功，文件路径:', result.path)
+      console.log('Sunshine API upload succeeded, file path:', result.path)
 
       return `${key}.png`
     },
@@ -235,7 +235,7 @@ export default {
      * 处理图片加载错误
      */
     handleImageError() {
-      this.$emit('image-error', '图片加载失败，请检查文件路径')
+      this.$emit('image-error', 'Failed to load the image. Check the file path.')
     },
 
     /**
@@ -243,7 +243,7 @@ export default {
      */
     openCoverFinder() {
       if (!this.appName) {
-        this.$emit('image-error', '请先输入应用名称')
+        this.$emit('image-error', 'Enter an application name first')
         return
       }
       this.showCoverFinder = true
@@ -283,7 +283,7 @@ export default {
 
 <style scoped>
 .monospace {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-family-mono);
 }
 
 .image-file-input {
@@ -310,7 +310,6 @@ export default {
 .image-input-group.is-dragging .form-control-enhanced {
   background: var(--ui-accent-soft);
   border-color: var(--ui-accent);
-  box-shadow: inset 0 0 0 1px var(--ui-accent);
 }
 
 .btn:disabled {
@@ -336,15 +335,14 @@ export default {
   text-align: center;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
 }
 
 .image-preview img {
   max-width: 100%;
   max-height: 148px;
   object-fit: contain;
-  border-radius: var(--ui-radius-sm);
-  box-shadow: var(--ui-shadow-sm);
+  border-radius: 0;
 }
 
 .image-preview-circle {
@@ -356,8 +354,7 @@ export default {
   text-align: center;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: 50%;
-  box-shadow: var(--ui-shadow-sm);
+  border-radius: 0;
 }
 
 .image-preview-circle img {
@@ -367,7 +364,7 @@ export default {
   width: calc(100% - 6px);
   height: calc(100% - 6px);
   object-fit: cover;
-  border-radius: 50%;
+  border-radius: 0;
   transform: translate(-50%, -50%);
 }
 
@@ -380,7 +377,7 @@ export default {
   content: '';
   background: var(--ui-surface-strong);
   border: 1px solid var(--ui-border-strong);
-  border-radius: 50%;
+  border-radius: 0;
   transform: translate(-50%, -50%);
 }
 
@@ -397,7 +394,7 @@ export default {
     max-width: none;
     margin: 0;
     border: 1px solid var(--ui-border) !important;
-    border-radius: var(--ui-radius-sm) !important;
+    border-radius: 0;
   }
 
   .image-preview-container {

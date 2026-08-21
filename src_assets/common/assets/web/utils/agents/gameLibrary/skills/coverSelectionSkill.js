@@ -58,7 +58,7 @@ export function createCoverSelectionSkill(options = {}) {
           phase: 'item:start',
           current: completed,
           total: apps.length,
-          detail: `正在匹配：${app?.name || '未命名游戏'}`,
+          detail: `Matching: ${app?.name || 'Untitled game'}`,
         })
 
         try {
@@ -87,7 +87,7 @@ export function createCoverSelectionSkill(options = {}) {
             phase: 'item:done',
             current: completed,
             total: apps.length,
-            detail: `已处理 ${completed}/${apps.length} 个游戏`,
+            detail: `Processed ${completed}/${apps.length} games`,
           })
         }
       }

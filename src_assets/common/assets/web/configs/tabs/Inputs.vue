@@ -517,7 +517,7 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 0.5rem 0.75rem;
   background: var(--ui-accent-soft);
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   border: 1px solid var(--ui-border);
   color: var(--ui-text-secondary);
   font-size: 0.85rem;
@@ -532,7 +532,7 @@ onBeforeUnmount(() => {
   align-items: center;
   padding: 0.2rem 0.45rem;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: 0;
   font-size: 0.7em;
   font-weight: 600;
   line-height: 1;
@@ -546,23 +546,22 @@ onBeforeUnmount(() => {
 }
 
 .driver-badge-warning {
-  border-color: color-mix(in srgb, var(--ui-warning) 36%, transparent);
-  background: color-mix(in srgb, var(--ui-warning) 12%, transparent);
+  border-color: var(--ui-warning-border);
+  background: var(--ui-warning-soft);
   color: var(--ui-warning-text);
 }
 
 /* 驱动管理面板 */
 .vmouse-panel {
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   border: 1px solid var(--ui-border);
   background: var(--ui-surface);
   overflow: hidden;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .vmouse-panel:hover {
   border-color: var(--ui-border-strong);
-  box-shadow: var(--ui-shadow-sm);
 }
 
 /* 面板头部 */
@@ -585,28 +584,20 @@ onBeforeUnmount(() => {
 .vmouse-dot {
   width: 8px;
   height: 8px;
-  border-radius: 50%;
+  border-radius: 0;
   flex-shrink: 0;
 }
 
 .vmouse-dot.dot-active {
   background: var(--ui-success);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ui-success) 16%, transparent);
-  animation: vmouse-pulse 2s ease-in-out infinite;
 }
 
 .vmouse-dot.dot-warning {
   background: var(--ui-warning);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--ui-warning) 16%, transparent);
 }
 
 .vmouse-dot.dot-inactive {
   background: var(--ui-text-muted);
-}
-
-@keyframes vmouse-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
 }
 
 .vmouse-status-label {
@@ -623,11 +614,11 @@ onBeforeUnmount(() => {
   width: 28px;
   height: 28px;
   border: none;
-  border-radius: 6px;
+  border-radius: 0;
   background: transparent;
   color: var(--ui-text-secondary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--transition-default);
 }
 
 .vmouse-refresh-btn:hover:not(:disabled) {
@@ -661,11 +652,11 @@ onBeforeUnmount(() => {
   gap: 0.4rem;
   padding: 0.35rem 0.85rem;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 0;
   font-size: 0.8rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--transition-default);
 }
 
 .vmouse-action-btn:disabled {
@@ -677,10 +668,6 @@ onBeforeUnmount(() => {
   background: var(--ui-accent);
   color: var(--ui-accent-contrast);
   border-color: var(--ui-accent);
-}
-
-.vmouse-install-btn:hover:not(:disabled) {
-  box-shadow: 0 0 0 3px var(--ui-accent-soft);
 }
 
 .vmouse-uninstall-btn {
@@ -700,7 +687,7 @@ onBeforeUnmount(() => {
   height: 14px;
   border: 2px solid currentColor;
   border-top-color: transparent;
-  border-radius: 50%;
+  border-radius: 0;
   animation: vmouse-spin 0.6s linear infinite;
 }
 
@@ -718,7 +705,7 @@ onBeforeUnmount(() => {
 #input .accordion-item {
   overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
 }
 
@@ -736,7 +723,8 @@ onBeforeUnmount(() => {
 }
 
 #input .accordion-button:focus {
-  box-shadow: inset 0 0 0 2px var(--ui-accent-soft);
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 @media (max-width: 575.98px) {

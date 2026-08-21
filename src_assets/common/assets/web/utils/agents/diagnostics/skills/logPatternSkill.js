@@ -7,7 +7,7 @@ const LOG_PATTERNS = [
     category: 'encoder',
     pattern: /\b(nvenc|amf|quicksync|video\s*toolbox|encoder|encoding)\b.*\b(fail|failed|error|unavailable|unsupported|unable|could not)\b/i,
     message: 'Encoder initialization or encoding failure detected',
-    labels: { zh: '检测到编码器初始化或编码失败' },
+    labels: { zh: 'Encoder initialization or encoding failure detected' },
   },
   {
     id: 'display-capture-failure',
@@ -15,7 +15,7 @@ const LOG_PATTERNS = [
     category: 'display',
     pattern: /\b(display|monitor|dxgi|capture|duplication|output)\b.*\b(fail|failed|error|not found|unavailable|unable|could not)\b/i,
     message: 'Display capture or monitor detection failure detected',
-    labels: { zh: '检测到显示捕获或显示器检测失败' },
+    labels: { zh: 'Display capture or monitor detection failure detected' },
   },
   {
     id: 'network-timeout',
@@ -23,7 +23,7 @@ const LOG_PATTERNS = [
     category: 'network',
     pattern: /\b(network|connection|client|pair|handshake|rtsp|udp|tcp|port)\b.*\b(timeout|timed out|refused|unreachable|blocked|failed|error)\b/i,
     message: 'Network, pairing, or client connection issue detected',
-    labels: { zh: '检测到网络、配对或客户端连接问题' },
+    labels: { zh: 'Network, pairing, or client connection issue detected' },
   },
   {
     id: 'port-bind-failure',
@@ -31,7 +31,7 @@ const LOG_PATTERNS = [
     category: 'network',
     pattern: /\b(address already in use|permission denied|port\b.*\b(bind|listen|failed|error|unable|cannot)|\b(bind|listen)\b.*\b(port|failed|error|unable|cannot))\b/i,
     message: 'Port binding or listening failure detected',
-    labels: { zh: '检测到端口绑定或监听失败' },
+    labels: { zh: 'Port binding or listening failure detected' },
   },
   {
     id: 'config-risk',
@@ -39,7 +39,7 @@ const LOG_PATTERNS = [
     category: 'config',
     pattern: /\b(config|configuration|option|setting)\b.*\b(invalid|missing|conflict|deprecated|failed|error)\b/i,
     message: 'Configuration warning or invalid setting detected',
-    labels: { zh: '检测到配置警告或无效设置' },
+    labels: { zh: 'Configuration warning or invalid setting detected' },
   },
 ]
 

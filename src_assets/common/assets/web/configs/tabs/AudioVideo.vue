@@ -271,17 +271,17 @@ const testMicrophoneRoute = async () => {
   gap: 0.25rem;
   padding: 0.3rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
   margin-bottom: 0.75rem;
 }
 
 .nav-tabs .nav-link {
   border: none;
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   color: var(--ui-text-secondary);
   padding: 0.65rem 1rem;
-  transition: color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .nav-tabs .nav-link:hover {
@@ -292,7 +292,6 @@ const testMicrophoneRoute = async () => {
 .nav-tabs .nav-link.active {
   color: var(--ui-accent);
   background: var(--ui-surface-strong);
-  box-shadow: var(--ui-shadow-sm);
   font-weight: 600;
 }
 
@@ -303,7 +302,7 @@ const testMicrophoneRoute = async () => {
 .stream-encoding-limit {
   padding: 1rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
 }
 
@@ -314,7 +313,7 @@ const testMicrophoneRoute = async () => {
   flex-wrap: wrap;
   padding: 0.75rem;
   background: var(--ui-surface);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   border: 1px solid var(--ui-border);
 }
 

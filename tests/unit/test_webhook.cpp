@@ -36,10 +36,10 @@ TEST_F(WebhookTest, IsEnabledRequiresFlagAndUrl) {
   EXPECT_TRUE(webhook::is_enabled());
 }
 
-TEST_F(WebhookTest, AlertMessageLocalization) {
-  EXPECT_EQ(webhook::get_alert_message(webhook::event_type_t::CONFIG_PIN_SUCCESS, true), "🔗 配置配对成功");
-  EXPECT_EQ(webhook::get_alert_message(webhook::event_type_t::NV_APP_LAUNCH, true), "🚀 应用启动");
-  EXPECT_EQ(webhook::get_alert_message(webhook::event_type_t::NV_APP_RESUME, false), "▶️ application resumed");
+TEST_F(WebhookTest, AlertMessagesAreEnglish) {
+  EXPECT_EQ(webhook::get_alert_message(webhook::event_type_t::CONFIG_PIN_SUCCESS), "🔗 Config pairing successful");
+  EXPECT_EQ(webhook::get_alert_message(webhook::event_type_t::NV_APP_LAUNCH), "🚀 application launched");
+  EXPECT_EQ(webhook::get_alert_message(webhook::event_type_t::NV_APP_RESUME), "▶️ application resumed");
 }
 
 TEST_F(WebhookTest, EventIdentifiersAndFilterAreStable) {
@@ -143,7 +143,7 @@ TEST_F(WebhookTest, ProductionPayloadIsValidJsonAndEscapesMarkup) {
     .extra_data = {{"resolution", "1920x1080"}, {"fps", "60"}}
   };
 
-  const auto payload_text = webhook::generate_webhook_json(event, false);
+  const auto payload_text = webhook::generate_webhook_json(event);
   ASSERT_TRUE(nlohmann::json::accept(payload_text));
   const auto payload = nlohmann::json::parse(payload_text);
   ASSERT_EQ(payload.at("msgtype"), "markdown");
@@ -166,10 +166,10 @@ TEST_F(WebhookTest, SuspiciousClientWarningAppearsInMarkdownNotification) {
     }
   };
 
-  const auto payload = nlohmann::json::parse(webhook::generate_webhook_json(event, true));
+  const auto payload = nlohmann::json::parse(webhook::generate_webhook_json(event));
   const auto content = payload.at("markdown").at("content").get<std::string>();
-  EXPECT_NE(content.find("您很可能正在受到未知侵权客户端的侵害"), std::string::npos);
-  EXPECT_NE(content.find("可能存在误判"), std::string::npos);
+  EXPECT_NE(content.find("unknown infringing client"), std::string::npos);
+  EXPECT_NE(content.find("may be inaccurate"), std::string::npos);
 }
 
 TEST_F(WebhookTest, SuspiciousClientWarningIsStructuredInJsonNotification) {
@@ -182,7 +182,7 @@ TEST_F(WebhookTest, SuspiciousClientWarningIsStructuredInJsonNotification) {
   };
 
   webhook::g_webhook_format.set_format_type(webhook::format_type_t::JSON);
-  const auto payload = nlohmann::json::parse(webhook::generate_webhook_json(event, false));
+  const auto payload = nlohmann::json::parse(webhook::generate_webhook_json(event));
   const auto &extra_data = payload.at("extra_data");
   EXPECT_EQ(extra_data.at("client_integrity_status"), client_fingerprint::suspicious_client_code);
   EXPECT_NE(
@@ -192,7 +192,7 @@ TEST_F(WebhookTest, SuspiciousClientWarningIsStructuredInJsonNotification) {
 }
 
 TEST_F(WebhookTest, EnglishTestPayloadUsesTheProductionEnvelope) {
-  const auto payload_text = webhook::g_webhook_format.generate_test_json_payload(false);
+  const auto payload_text = webhook::g_webhook_format.generate_test_json_payload();
   ASSERT_TRUE(nlohmann::json::accept(payload_text));
 
   const auto payload = nlohmann::json::parse(payload_text);
@@ -208,45 +208,28 @@ TEST_F(WebhookTest, EnglishTestPayloadUsesTheProductionEnvelope) {
   EXPECT_NE(content.find("Time:"), std::string::npos);
 }
 
-TEST_F(WebhookTest, ChineseTestPayloadUsesTheProductionEnvelope) {
-  const auto payload_text = webhook::g_webhook_format.generate_test_json_payload(true);
-  ASSERT_TRUE(nlohmann::json::accept(payload_text));
-
-  const auto payload = nlohmann::json::parse(payload_text);
-  EXPECT_EQ(payload.at("event_id"), -1);
-  EXPECT_EQ(payload.at("event_type"), "webhook_test");
-  EXPECT_EQ(payload.at("msgtype"), "markdown");
-  const auto content = payload.at("markdown").at("content").get<std::string>();
-  EXPECT_NE(content.find("**Sunshine Webhook 测试**"), std::string::npos);
-  EXPECT_NE(content.find("Webhook 接收地址已收到测试请求"), std::string::npos);
-  EXPECT_NE(content.find("事件类型"), std::string::npos);
-  EXPECT_NE(content.find("Sunshine 测试应用"), std::string::npos);
-  EXPECT_NE(content.find("1920x1080，60 FPS，音频已启用"), std::string::npos);
-  EXPECT_NE(content.find("时间:"), std::string::npos);
-}
-
-TEST_F(WebhookTest, ChineseTestPayloadSupportsTextAndJsonFormats) {
+TEST_F(WebhookTest, TestPayloadSupportsTextAndJsonFormats) {
   webhook::g_webhook_format.set_format_type(webhook::format_type_t::TEXT);
   const auto text_payload = nlohmann::json::parse(
-    webhook::g_webhook_format.generate_test_json_payload(true)
+    webhook::g_webhook_format.generate_test_json_payload()
   );
   EXPECT_EQ(text_payload.at("event_id"), -1);
   EXPECT_EQ(text_payload.at("event_type"), "webhook_test");
   EXPECT_EQ(text_payload.at("msgtype"), "text");
   EXPECT_NE(
-    text_payload.at("text").at("content").get<std::string>().find("结果: Webhook 接收地址已收到测试请求"),
+    text_payload.at("text").at("content").get<std::string>().find("Result: Webhook endpoint reached"),
     std::string::npos
   );
 
   webhook::g_webhook_format.set_format_type(webhook::format_type_t::JSON);
   const auto json_payload = nlohmann::json::parse(
-    webhook::g_webhook_format.generate_test_json_payload(true)
+    webhook::g_webhook_format.generate_test_json_payload()
   );
   EXPECT_EQ(json_payload.at("event_id"), -1);
   EXPECT_EQ(json_payload.at("event_type"), "webhook_test");
-  EXPECT_EQ(json_payload.at("event_title"), "Webhook 测试");
-  EXPECT_EQ(json_payload.at("result"), "Webhook 接收地址已收到测试请求");
-  EXPECT_EQ(json_payload.at("sample").at("audio"), "已启用");
+  EXPECT_EQ(json_payload.at("event_title"), "Webhook Test");
+  EXPECT_EQ(json_payload.at("result"), "Webhook endpoint reached");
+  EXPECT_EQ(json_payload.at("sample").at("audio"), "Enabled");
 }
 
 TEST_F(WebhookTest, TestRetryCountRejectsValuesAboveThree) {
@@ -317,7 +300,7 @@ TEST_F(WebhookTest, PayloadTruncationPreservesUtf8AndJson) {
     event.extra_data["error"] += "界";
   }
 
-  const auto payload_text = webhook::generate_webhook_json(event, false);
+  const auto payload_text = webhook::generate_webhook_json(event);
   ASSERT_TRUE(nlohmann::json::accept(payload_text));
   const auto content = nlohmann::json::parse(payload_text).at("markdown").at("content").get<std::string>();
   EXPECT_LE(content.size(), 4096);

@@ -55,6 +55,32 @@ namespace {
 
 using namespace std::literals;
 
+namespace {
+  /**
+   * @brief How long main() waits for the servers to report before logging the startup summary.
+   * @details A little longer than the bind retry window in httpcommon, so a listener that
+   *          exhausts its retries is reported as having given up rather than as still trying.
+   */
+  constexpr auto READINESS_REPORT_TIMEOUT = 150s;
+
+  /**
+   * @brief Report an exit code that survives the Windows atexit terminator.
+   * @details On Windows the atexit hook installed in main() terminates the process with
+   *          g_final_exit_code, so anything merely returned from main() is replaced by that
+   *          value. It defaults to 0, which made every early failure look like a clean,
+   *          requested stop to whatever supervises Sunshine.
+   * @param exit_code The code main() is about to return.
+   * @return The same exit code.
+   */
+  int
+  exit_with(int exit_code) {
+#ifdef _WIN32
+    g_final_exit_code.store(exit_code, std::memory_order_release);
+#endif
+    return exit_code;
+  }
+}  // namespace
+
 std::map<int, std::function<void()>> signal_handlers;
 void
 on_signal_forwarder(int sig) {
@@ -236,8 +262,13 @@ main(int argc, char *argv[]) {
   }
 
   // parse config file
-  if (config::parse(argc, argv)) {
-    return 0;
+  //
+  // config::parse() returns 1 after printing the help text, which is a successful run, and
+  // -1 when the configuration could not be read or its directory could not be written.
+  // Reporting the latter as exit code 0 told the supervisor Sunshine had stopped cleanly, so
+  // it respawned straight back into the very same unusable configuration, forever.
+  if (const auto config_status = config::parse(argc, argv); config_status != 0) {
+    return exit_with(config_status > 0 ? http::exit_code::SUCCESS : http::exit_code::CONFIG_UNUSABLE);
   }
 
   auto log_deinit_guard = logging::init(config::sunshine.min_log_level, config::sunshine.log_file, config::sunshine.restore_log);
@@ -286,10 +317,10 @@ main(int argc, char *argv[]) {
         BOOST_LOG(info) << '\t' << key;
       }
 
-      return 7;
+      return exit_with(7);
     }
 
-    return fn->second(argv[0], config::sunshine.cmd.argc, config::sunshine.cmd.argv);
+    return exit_with(fn->second(argv[0], config::sunshine.cmd.argc, config::sunshine.cmd.argv));
   }
 
   // Adding this guard here first as it also performs recovery after crash,
@@ -446,14 +477,14 @@ main(int argc, char *argv[]) {
   }
 
   if (http::init()) {
-    BOOST_LOG(fatal) << "HTTP interface failed to initialize"sv;
+    BOOST_LOG(fatal) << "HTTP interface failed to initialize: the TLS credentials could not be created or loaded."sv;
 
 #ifdef _WIN32
     BOOST_LOG(fatal) << "To relaunch Sunshine successfully, use the shortcut in the Start Menu. Do not run Sunshine.exe manually."sv;
     std::this_thread::sleep_for(10s);
 #endif
 
-    return -1;
+    return exit_with(http::exit_code::CREDENTIALS_UNUSABLE);
   }
 
   auto client_fingerprint_deinit_guard = client_fingerprint::init({
@@ -481,7 +512,7 @@ main(int argc, char *argv[]) {
 
   // FIXME: Temporary workaround: Simple-Web_server needs to be updated or replaced
   if (shutdown_event->peek()) {
-    return lifetime::desired_exit_code;
+    return exit_with(lifetime::desired_exit_code);
   }
 
   webhook::auth::load_result_t webhook_auth_result {
@@ -528,6 +559,15 @@ main(int argc, char *argv[]) {
   std::thread httpThread { nvhttp::start };
   std::thread rtspThread { rtsp_stream::start };
 
+  // The server threads above own their ports; nothing here used to learn whether any of them
+  // was actually bound, so a dead port was only visible as connections that never arrived.
+  // This helper waits for every server to report and writes one summary line naming the
+  // servers that came up, the ports they are on, and any server that never made it.
+  std::thread readinessThread { []() {
+    http::report_listener_readiness(
+      std::chrono::duration_cast<std::chrono::milliseconds>(READINESS_REPORT_TIMEOUT));
+  } };
+
 #if defined(_WIN32) && defined(SUNSHINE_GUI_TRAY) && SUNSHINE_GUI_TRAY >= 1
   // The service wrapper owns user-session agent startup in service mode.
   // Standalone and portable runs need to reconcile the same bundled agent here.
@@ -543,9 +583,7 @@ main(int argc, char *argv[]) {
   // If we're using the default port and GameStream is enabled, warn the user
   if (config::sunshine.port == 47989 && is_gamestream_enabled()) {
     BOOST_LOG(fatal) << "GameStream is still enabled in GeForce Experience! This *will* cause streaming problems with Sunshine!"sv;
-    BOOST_LOG(fatal) << "GeForce Experience 中仍然启用了 GameStream！这将导致流媒体问题与 Sunshine！"sv;
     BOOST_LOG(fatal) << "Disable GameStream on the SHIELD tab in GeForce Experience or change the Port setting on the Advanced tab in the Sunshine Web UI."sv;
-    BOOST_LOG(fatal) << "在 GeForce Experience 的 SHIELD 标签中禁用 GameStream，或在 Sunshine Web UI 的 Advanced 标签中更改端口设置。"sv;
   }
 #endif
 
@@ -583,6 +621,8 @@ main(int argc, char *argv[]) {
   }
   display_device_deinit_guard = nullptr;
 
+  readinessThread.join();
+
   httpThread.join();
   configThread.join();
   rtspThread.join();
@@ -603,12 +643,9 @@ main(int argc, char *argv[]) {
   }
 #endif
 
-#ifdef _WIN32
-  // Hand the chosen exit code over to the atexit terminator so it can pass it
-  // straight to TerminateProcess. Without this the terminator would always
-  // exit with 0 even when lifetime::desired_exit_code was set non-zero by a
-  // failure path that still chose to return cleanly from main.
-  g_final_exit_code.store(lifetime::desired_exit_code, std::memory_order_release);
-#endif
-  return lifetime::desired_exit_code;
+  // exit_with() hands the chosen exit code over to the Windows atexit terminator so it can
+  // pass it straight to TerminateProcess. Without that the terminator would always exit with
+  // 0, even when lifetime::desired_exit_code was set non-zero by a failure path that still
+  // chose to return cleanly from main.
+  return exit_with(lifetime::desired_exit_code);
 }

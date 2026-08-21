@@ -433,7 +433,7 @@ namespace display_device {
       constexpr auto stability_check_interval = std::chrono::milliseconds(500);
       constexpr auto max_wait_time = std::chrono::milliseconds(5000);
 
-      BOOST_LOG(debug) << "等待显示器操作稳定，准备进行HDR切换...";
+      BOOST_LOG(debug) << "Waiting for display operations to settle before toggling HDR...";
 
       auto start_time = std::chrono::steady_clock::now();
 
@@ -441,7 +441,7 @@ namespace display_device {
         // 检查是否超时
         auto elapsed = std::chrono::steady_clock::now() - start_time;
         if (elapsed > max_wait_time) {
-          BOOST_LOG(warning) << "等待显示器稳定超时，继续执行HDR切换";
+          BOOST_LOG(warning) << "Timed out waiting for displays to settle, proceeding with the HDR toggle";
           return false;
         }
 
@@ -461,7 +461,7 @@ namespace display_device {
           }
 
           if (modes_stable) {
-            BOOST_LOG(debug) << "显示器操作已稳定，可以进行HDR切换";
+            BOOST_LOG(debug) << "Display operations have settled, the HDR toggle can proceed";
             return true;
           }
         }
@@ -469,7 +469,7 @@ namespace display_device {
         std::this_thread::sleep_for(stability_check_interval);
       }
 
-      BOOST_LOG(warning) << "显示器稳定检查达到最大尝试次数，继续执行HDR切换";
+      BOOST_LOG(warning) << "Display stability check hit the maximum number of attempts, proceeding with the HDR toggle";
       return false;
     }
 
@@ -665,17 +665,17 @@ namespace display_device {
       }
       
       if (skip_vdd_destroy) {
-        BOOST_LOG(debug) << "VDD已由调用方销毁，跳过try_revert_settings中的VDD销毁逻辑";
+        BOOST_LOG(debug) << "VDD was already destroyed by the caller, skipping VDD teardown in try_revert_settings";
       }
       else if (config::video.vdd_keep_enabled) {
-        BOOST_LOG(debug) << "VDD保持启用模式已开启，保留VDD";
+        BOOST_LOG(debug) << "VDD keep-alive mode is enabled, keeping the VDD";
       }
       else if (should_destroy_vdd) {
-        BOOST_LOG(info) << "检测到Sunshine创建的VDD（不在初始拓扑中），销毁VDD";
+        BOOST_LOG(info) << "Detected a Sunshine-created VDD (not in the initial topology), destroying it";
         display_device::session_t::get().destroy_vdd_monitor();
       }
       else if (!vdd_in_initial.empty()) {
-        BOOST_LOG(debug) << "VDD在初始拓扑中（常驻VDD），保留不销毁";
+        BOOST_LOG(debug) << "VDD is part of the initial topology (persistent VDD), leaving it in place";
       }
 
       // Remove VDD devices from topology before reverting, as VDD may have been destroyed
@@ -1094,9 +1094,9 @@ namespace display_device {
 
       // 如果有HDR切换操作，等待其他操作稳定后再进行HDR切换
       if (config.change_hdr_state) {
-        BOOST_LOG(info) << "检测到HDR切换操作，等待其他显示器操作稳定...";
+        BOOST_LOG(info) << "HDR toggle requested, waiting for other display operations to settle...";
         if (!wait_for_display_stability(topology_result->metadata)) {
-          BOOST_LOG(warning) << "显示器稳定检查未完全通过，但继续执行HDR切换";
+          BOOST_LOG(warning) << "Display stability check did not fully pass, proceeding with the HDR toggle anyway";
         }
       }
 
@@ -1181,13 +1181,13 @@ namespace display_device {
 
   bool
   settings_t::revert_settings(revert_reason_e reason, bool skip_vdd_destroy) {
-    static const char *reason_strs[] = { "串流结束", "拓扑切换", "配置清理", "重置持久化" };
+    static const char *reason_strs[] = { "stream ended", "topology switch", "config cleanup", "persistence reset" };
     const char *reason_str = reason_strs[static_cast<int>(reason)];
-    BOOST_LOG(info) << "正在恢复显示设备设置 (原因: " << reason_str << ")";
+    BOOST_LOG(info) << "Reverting display device settings (reason: " << reason_str << ")";
 
     // 加载持久化设置数据
     if (!persistent_data) {
-      BOOST_LOG(info) << "加载显示设备持久化设置";
+      BOOST_LOG(info) << "Loading persisted display device settings";
       persistent_data = load_settings(filepath);
     }
 
@@ -1200,7 +1200,7 @@ namespace display_device {
         if (data_updated) {
           save_settings(filepath, *persistent_data);  // Best effort; retain remaining restore state for retry.
         }
-        BOOST_LOG(error) << "恢复显示设备设置失败！如有异常请尝试关闭基地显示器，或手动修改系统显示设置~";
+        BOOST_LOG(error) << "Failed to revert display device settings! If the display misbehaves, try turning off the virtual display or adjusting the system display settings manually.";
         return false;
       }
 
@@ -1213,7 +1213,7 @@ namespace display_device {
         release_audio_sink();
       }
 
-      BOOST_LOG(info) << "显示设备配置已恢复";
+      BOOST_LOG(info) << "Display device settings reverted";
     }
     return true;
   }

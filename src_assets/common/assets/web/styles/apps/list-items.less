@@ -4,20 +4,15 @@
 .app-list-item {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
+  border-radius: 0;
   content-visibility: auto;
   contain-intrinsic-size: auto 96px;
   overflow: hidden;
-  .glass-effect();
   .transition-default();
-  box-shadow: var(--ui-shadow-sm);
-  animation: fadeIn 0.5s ease;
   touch-action: pan-y;
 
   &:hover {
-    transform: translateX(2px);
     background: var(--ui-surface-hover);
-    box-shadow: var(--ui-shadow-md);
     border-color: var(--ui-border-strong);
   }
 }
@@ -35,7 +30,7 @@
   cursor: grab;
   font-size: var(--font-size-lg);
   padding: 0;
-  border-radius: 10px;
+  border-radius: 0;
   min-width: 44px;
   min-height: 44px;
   touch-action: none;
@@ -46,7 +41,7 @@
 
   &:hover {
     color: var(--ui-text-primary);
-    background: var(--ui-accent-soft);
+    background: var(--ui-surface-hover);
   }
 }
 
@@ -60,20 +55,20 @@
 .app-icon-list {
   width: 60px;
   height: 60px;
-  border-radius: var(--border-radius-md);
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
   object-fit: cover;
-  box-shadow: var(--box-shadow-md);
 }
 
 .app-icon-placeholder-list {
   width: 60px;
   height: 60px;
-  background: linear-gradient(135deg, var(--ui-accent), var(--ui-accent-secondary));
-  border-radius: var(--border-radius-md);
+  background: var(--ui-surface-strong);
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
   .flex-center();
-  color: var(--ui-accent-contrast);
+  color: var(--ui-text-muted);
   font-size: 1.5rem;
-  box-shadow: var(--box-shadow-md);
 }
 
 .app-info-list {
@@ -105,11 +100,11 @@
   font-size: var(--font-size-sm);
   color: var(--ui-text-secondary);
   margin: 0;
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-family-mono);
   background: var(--ui-surface-strong);
   border: 1px solid var(--ui-border);
   padding: 6px 12px;
-  border-radius: var(--border-radius-sm);
+  border-radius: 0;
   .text-ellipsis();
   .transition-default();
   display: flex;
@@ -138,11 +133,6 @@
   &:hover {
     background: var(--ui-surface-hover);
     color: var(--ui-text-primary);
-    transform: translateX(3px);
-  }
-
-  &.copy-success {
-    animation: copySuccess 0.4s ease;
   }
 }
 
@@ -164,9 +154,10 @@
 
 .app-tag-list {
   background: var(--ui-surface-strong);
+  border: 1px solid var(--ui-border);
   color: var(--ui-text-primary);
   padding: 3px 8px;
-  border-radius: var(--border-radius-md);
+  border-radius: 0;
   font-size: var(--font-size-xs);
   font-weight: 500;
   white-space: nowrap;
@@ -180,32 +171,28 @@
   flex-shrink: 0;
 
   .btn {
-    .btn-rounded(38px);
-    color: #fff;
+    .btn-square(38px);
     font-size: var(--font-size-md);
-    backdrop-filter: blur(5px);
   }
 }
 
 .btn-edit-list {
-  background: var(--ui-accent-soft);
+  background: transparent;
   border: 1px solid var(--ui-border-strong);
-  color: var(--ui-accent) !important;
-  .hover-scale();
+  color: var(--ui-text-primary) !important;
 
   &:hover {
-    background: rgba(var(--ui-accent-rgb), 0.22);
+    background: var(--ui-surface-hover);
   }
 }
 
 .btn-delete-list {
-  background: var(--ui-danger-soft);
+  background: transparent;
   border: 1px solid var(--ui-danger-border);
   color: var(--ui-danger-text) !important;
-  .hover-scale();
 
   &:hover {
-    background: rgba(var(--ui-danger-rgb), 0.22);
+    background: var(--ui-danger-soft);
     border-color: var(--ui-danger-border);
     color: var(--ui-danger-text) !important;
   }
@@ -218,8 +205,9 @@
   color: var(--ui-text-muted);
   font-size: var(--font-size-sm);
   padding: 4px 8px;
-  border-radius: 5px;
-  background: var(--ui-accent-soft);
+  border-radius: 0;
+  background: var(--ui-surface-strong);
+  border: 1px solid var(--ui-border);
 }
 
 @media (max-width: 576px) {
@@ -273,22 +261,21 @@
   }
 }
 
-// List drag states
+// List drag states: opacity and outline only, no tilt and no shadow.
 .app-list-item-dragging {
   opacity: 0.8;
 }
 .app-list-item-ghost {
   opacity: 0.3;
-  background: rgba(255, 255, 255, 0.05) !important;
 }
 .app-list-item-chosen {
-  transform: scale(1.02);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3) !important;
+  outline: 2px solid var(--ui-border-strong);
+  outline-offset: 0;
   z-index: 1000;
 }
 .app-list-item-drag {
-  transform: rotate(2deg) scale(1.03);
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4) !important;
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 0;
 }
 
 // ============================================================================

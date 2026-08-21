@@ -47,21 +47,11 @@ function normalizeLocale(raw) {
   return LANGUAGE_NAMES[primary] ? primary : 'en'
 }
 
+// The product is English-only, so the locale is fixed rather than negotiated.
+// This used to fall back to navigator.languages when the <html lang> attribute
+// was missing, which meant a browser configured for another language could still
+// steer AI prompts - and the callers that branch on the result - away from English.
 export function getCurrentLocale() {
-  if (typeof document !== 'undefined') {
-    const htmlLang = document.documentElement?.getAttribute('lang')
-    if (htmlLang) return normalizeLocale(htmlLang)
-  }
-
-  if (typeof navigator !== 'undefined') {
-    if (Array.isArray(navigator.languages) && navigator.languages.length > 0) {
-      return normalizeLocale(navigator.languages[0])
-    }
-    if (navigator.language) {
-      return normalizeLocale(navigator.language)
-    }
-  }
-
   return 'en'
 }
 

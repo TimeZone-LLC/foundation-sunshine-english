@@ -1655,19 +1655,46 @@ namespace video {
     return std::isfinite(nits) && nits >= 50.0f && nits <= 1000.0f;
   }
 
+  // Capture and display creation can fail for a while without the failure being
+  // permanent: the host may be sitting on the lock screen or the secure desktop, or
+  // the GPU and monitor topology may still be settling after a resume from sleep.
+  // These constants control how long and how aggressively we keep retrying before
+  // a failure is treated as fatal for the capture thread.
+  constexpr auto capture_retry_min_delay = 100ms;
+  constexpr auto capture_retry_max_delay = 5s;
+  constexpr auto capture_retry_window = 60s;
+  constexpr int reset_display_max_attempts = 3;
+
+  /**
+   * @brief Compute the exponential backoff delay for a capture or display retry.
+   * @param attempt Number of consecutive failures so far, starting at 1.
+   * @return The delay to wait before the next attempt, capped at `capture_retry_max_delay`.
+   */
+  std::chrono::milliseconds
+  capture_retry_delay(int attempt) {
+    auto delay = capture_retry_min_delay;
+    for (int x = 1; x < attempt && delay < capture_retry_max_delay; ++x) {
+      delay *= 2;
+    }
+    return std::min<std::chrono::milliseconds>(delay, capture_retry_max_delay);
+  }
+
   void
   reset_display(std::shared_ptr<platf::display_t> &disp, const platf::mem_type_e &type, const std::string &display_name, const config_t &config) {
-    // We try this twice, in case we still get an error on reinitialization
-    for (int x = 0; x < 2; ++x) {
+    // Retry a few times with backoff, in case we still get an error on reinitialization
+    for (int x = 1; x <= reset_display_max_attempts; ++x) {
       disp.reset();
       disp = platf::display(type, display_name, config);
       if (disp) {
-        BOOST_LOG(debug) << "[reset_display] 成功重置显示器: " << display_name;
+        BOOST_LOG(debug) << "[reset_display] Display reset succeeded: "sv << display_name;
         break;
       }
-      BOOST_LOG(debug) << "[reset_display] 显示器创建失败 (尝试 " << (x + 1) << "/2): " << display_name;
+
       // The capture code depends on us to sleep between failures
-      std::this_thread::sleep_for(200ms);
+      const auto delay = capture_retry_delay(x);
+      BOOST_LOG(debug) << "[reset_display] Display creation failed (attempt "sv << x << '/' << reset_display_max_attempts
+                       << ") for ["sv << display_name << "], retrying in "sv << delay.count() << "ms"sv;
+      std::this_thread::sleep_for(delay);
     }
   }
 
@@ -1796,9 +1823,33 @@ namespace video {
       target_display_name = display_names[display_p];
     }
 
-    auto disp = platf::display(encoder.platform_formats->dev_type, target_display_name, config);
-    if (!disp) {
-      return;
+    // The display can be unavailable for a while when a stream is started at the lock
+    // screen or during the settling window after a resume from sleep. Retry with
+    // backoff instead of killing the session on the very first failure.
+    std::shared_ptr<platf::display_t> disp;
+    {
+      const auto give_up_at = std::chrono::steady_clock::now() + capture_retry_window;
+      for (int attempt = 1; capture_ctx_queue->running(); ++attempt) {
+        disp = platf::display(encoder.platform_formats->dev_type, target_display_name, config);
+        if (disp) {
+          break;
+        }
+
+        if (std::chrono::steady_clock::now() >= give_up_at) {
+          BOOST_LOG(error) << "Failed to create display ["sv << target_display_name << "] after "sv << attempt
+                           << " attempts, giving up on this capture thread"sv;
+          return;
+        }
+
+        const auto delay = capture_retry_delay(attempt);
+        BOOST_LOG(debug) << "Initial display creation failed for ["sv << target_display_name << "] (attempt "sv
+                         << attempt << "), retrying in "sv << delay.count() << "ms"sv;
+        std::this_thread::sleep_for(delay);
+      }
+
+      if (!disp) {
+        return;
+      }
     }
     active_display_event->raise(target_display_name);
     display_wp = disp;
@@ -1930,6 +1981,13 @@ namespace video {
     // Capture takes place on this thread
     platf::adjust_thread_priority(platf::thread_priority_e::critical);
 
+    // A capture error is usually transient (lock screen, secure desktop switch, GPU
+    // still recovering from a resume), so it is retried like a reinit request. Only a
+    // failure that persists for `capture_retry_window` tears the sessions down.
+    int consecutive_capture_errors = 0;
+    std::chrono::steady_clock::time_point first_capture_error {};
+    std::chrono::steady_clock::time_point last_capture_error {};
+
     while (capture_ctx_queue->running()) {
       bool artificial_reinit = false;
 
@@ -1954,6 +2012,9 @@ namespace video {
         }
 
         if (frame_captured) {
+          // Capture is healthy again, so a later failure starts a fresh retry window.
+          consecutive_capture_errors = 0;
+
           latest_captured_img = img;
           for (auto &capture_ctx : capture_ctxs) {
             capture_ctx.images->raise(captured_frame_t {
@@ -1975,6 +2036,37 @@ namespace video {
       if (artificial_reinit && status != platf::capture_e::error) {
         status = platf::capture_e::reinit;
 
+        artificial_reinit = false;
+      }
+
+      if (status == platf::capture_e::error) {
+        const auto now = std::chrono::steady_clock::now();
+
+        // Retries are at most `capture_retry_max_delay` apart, so a much larger gap means
+        // capture worked in between. That is a new incident, not a continuing failure.
+        if (consecutive_capture_errors > 0 && now - last_capture_error >= capture_retry_window) {
+          consecutive_capture_errors = 0;
+        }
+        if (consecutive_capture_errors == 0) {
+          first_capture_error = now;
+        }
+        ++consecutive_capture_errors;
+        last_capture_error = now;
+
+        const auto failing_for = std::chrono::duration_cast<std::chrono::seconds>(now - first_capture_error);
+        if (now - first_capture_error >= capture_retry_window) {
+          BOOST_LOG(error) << "Capture has been failing for "sv << failing_for.count() << "s ("sv
+                           << consecutive_capture_errors << " consecutive errors), giving up on this capture thread"sv;
+          return;
+        }
+
+        const auto delay = capture_retry_delay(consecutive_capture_errors);
+        BOOST_LOG(debug) << "Capture error #"sv << consecutive_capture_errors << " (failing for "sv
+                         << failing_for.count() << "s), retrying capture in "sv << delay.count() << "ms"sv;
+        std::this_thread::sleep_for(delay);
+
+        // Recover through the same path as an explicit reinitialization request.
+        status = platf::capture_e::reinit;
         artificial_reinit = false;
       }
 
@@ -2018,6 +2110,7 @@ namespace video {
             return;
           }
 
+          int reinit_attempt = 0;
           while (capture_ctx_queue->running()) {
             // Release the display before reenumerating displays, since some capture backends
             // only support a single display session per device/application.
@@ -2067,9 +2160,21 @@ namespace video {
             // reset_display() will sleep between retries
             reset_display(disp, encoder.platform_formats->dev_type, target_display_name, config);
             if (disp) {
+              if (reinit_attempt > 0) {
+                BOOST_LOG(info) << "Display ["sv << target_display_name << "] recovered after "sv
+                                << reinit_attempt << " failed reinitialization rounds"sv;
+              }
               active_display_event->raise(target_display_name);
               break;
             }
+
+            // Recovery can take a long time (resume from sleep, secure desktop), so back
+            // off instead of re-enumerating displays as fast as the CPU allows.
+            ++reinit_attempt;
+            const auto delay = capture_retry_delay(reinit_attempt);
+            BOOST_LOG(debug) << "Display reinitialization round "sv << reinit_attempt << " failed for ["sv
+                             << target_display_name << "], retrying in "sv << delay.count() << "ms"sv;
+            std::this_thread::sleep_for(delay);
           }
           if (!disp) {
             return;
@@ -2080,7 +2185,8 @@ namespace video {
           reinit_event.reset();
           continue;
         }
-        case platf::capture_e::error:
+        // capture_e::error never reaches this switch: it is converted into a
+        // reinitialization request above until the retry window is exhausted.
         case platf::capture_e::ok:
         case platf::capture_e::timeout:
         case platf::capture_e::interrupted:
@@ -4396,7 +4502,7 @@ namespace video {
       }
     }
 
-    BOOST_LOG(info) << "Testing for available encoders - Errors during this phase can be ignored (测试可用编码器 - 此阶段的错误可以忽略)";
+    BOOST_LOG(info) << "Testing for available encoders - Errors during this phase can be ignored";
 
     // If we haven't found an encoder yet, but we want one with specific codec support, search for that now.
     if (chosen_encoder == nullptr && (active_hevc_mode >= 2 || active_av1_mode >= 2)) {
@@ -4495,7 +4601,7 @@ namespace video {
       return -1;
     }
 
-    BOOST_LOG(info) << "Ignore any errors, Encoder testing completed (忽略任何错误，编码器测试完成)";
+    BOOST_LOG(info) << "Ignore any errors, Encoder testing completed";
 
     auto &encoder = *chosen_encoder;
     active_encoder_for_status.store(chosen_encoder, std::memory_order_release);

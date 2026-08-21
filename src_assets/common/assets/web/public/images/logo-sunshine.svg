@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor" role="img" aria-label="Sunshine">
+  <!-- Brutalist sun: one solid core square with four square rays. Flat, hard
+       edged, monochrome, and painted with currentColor so it inverts with the
+       theme. No gradients, no rounded corners, no filters. -->
+  <rect x="8" y="8" width="8" height="8"/>
+  <rect x="10" y="1" width="4" height="4"/>
+  <rect x="10" y="19" width="4" height="4"/>
+  <rect x="1" y="10" width="4" height="4"/>
+  <rect x="19" y="10" width="4" height="4"/>
+</svg>

@@ -29,16 +29,16 @@ namespace platf {
   int
   dsu_server_t::start() {
     if (running_) {
-      BOOST_LOG(warning) << "DSU服务器已经在运行中";
+      BOOST_LOG(warning) << "DSU server is already running";
       return 0;
     }
 
     try {
       // 检查端口是否可用
-      BOOST_LOG(info) << "DSU服务器正在启动，端口: " << port_;
+      BOOST_LOG(info) << "DSU server starting on port: " << port_;
 
       if (!is_port_available(port_)) {
-        BOOST_LOG(warning) << "端口 " << port_ << " 可能被占用，尝试继续启动...";
+        BOOST_LOG(warning) << "Port " << port_ << " may be in use, attempting to start anyway...";
       }
 
       // 绑定到指定端口
@@ -57,7 +57,7 @@ namespace platf {
       SOCKET native_socket = socket_.native_handle();
       WSAIoctl(native_socket, SIO_UDP_CONNRESET, &bNewBehavior, sizeof(bNewBehavior),
         NULL, 0, &dwBytesReturned, NULL, NULL);
-      BOOST_LOG(debug) << "DSU服务器已禁用Windows UDP连接重置 (SIO_UDP_CONNRESET)";
+      BOOST_LOG(debug) << "DSU server disabled Windows UDP connection reset (SIO_UDP_CONNRESET)";
 
       // 尝试绑定端口
       boost::asio::ip::udp::endpoint endpoint(boost::asio::ip::udp::v4(), port_);
@@ -68,25 +68,25 @@ namespace platf {
       // 启动服务器线程
       server_thread_ = std::thread(&dsu_server_t::server_loop, this);
 
-      BOOST_LOG(info) << "DSU服务器启动成功，监听端口: " << port_
+      BOOST_LOG(info) << "DSU server started, listening on port: " << port_
                       << " (IP: " << endpoint.address().to_string() << ")";
       return 0;
     }
     catch (const boost::system::system_error &e) {
-      BOOST_LOG(error) << "DSU服务器启动失败: " << e.what()
-                       << " (错误代码: " << e.code().value() << ")";
+      BOOST_LOG(error) << "DSU server failed to start: " << e.what()
+                       << " (error code: " << e.code().value() << ")";
 
       if (e.code() == boost::asio::error::address_in_use) {
-        BOOST_LOG(error) << "端口 " << port_ << " 已被占用，请尝试使用其他端口";
+        BOOST_LOG(error) << "Port " << port_ << " is already in use, try a different port";
       }
       else if (e.code() == boost::asio::error::access_denied) {
-        BOOST_LOG(error) << "访问被拒绝，请检查防火墙设置或管理员权限";
+        BOOST_LOG(error) << "Access denied, check the firewall settings or administrator privileges";
       }
 
       return -1;
     }
     catch (const std::exception &e) {
-      BOOST_LOG(error) << "DSU服务器启动失败: " << e.what();
+      BOOST_LOG(error) << "DSU server failed to start: " << e.what();
       return -1;
     }
   }
@@ -112,7 +112,7 @@ namespace platf {
     // 清理客户端列表
     clients_.clear();
 
-    BOOST_LOG(info) << "DSU服务器已停止";
+    BOOST_LOG(info) << "DSU server stopped";
   }
 
   void
@@ -120,7 +120,7 @@ namespace platf {
     auto last_cleanup = std::chrono::steady_clock::now();
     const auto cleanup_interval = std::chrono::milliseconds(500);  // 每500ms清理一次，匹配cemuhook的MAIN_SLEEP_TIME_M
 
-    BOOST_LOG(debug) << "DSU服务器主循环开始";
+    BOOST_LOG(debug) << "DSU server main loop started";
 
     while (running_) {
       try {
@@ -137,11 +137,11 @@ namespace platf {
           // 忽略Windows UDP socket的10054错误（远程主机强制关闭连接）
           // 这是Windows的已知bug，客户端断开连接时会触发此错误
           if (ec.value() != 10054) {
-            BOOST_LOG(warning) << "DSU服务器接收数据错误: " << ec.message()
-                               << " (错误代码: " << ec.value() << ")";
+            BOOST_LOG(warning) << "DSU server receive error: " << ec.message()
+                               << " (error code: " << ec.value() << ")";
           }
           else {
-            BOOST_LOG(debug) << "DSU服务器忽略Windows UDP连接重置错误 (10054)";
+            BOOST_LOG(debug) << "DSU server ignoring Windows UDP connection reset error (10054)";
           }
         }
 
@@ -157,12 +157,12 @@ namespace platf {
       }
       catch (const std::exception &e) {
         if (running_) {
-          BOOST_LOG(error) << "DSU服务器异常: " << e.what();
+          BOOST_LOG(error) << "DSU server exception: " << e.what();
         }
       }
     }
 
-    BOOST_LOG(debug) << "DSU服务器主循环结束";
+    BOOST_LOG(debug) << "DSU server main loop finished";
   }
 
   void
@@ -173,20 +173,20 @@ namespace platf {
 
     if (ec) {
       if (ec != boost::asio::error::operation_aborted) {
-        BOOST_LOG(warning) << "DSU服务器接收数据错误: " << ec.message()
-                           << " (错误代码: " << ec.value() << ")";
+        BOOST_LOG(warning) << "DSU server receive error: " << ec.message()
+                           << " (error code: " << ec.value() << ")";
       }
       return;
     }
 
     if (bytes_transferred < 4) {
-      BOOST_LOG(warning) << "DSU服务器收到过小的数据包: " << bytes_transferred << " 字节";
+      BOOST_LOG(warning) << "DSU server received an undersized packet: " << bytes_transferred << " bytes";
       return;
     }
 
     // 解析Header（前16字节）
     if (bytes_transferred < 16) {
-      BOOST_LOG(warning) << "DSU服务器收到过小的数据包: " << bytes_transferred << " 字节";
+      BOOST_LOG(warning) << "DSU server received an undersized packet: " << bytes_transferred << " bytes";
       return;
     }
 
@@ -203,7 +203,7 @@ namespace platf {
         break;
 
       default:
-        BOOST_LOG(debug) << "DSU服务器收到未知消息类型: 0x" << std::hex << message_type;
+        BOOST_LOG(debug) << "DSU server received unknown message type: 0x" << std::hex << message_type;
         break;
     }
   }
@@ -212,7 +212,7 @@ namespace platf {
   dsu_server_t::handle_info_request(const boost::asio::ip::udp::endpoint &client_endpoint,
     const uint8_t *data, std::size_t size) {
     if (size < 20) {  // 至少需要16字节Header + 4字节消息类型
-      BOOST_LOG(warning) << "DSU服务器收到过小的INFO请求: " << size << " 字节";
+      BOOST_LOG(warning) << "DSU server received an undersized INFO request: " << size << " bytes";
       return;
     }
 
@@ -223,9 +223,9 @@ namespace platf {
     uint8_t slot = *(data + 16 + 4);  // 跳过消息类型，读取槽位
 
     // INFO请求不管理客户端连接，只响应信息（匹配cemuhook行为）
-    BOOST_LOG(debug) << "DSU服务器收到INFO请求 - 客户端ID: " << client_id
-                     << ", 槽位: " << (int) slot
-                     << ", 当前客户端总数: " << clients_.size();
+    BOOST_LOG(debug) << "DSU server received INFO request - client ID: " << client_id
+                     << ", slot: " << (int) slot
+                     << ", total clients: " << clients_.size();
 
     memset(&info_packet_, 0, sizeof(info_packet_));
 
@@ -257,20 +257,20 @@ namespace platf {
     // 使用通用函数计算CRC32并发送
     send_packet_with_crc(client_endpoint, &info_packet_, sizeof(info_packet_));
 
-    BOOST_LOG(debug) << "DSU服务器发送INFO响应 - 客户端ID: " << client_id
-                     << ", 槽位: " << (int) slot
-                     << ", 槽位状态: " << (int) info_packet_.shared.slot_state
-                     << ", 设备型号: " << (int) info_packet_.shared.device_model
-                     << ", 连接类型: " << (int) info_packet_.shared.connection_type
-                     << ", 电池状态: " << (int) info_packet_.shared.battery_status
-                     << ", 响应大小: " << sizeof(info_packet_) << " 字节";
+    BOOST_LOG(debug) << "DSU server sent INFO response - client ID: " << client_id
+                     << ", slot: " << (int) slot
+                     << ", slot state: " << (int) info_packet_.shared.slot_state
+                     << ", device model: " << (int) info_packet_.shared.device_model
+                     << ", connection type: " << (int) info_packet_.shared.connection_type
+                     << ", battery status: " << (int) info_packet_.shared.battery_status
+                     << ", response size: " << sizeof(info_packet_) << " bytes";
   }
 
   void
   dsu_server_t::handle_data_request(const boost::asio::ip::udp::endpoint &client_endpoint,
     const uint8_t *data, std::size_t size) {
     if (size < 20) {  // 至少需要16字节Header + 4字节消息类型
-      BOOST_LOG(warning) << "DSU服务器收到过小的数据包请求: " << size << " 字节";
+      BOOST_LOG(warning) << "DSU server received an undersized data request: " << size << " bytes";
       return;
     }
 
@@ -288,11 +288,11 @@ namespace platf {
     if (it == clients_.end()) {
       // 新客户端
       clients_[client_key] = client_info_t(client_endpoint, controller_id, client_id);
-      BOOST_LOG(debug) << "DSU服务器新客户端订阅数据 - 客户端ID: " << client_id
-                       << ", 槽位: " << (int) slot
-                       << ", 客户端: " << client_endpoint.address().to_string()
+      BOOST_LOG(debug) << "DSU server new client subscribed to data - client ID: " << client_id
+                       << ", slot: " << (int) slot
+                       << ", client: " << client_endpoint.address().to_string()
                        << ":" << client_endpoint.port()
-                       << ", 当前客户端总数: " << clients_.size();
+                       << ", total clients: " << clients_.size();
     }
     else {
       // 现有客户端，重置超时计数器（匹配cemuhook行为）
@@ -307,7 +307,7 @@ namespace platf {
       socket_.send_to(boost::asio::buffer(data, size), client_endpoint);
     }
     catch (const std::exception &e) {
-      BOOST_LOG(warning) << "DSU服务器发送数据包失败: " << e.what();
+      BOOST_LOG(warning) << "DSU server failed to send packet: " << e.what();
     }
   }
 
@@ -378,8 +378,8 @@ namespace platf {
       motion.accel_y = accel_y;
       motion.accel_z = accel_z;
       motion.has_accel = true;
-      BOOST_LOG(debug) << "DSU服务器更新加速度数据 - 控制器ID: " << controller_id
-                       << ", 加速度: (" << accel_x << ", " << accel_y << ", " << accel_z << ")";
+      BOOST_LOG(debug) << "DSU server updated accelerometer data - controller ID: " << controller_id
+                       << ", acceleration: (" << accel_x << ", " << accel_y << ", " << accel_z << ")";
     }
 
     // 总是更新陀螺仪数据（如果提供了非零值）
@@ -388,8 +388,8 @@ namespace platf {
       motion.gyro_y = gyro_y;
       motion.gyro_z = gyro_z;
       motion.has_gyro = true;
-      BOOST_LOG(debug) << "DSU服务器更新陀螺仪数据 - 控制器ID: " << controller_id
-                       << ", 角速度: (" << gyro_x << ", " << gyro_y << ", " << gyro_z << ")";
+      BOOST_LOG(debug) << "DSU server updated gyroscope data - controller ID: " << controller_id
+                       << ", angular velocity: (" << gyro_x << ", " << gyro_y << ", " << gyro_z << ")";
     }
 
     // 只有当有运动数据时才发送
@@ -445,7 +445,7 @@ namespace platf {
     data_packet_.motion.gyroscope_roll = motion.gyro_z;     // roll对应gyro_z
 
     if (clients_.empty()) {
-      BOOST_LOG(debug) << "DSU服务器没有连接的客户端，跳过运动数据发送";
+      BOOST_LOG(debug) << "DSU server has no connected clients, skipping motion data";
       return;
     }
 
@@ -467,7 +467,7 @@ namespace platf {
     while (it != clients_.end()) {
       it->second.sendTimeout++;
       if (it->second.sendTimeout >= CLIENT_TIMEOUT) {
-        BOOST_LOG(debug) << "DSU服务器清理超时客户端: " << it->first;
+        BOOST_LOG(debug) << "DSU server removing timed-out client: " << it->first;
         it = clients_.erase(it);
       }
       else {

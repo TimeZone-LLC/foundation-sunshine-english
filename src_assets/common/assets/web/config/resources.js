@@ -1,49 +1,23 @@
+/*
+ * Outbound link data.
+ *
+ * The home page no longer advertises anything: the resource card that used to
+ * render the official-site, tutorial, community and third-party-client lists is
+ * gone, and so are those lists. What is left is only what still has a caller:
+ *
+ *   CLIENT_RESOURCES / FEATURED_RESOURCES / HARMONY_CLIENT_URL
+ *       - the first-run Setup Wizard, which still points a new user at a client.
+ *   LEGAL_RESOURCES
+ *       - licence and third-party-notice targets, pinned by externalLinks.test.js.
+ *
+ * Do not reintroduce a list here without a screen that renders it.
+ */
 export const HARMONY_CLIENT_URL = 'https://github.com/AlkaidLab/moonlight-harmony'
 
 const ALKAIDLAB_WEBSITE_URL = 'https://www.alkaidlab.com/'
 const ALKAIDLAB_WEBSITE_ZH_URL = 'https://www.alkaidlab.cn/'
 const VOIDLINK_APP_STORE_URL = 'https://apps.apple.com/us/app/voidlink-extreme/id6755103808'
 const VOIDLINK_APP_STORE_ZH_URL = 'https://apps.apple.com/cn/app/voidlink/id6747717070'
-
-export const OFFICIAL_RESOURCES = [
-  {
-    id: 'official-website',
-    href: ALKAIDLAB_WEBSITE_URL,
-    zhHref: ALKAIDLAB_WEBSITE_ZH_URL,
-    icon: 'fas fa-globe',
-    titleKey: 'resource_card.official_website_title',
-    variant: 'accent',
-  },
-  {
-    id: 'foundation-github',
-    href: 'https://github.com/AlkaidLab/foundation-sunshine',
-    icon: 'fab fa-github',
-    title: 'Foundation Sunshine',
-    descriptionKey: 'resource_card.open_source_desc',
-    variant: 'github',
-    arrowIcon: 'fas fa-star',
-    arrowClass: 'text-warning',
-  },
-]
-
-export const QUICK_START_RESOURCES = [
-  {
-    id: 'tutorial',
-    href: 'https://docs.qq.com/aio/DSGdQc3htbFJjSFdO',
-    icon: 'fas fa-file-alt',
-    titleKey: 'resource_card.tutorial',
-    descriptionKey: 'resource_card.tutorial_desc',
-    variant: 'accent',
-  },
-  {
-    id: 'community-group',
-    href: 'https://qm.qq.com/q/3tWBFVNZ',
-    icon: 'fab fa-qq',
-    titleKey: 'resource_card.join_group',
-    descriptionKey: 'resource_card.join_group_desc',
-    variant: 'accent-alt',
-  },
-]
 
 export const CLIENT_RESOURCES = [
   {
@@ -91,52 +65,6 @@ export const CLIENT_RESOURCES = [
   },
 ]
 
-export const COMMUNITY_RESOURCES = [
-  {
-    id: 'crown-edition',
-    href: 'https://github.com/WACrown/moonlight-android',
-    icon: 'fas fa-crown',
-    titleKey: 'resource_card.crown_edition',
-    descriptionKey: 'resource_card.crown_edition_desc',
-    variant: 'android',
-  },
-  {
-    id: 'moonlight-ohos',
-    href: 'https://gitee.com/smdsbz/moonlight-ohos',
-    icon: 'fas fa-mobile-alt',
-    titleKey: 'resource_card.moonlight_ohos',
-    descriptionKey: 'resource_card.moonlight_ohos_desc',
-    variant: 'harmony',
-  },
-]
-
-export const HOME_RESOURCE_GROUPS = [
-  {
-    id: 'official',
-    titleKey: 'resource_card.official_website',
-    icon: 'fas fa-globe',
-    items: OFFICIAL_RESOURCES,
-  },
-  {
-    id: 'quick-start',
-    titleKey: 'resource_card.quick_start',
-    icon: 'fas fa-rocket',
-    items: QUICK_START_RESOURCES,
-  },
-  {
-    id: 'clients',
-    titleKey: 'resource_card.client_downloads',
-    icon: 'fas fa-download',
-    items: CLIENT_RESOURCES,
-  },
-  {
-    id: 'community',
-    titleKey: 'resource_card.third_party_moonlight',
-    icon: 'fas fa-code-branch',
-    items: COMMUNITY_RESOURCES,
-  },
-]
-
 export const LEGAL_RESOURCES = [
   {
     id: 'license',
@@ -171,7 +99,7 @@ export const FEATURED_RESOURCES = [
     id: 'natpierce',
     href: 'https://docs.qq.com/aio/DRFVhWERDaFhKd1ZE',
     imageSrc: '/images/logo-natpierce.png',
-    imageAlt: '皎月连',
+    imageAlt: 'Natpierce',
     titleKey: 'resource_card.jiaoyuelian_title',
     descriptionKey: 'resource_card.jiaoyuelian_desc',
     variant: 'moonlink',

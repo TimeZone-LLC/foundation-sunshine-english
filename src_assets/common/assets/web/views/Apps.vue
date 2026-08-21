@@ -29,7 +29,7 @@
               class="view-toggle-btn"
               :class="{ active: viewMode === 'grid' }"
               @click="viewMode = 'grid'"
-              title="网格视图"
+              title="Grid view"
             >
               <i class="fas fa-th"></i>
             </button>
@@ -37,17 +37,17 @@
               class="view-toggle-btn"
               :class="{ active: viewMode === 'list' }"
               @click="viewMode = 'list'"
-              title="列表视图"
+              title="List view"
             >
               <i class="fas fa-list"></i>
             </button>
           </div>
 
-          <button class="cute-btn cute-btn-primary" @click="newApp" :title="$t('apps.add_new')">
+          <button class="tool-btn tool-btn-primary" @click="newApp" :title="$t('apps.add_new')">
             <i class="fas fa-plus"></i>
           </button>
           <button
-            class="cute-btn cute-btn-secondary"
+            class="tool-btn tool-btn-secondary"
             type="button"
             @click="restoreDefaultApps"
             :disabled="isSaving"
@@ -57,8 +57,8 @@
             <i class="fas fa-rotate-left"></i>
           </button>
           <button
-            class="cute-btn"
-            :class="selectionMode ? 'cute-btn-primary' : 'cute-btn-secondary'"
+            class="tool-btn"
+            :class="selectionMode ? 'tool-btn-primary' : 'tool-btn-secondary'"
             type="button"
             :aria-pressed="selectionMode"
             :aria-label="$t('apps.batch_select_toggle')"
@@ -69,16 +69,16 @@
           </button>
           <button
             v-if="isTauriEnv()"
-            class="cute-btn cute-btn-secondary"
+            class="tool-btn tool-btn-secondary"
             @click="openScanOptions"
             :disabled="isScanning || scanProgress.active"
-            title="扫描游戏平台库 (Steam/Epic/GOG)"
-            aria-label="扫描游戏平台库 (Steam/Epic/GOG)"
+            title="Scan game platform libraries (Steam/Epic/GOG)"
+            aria-label="Scan game platform libraries (Steam/Epic/GOG)"
           >
             <i class="fas" :class="isScanning || scanProgress.active ? 'fa-spinner fa-spin' : 'fa-gamepad'"></i>
           </button>
           <button
-            class="cute-btn cute-btn-secondary"
+            class="tool-btn tool-btn-secondary"
             type="button"
             data-bs-toggle="modal"
             data-bs-target="#envVarsModal"
@@ -88,7 +88,7 @@
             <i class="fas fa-info-circle"></i>
           </button>
           <button 
-            class="cute-btn cute-btn-primary"
+            class="tool-btn tool-btn-primary"
             :class="{ 'has-changes': hasUnsavedChanges }"
             @click="save" 
             :disabled="!hasUnsavedChanges || isSaving"
@@ -314,8 +314,8 @@
           <div class="empty-icon">
             <i class="fas fa-search"></i>
           </div>
-          <h3 class="empty-title">未找到匹配的应用</h3>
-          <p class="empty-subtitle">尝试使用不同的搜索关键词</p>
+          <h3 class="empty-title">No matching applications</h3>
+          <p class="empty-subtitle">Try a different search term</p>
         </div>
 
         <!-- 空状态 - 无应用 -->
@@ -323,8 +323,8 @@
           <div class="empty-icon">
             <i class="fas fa-rocket"></i>
           </div>
-          <h3 class="empty-title">暂无应用</h3>
-          <p class="empty-subtitle">点击下方按钮添加第一个应用</p>
+          <h3 class="empty-title">No applications yet</h3>
+          <p class="empty-subtitle">Add your first application with the button below</p>
           <button class="btn btn-primary" @click="newApp">
             <i class="fas fa-plus me-1"></i>{{ $t('apps.add_new') }}
           </button>
@@ -369,32 +369,32 @@
           <div class="scan-options-modal">
             <div class="scan-options-header">
               <h5>
-                <i class="fas fa-gamepad me-2"></i>扫描游戏资源
+                <i class="fas fa-gamepad me-2"></i>Scan for games
               </h5>
               <button class="btn-close" type="button" aria-label="Close" @click="closeScanOptions"></button>
             </div>
 
             <div class="scan-options-body">
               <section class="scan-options-section">
-                <div class="scan-options-title">扫描范围</div>
+                <div class="scan-options-title">Scan scope</div>
                 <label class="scan-option-row">
                   <input v-model="scanOptions.scope" type="radio" value="libraries" />
                   <span>
-                    <strong>游戏平台库</strong>
-                    <small>扫描已安装的 Steam、Epic Games 和 GOG 游戏</small>
+                    <strong>Game platform libraries</strong>
+                    <small>Scan installed Steam, Epic Games and GOG titles</small>
                   </span>
                 </label>
                 <label class="scan-option-row">
                   <input v-model="scanOptions.scope" type="radio" value="directory" />
                   <span>
-                    <strong>自选目录</strong>
-                    <small>选择一个本地目录，扫描其中的可启动程序</small>
+                    <strong>Custom directory</strong>
+                    <small>Pick a local folder and scan it for launchable programs</small>
                   </span>
                 </label>
               </section>
 
               <section v-if="scanOptions.scope === 'libraries'" class="scan-options-section">
-                <div class="scan-options-title">游戏平台</div>
+                <div class="scan-options-title">Game platforms</div>
                 <div class="scan-platform-grid">
                   <label v-for="platformOption in scanPlatformOptions" :key="platformOption.id" class="scan-pill-toggle">
                     <input v-model="scanOptions.platforms[platformOption.id]" type="checkbox" />
@@ -404,18 +404,18 @@
               </section>
 
               <section v-if="scanOptions.scope === 'directory'" class="scan-options-section">
-                <div class="scan-options-title">目录扫描</div>
+                <div class="scan-options-title">Directory scan</div>
                 <label class="scan-option-row scan-option-row--compact">
                   <input v-model="scanOptions.extractIcons" type="checkbox" />
                   <span>
-                    <strong>提取应用图标</strong>
-                    <small>扫描速度会稍慢，但结果更容易辨认</small>
+                    <strong>Extract application icons</strong>
+                    <small>Slower to scan, but the results are easier to recognize</small>
                   </span>
                 </label>
               </section>
 
               <section class="scan-options-section">
-                <div class="scan-options-title">AI 增强</div>
+                <div class="scan-options-title">AI enhancement</div>
                 <div class="scan-enhancement-list">
                   <label
                     v-for="skill in selectableGameLibrarySkills"
@@ -429,7 +429,7 @@
                     />
                     <span>
                       <strong>{{ getGameLibrarySkillLabel(skill.skillId) }}</strong>
-                      <small>作为扫描后的增强步骤执行</small>
+                      <small>Runs as a post-scan enhancement step</small>
                     </span>
                     <i class="fas scan-option-icon" :class="getGameLibrarySkillIcon(skill.skillId)"></i>
                   </label>
@@ -439,11 +439,11 @@
 
             <div class="scan-options-footer">
               <button class="btn btn-secondary" type="button" :disabled="isScanning" @click="closeScanOptions">
-                取消
+                Cancel
               </button>
               <button class="btn btn-primary" type="button" :disabled="isScanning" @click="runConfiguredScan">
                 <i class="fas me-1" :class="isScanning ? 'fa-spinner fa-spin' : 'fa-search'"></i>
-                开始扫描
+                Start scan
               </button>
             </div>
           </div>
@@ -462,7 +462,7 @@
                 type="button"
                 class="btn-close"
                 data-bs-dismiss="modal"
-                :aria-label="$t('_common.close') || '关闭'"
+                :aria-label="$t('_common.close') || 'Close'"
               ></button>
             </div>
             <div class="modal-body">
@@ -535,7 +535,7 @@ sh -c "displayplacer "id:&lt;screenId&gt; res:${SUNSHINE_CLIENT_WIDTH}x${SUNSHIN
                 <i class="fas fa-external-link-alt me-1"></i>{{ $t('_common.see_more') }}
               </a>
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                <i class="fas fa-times me-1"></i>{{ $t('_common.close') || '关闭' }}
+                <i class="fas fa-times me-1"></i>{{ $t('_common.close') || 'Close' }}
               </button>
             </div>
           </div>
@@ -554,7 +554,7 @@ sh -c "displayplacer "id:&lt;screenId&gt; res:${SUNSHINE_CLIENT_WIDTH}x${SUNSHIN
             <button
               type="button"
               class="btn-close delete-app-close"
-              :aria-label="$t('_common.close') || '关闭'"
+              :aria-label="$t('_common.close') || 'Close'"
               @click="cancelDeleteApp"
             ></button>
           </div>
@@ -581,7 +581,7 @@ sh -c "displayplacer "id:&lt;screenId&gt; res:${SUNSHINE_CLIENT_WIDTH}x${SUNSHIN
             <button
               type="button"
               class="btn-close delete-app-close"
-              :aria-label="$t('_common.close') || '关闭'"
+              :aria-label="$t('_common.close') || 'Close'"
               @click="cancelBatchDelete"
             ></button>
           </div>

@@ -5,7 +5,7 @@
   >
     <div class="container-fluid">
       <a class="navbar-brand brand-enhanced" href="/" title="Sunshine">
-        <img src="/images/logo-sunshine-256.png" height="50" alt="Sunshine-Foundation" class="brand-logo" />
+        <BrandMark :size="24" />
       </a>
       <button
         class="navbar-toggler"
@@ -32,7 +32,6 @@
           </li>
         </ul>
         <div class="navbar-utilities ms-md-2">
-          <ThemeToggle />
           <AccountMenu />
         </div>
       </div>
@@ -42,9 +41,18 @@
 
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue'
-import ThemeToggle from '../common/ThemeToggle.vue'
 import AccountMenu from '../common/AccountMenu.vue'
+import BrandMark from '../common/BrandMark.vue'
 import { useBackground } from '../../composables/useBackground.js'
+import { useTheme } from '../../composables/useTheme.js'
+
+/*
+ * Applies the stored/preferred theme on load by writing data-bs-theme, which is
+ * what the whole palette keys off. This used to happen inside ThemeToggle's
+ * onMounted; removing that control also removed the initialisation, which left
+ * every page rendering in Bootstrap's default light theme.
+ */
+useTheme()
 
 // 导航项配置
 const navItems = Object.freeze([
@@ -114,10 +122,9 @@ onUnmounted(() => {
 .navbar-background {
   position: relative;
   z-index: 1030;
-  background-color: var(--ui-nav-bg, rgba(240, 248, 255, 0.92));
-  border-bottom: 1px solid var(--ui-border, rgba(74, 158, 255, 0.22));
-  box-shadow: var(--ui-shadow-sm, 0 4px 16px rgba(74, 158, 255, 0.1));
-  backdrop-filter: blur(14px);
+  /* Opaque bar; the hairline bottom border is the only separator. */
+  background-color: var(--ui-nav-bg);
+  border-bottom: 1px solid var(--ui-border);
 }
 
 .navbar-background.navbar-embedded {
@@ -127,16 +134,30 @@ onUnmounted(() => {
   margin-bottom: 0;
 }
 
-.navbar-embedded > .container-fluid {
-  padding-right: 9rem;
-}
+/*
+ * No right-hand reservation: the shell uses the native Windows title bar, so
+ * there is no longer a custom window-control cluster overlaid on this bar to
+ * clear. The old 9rem is what left the void at the top right.
+ */
 
 .brand-enhanced {
-  transition: transform 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  /*
+   * The embedded shell offsets the page body by the bar height, so the bar and
+   * that offset are driven by one token (--ui-navbar-height) and cannot drift.
+   * This used to be min-height: 50px, sized for a mascot logo that no longer
+   * exists, which is what made the bar 77px tall and left a void beside the
+   * window controls.
+   */
+  min-height: var(--ui-control-height);
+  color: var(--ui-text-primary);
+  transition: var(--transition-default);
 }
 
-.brand-enhanced:hover {
-  transform: scale(1.05) rotate(-5deg);
+.brand-enhanced:hover,
+.brand-enhanced:focus-visible {
+  color: var(--ui-text-primary);
 }
 
 .navbar-utilities {
@@ -148,15 +169,15 @@ onUnmounted(() => {
 
 <style>
 html[data-sunshine-gui='true'] body {
-  padding-top: 77px !important;
+  padding-top: var(--ui-navbar-height) !important;
 }
 
 .header .navbar-utilities .nav-link,
 .header .navbar-utilities .nav-utility-button {
-  color: var(--ui-text-secondary, #64748b) !important;
+  color: var(--ui-text-secondary) !important;
   border: 0;
-  border-radius: var(--ui-radius-sm, 8px);
-  transition: color 0.2s ease, background-color 0.2s ease;
+  border-radius: 0;
+  transition: var(--transition-default);
 }
 
 .header {
@@ -167,8 +188,8 @@ html[data-sunshine-gui='true'] body {
 .header .navbar-utilities .nav-link:focus,
 .header .navbar-utilities .nav-utility-button:hover,
 .header .navbar-utilities .nav-utility-button:focus {
-  color: var(--ui-accent, #4a9eff) !important;
-  background-color: var(--ui-accent-soft, rgba(74, 158, 255, 0.12));
+  color: var(--ui-text-primary) !important;
+  background-color: var(--ui-surface-hover);
 }
 
 .header .navbar-utilities .nav-utility-button {
@@ -183,58 +204,60 @@ html[data-sunshine-gui='true'] body {
 .header .navbar-nav > .nav-item > .nav-link {
   position: relative;
   background: transparent;
-  color: var(--ui-text-secondary, #64748b) !important;
+  color: var(--ui-text-secondary) !important;
   border-radius: 0;
-  transition: color 0.2s ease;
+  transition: var(--transition-default);
 }
 
+/*
+ * Active-page indicator: a solid square underline that is simply present or
+ * absent. It never grows, slides or fades.
+ */
 .header .navbar-nav > .nav-item > .nav-link::after {
   position: absolute;
   right: 0.75rem;
   bottom: 0.3rem;
   left: 0.75rem;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--ui-accent, #4a9eff);
+  height: 3px;
+  border-radius: 0;
+  background: transparent;
   content: '';
-  transform: scaleX(0);
-  transform-origin: center;
-  transition: transform 0.2s ease;
 }
 
 .header .navbar-nav > .nav-item > .nav-link:hover,
 .header .navbar-nav > .nav-item > .nav-link.active,
 .header .navbar-nav > .nav-item > .nav-link:focus-visible {
-  color: var(--ui-accent, #4a9eff) !important;
+  color: var(--ui-text-primary) !important;
   background: transparent;
 }
 
-.header .navbar-nav > .nav-item > .nav-link.active::after,
-.header .navbar-nav > .nav-item > .nav-link:focus-visible::after {
-  transform: scaleX(1);
+.header .navbar-nav > .nav-item > .nav-link.active::after {
+  background: var(--ui-accent);
 }
 
 .header .navbar-nav > .nav-item > .nav-link:focus-visible {
-  outline: none;
-  box-shadow: none;
-}
-
-.header .navbar-nav > .nav-item > .nav-link:focus-visible::after {
-  height: 3px;
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 .header .navbar-toggler {
-  color: var(--ui-text-secondary, #64748b) !important;
-  border: var(--bs-border-width) solid var(--ui-border, rgba(74, 158, 255, 0.22)) !important;
-  background-color: var(--ui-accent-soft, rgba(74, 158, 255, 0.12));
+  color: var(--ui-text-secondary) !important;
+  border: 1px solid var(--ui-border-strong) !important;
+  border-radius: 0;
+  background-color: transparent;
 }
 
+/*
+ * Flat hamburger glyph: butt caps and miter joins instead of rounded strokes.
+ * A background image is its own document, so currentColor cannot reach it and
+ * each theme has to name its stroke explicitly.
+ */
 .header .navbar-toggler-icon {
-  --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%2833, 37, 41, 0.75%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
+  --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%23000000' stroke-linecap='butt' stroke-linejoin='miter' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
 }
 
 [data-bs-theme='dark'] .header .navbar-toggler-icon {
-  filter: invert(92%) sepia(13%) saturate(430%) hue-rotate(350deg) brightness(94%);
+  --bs-navbar-toggler-icon-bg: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%23ffffff' stroke-linecap='butt' stroke-linejoin='miter' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
 }
 
 .form-control::placeholder {
@@ -245,7 +268,7 @@ html[data-sunshine-gui='true'] body {
   .header .navbar-collapse {
     flex-basis: 100%;
     padding: 0.5rem 0 0.25rem;
-    border-top: 1px solid var(--ui-border, rgba(74, 158, 255, 0.22));
+    border-top: 1px solid var(--ui-border);
   }
 
   .header .navbar-nav {
@@ -264,14 +287,14 @@ html[data-sunshine-gui='true'] body {
     align-items: center;
     min-height: 2.5rem;
     padding: 0.5rem 0.75rem;
-    border-radius: var(--ui-radius-md, 12px);
+    border-radius: 0;
     gap: 0.5rem;
   }
 
   .header .navbar-nav > .nav-item > .nav-link:hover,
   .header .navbar-nav > .nav-item > .nav-link.active,
   .header .navbar-nav > .nav-item > .nav-link:focus-visible {
-    background: var(--ui-accent-soft, rgba(74, 158, 255, 0.12));
+    background: var(--ui-surface-hover);
   }
 
   .header .navbar-utilities {
@@ -281,7 +304,7 @@ html[data-sunshine-gui='true'] body {
     width: 100%;
     margin-left: 0 !important;
     padding-top: 0.5rem;
-    border-top: 1px solid var(--ui-border, rgba(74, 158, 255, 0.22));
+    border-top: 1px solid var(--ui-border);
   }
 
   .header .navbar-utilities .bd-mode-toggle {
@@ -313,7 +336,7 @@ html[data-sunshine-gui='true'] body {
   }
 
   .header .navbar-toggler {
-    border-radius: var(--ui-radius-md, 12px);
+    border-radius: 0;
   }
 }
 </style>

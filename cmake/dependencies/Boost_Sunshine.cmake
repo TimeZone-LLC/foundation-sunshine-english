@@ -9,13 +9,21 @@ set(BOOST_COMPONENTS
         atomic
         beast
         filesystem
+        format
         function
         locale
         log
+        optional
         program_options
+        property_tree
         system
 )
 # system is not used by Sunshine, but by Simple-Web-Server, added here for convenience
+
+# format, optional, and property_tree are header-only, but tests/CMakeLists.txt names them
+# directly in target_link_libraries. They used to be requested only on the FetchContent
+# fallback path below, so configuring against a system Boost failed at generate time with
+# "Target ... links to Boost::format but the target was not found".
 
 # algorithm, preprocessor, scope, and uuid are not used by Sunshine, but by libdisplaydevice, added here for convenience
 if(WIN32)
@@ -47,12 +55,11 @@ if(NOT Boost_FOUND)
     endif()
 
     # more components required for compiling boost targets
+    # (format and property_tree are already in the base list above)
     list(APPEND BOOST_COMPONENTS
             asio
             crc
-            format
-            process
-            property_tree)
+            process)
 
     set(BOOST_ENABLE_CMAKE ON)
 

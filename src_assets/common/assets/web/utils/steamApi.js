@@ -89,7 +89,7 @@ export async function searchSteamApps(searchName, maxResults = 20) {
  * @returns {Promise<Array>} 空数组
  */
 export async function loadSteamApps() {
-  console.warn('loadSteamApps 已弃用，请使用 searchSteamApps 直接搜索')
+  console.warn('loadSteamApps is deprecated; use searchSteamApps to search directly')
   return []
 }
 

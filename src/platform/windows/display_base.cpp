@@ -44,6 +44,30 @@ namespace platf {
 namespace platf::dxgi {
   namespace bp = boost::process::v1;
 
+  namespace {
+    // Creating a duplication can keep failing for several seconds while the desktop is
+    // switching (lock screen, UAC secure desktop) or while the GPU and the monitor
+    // topology are still re-enumerating after a resume from sleep. Retry within a time
+    // budget instead of giving up after a couple of hundred milliseconds.
+    constexpr auto duplication_retry_budget = 5s;
+    constexpr auto duplication_retry_min_delay = 100ms;
+    constexpr auto duplication_retry_max_delay = 1s;
+
+    /**
+     * @brief Compute the exponential backoff delay for a duplication retry.
+     * @param attempt Number of attempts already made, starting at 1.
+     * @return The delay to wait before the next attempt, capped at `duplication_retry_max_delay`.
+     */
+    std::chrono::milliseconds
+    duplication_retry_delay(int attempt) {
+      auto delay = duplication_retry_min_delay;
+      for (int x = 1; x < attempt && delay < duplication_retry_max_delay; ++x) {
+        delay *= 2;
+      }
+      return std::min<std::chrono::milliseconds>(delay, duplication_retry_max_delay);
+    }
+  }  // namespace
+
   /**
    * DDAPI-specific initialization goes here.
    */
@@ -67,16 +91,28 @@ namespace platf::dxgi {
           return -1;
         }
 
-        // We try this twice, in case we still get an error on reinitialization
-        for (int x = 0; x < 2; ++x) {
+        // Keep retrying within a time budget, in case we still get an error on reinitialization
+        const auto give_up_at = std::chrono::steady_clock::now() + duplication_retry_budget;
+        for (int attempt = 1;; ++attempt) {
           // Ensure we can duplicate the current display
           syncThreadDesktop();
 
           status = output5->DuplicateOutput1((IUnknown *) display->device.get(), 0, supported_formats.size(), supported_formats.data(), &dup);
           if (SUCCEEDED(status)) {
+            if (attempt > 1) {
+              BOOST_LOG(debug) << "DuplicateOutput1 succeeded on attempt "sv << attempt;
+            }
             break;
           }
-          std::this_thread::sleep_for(200ms);
+
+          if (std::chrono::steady_clock::now() >= give_up_at) {
+            break;
+          }
+
+          const auto delay = duplication_retry_delay(attempt);
+          BOOST_LOG(debug) << "DuplicateOutput1 failed [0x"sv << util::hex(status).to_string_view()
+                           << "] on attempt "sv << attempt << ", retrying in "sv << delay.count() << "ms"sv;
+          std::this_thread::sleep_for(delay);
         }
 
         // We don't retry with DuplicateOutput() because we can hit this codepath when we're racing
@@ -97,15 +133,27 @@ namespace platf::dxgi {
           return -1;
         }
 
-        for (int x = 0; x < 2; ++x) {
+        const auto give_up_at = std::chrono::steady_clock::now() + duplication_retry_budget;
+        for (int attempt = 1;; ++attempt) {
           // Ensure we can duplicate the current display
           syncThreadDesktop();
 
           status = output1->DuplicateOutput((IUnknown *) display->device.get(), &dup);
           if (SUCCEEDED(status)) {
+            if (attempt > 1) {
+              BOOST_LOG(debug) << "DuplicateOutput succeeded on attempt "sv << attempt;
+            }
             break;
           }
-          std::this_thread::sleep_for(200ms);
+
+          if (std::chrono::steady_clock::now() >= give_up_at) {
+            break;
+          }
+
+          const auto delay = duplication_retry_delay(attempt);
+          BOOST_LOG(debug) << "DuplicateOutput failed [0x"sv << util::hex(status).to_string_view()
+                           << "] on attempt "sv << attempt << ", retrying in "sv << delay.count() << "ms"sv;
+          std::this_thread::sleep_for(delay);
         }
 
         if (FAILED(status)) {
@@ -155,14 +203,27 @@ namespace platf::dxgi {
       case WAIT_ABANDONED:
       case DXGI_ERROR_ACCESS_LOST:
       case DXGI_ERROR_ACCESS_DENIED:
+      case E_ACCESSDENIED:
+      case DXGI_ERROR_INVALID_CALL:
+      case DXGI_ERROR_SESSION_DISCONNECTED:
+        // The desktop switched away from us (lock screen, UAC secure desktop) or the
+        // duplication object went stale. A new duplication recovers from all of these.
+        BOOST_LOG(debug) << "Duplication is no longer usable [0x"sv << util::hex(status).to_string_view() << "], requesting reinit"sv;
         return capture_e::reinit;
       case DXGI_ERROR_DEVICE_REMOVED:
       case DXGI_ERROR_DEVICE_RESET:
         BOOST_LOG(error) << "D3D11 device lost during AcquireNextFrame [0x"sv << util::hex(status).to_string_view() << "], requesting reinit"sv;
         return capture_e::reinit;
-      default:
-        BOOST_LOG(error) << "Couldn't acquire next frame [0x"sv << util::hex(status).to_string_view();
+      case DXGI_ERROR_UNSUPPORTED:
+      case DXGI_ERROR_NOT_FOUND:
+        // The output or the capture format is genuinely gone, retrying cannot help.
+        BOOST_LOG(error) << "Couldn't acquire next frame [0x"sv << util::hex(status).to_string_view() << ']';
         return capture_e::error;
+      default:
+        // Everything else is assumed to be transient. Failing here would tear down every
+        // session, so ask for a reinit and let the capture loop decide when to give up.
+        BOOST_LOG(warning) << "Couldn't acquire next frame [0x"sv << util::hex(status).to_string_view() << "], requesting reinit"sv;
+        return capture_e::reinit;
     }
   }
 
@@ -181,9 +242,12 @@ namespace platf::dxgi {
         &shape_info
       );
       if (FAILED(status) || actual_size > img_data.size()) {
-        BOOST_LOG(error) << "Failed to get new pointer shape [0x"sv
-                         << util::hex(status).to_string_view() << ']';
-        return capture_e::error;
+        // The pointer shape can legitimately become unavailable while the desktop is
+        // switching to or from the secure desktop. Recreate the duplication instead of
+        // reporting a fatal capture failure.
+        BOOST_LOG(warning) << "Failed to get new pointer shape [0x"sv
+                           << util::hex(status).to_string_view() << "], requesting reinit"sv;
+        return capture_e::reinit;
       }
 
       img_data.resize(actual_size);
@@ -228,7 +292,13 @@ namespace platf::dxgi {
         BOOST_LOG(warning) << "Duplication frame already released";
         return capture_e::ok;
 
+      case WAIT_ABANDONED:
       case DXGI_ERROR_ACCESS_LOST:
+      case DXGI_ERROR_ACCESS_DENIED:
+      case E_ACCESSDENIED:
+      case DXGI_ERROR_SESSION_DISCONNECTED:
+        // The duplication was invalidated by a desktop switch while we held the frame.
+        BOOST_LOG(debug) << "Duplication frame reference is stale [0x"sv << util::hex(status).to_string_view() << "], requesting reinit"sv;
         return capture_e::reinit;
 
       case DXGI_ERROR_DEVICE_REMOVED:
@@ -237,8 +307,9 @@ namespace platf::dxgi {
         return capture_e::reinit;
 
       default:
-        BOOST_LOG(error) << "Error while releasing duplication frame [0x"sv << util::hex(status).to_string_view();
-        return capture_e::error;
+        // Assume the duplication is recoverable rather than killing every session.
+        BOOST_LOG(warning) << "Error while releasing duplication frame [0x"sv << util::hex(status).to_string_view() << "], requesting reinit"sv;
+        return capture_e::reinit;
     }
   }
 
@@ -531,8 +602,14 @@ namespace platf::dxgi {
       return false;
     }
 
-    // Check if we can use the Desktop Duplication API on this output
-    for (int x = 0; x < 2; ++x) {
+    // Check if we can use the Desktop Duplication API on this output. Duplication can be
+    // refused for seconds at a time while the desktop switches or while the GPU settles
+    // after a resume from sleep, so retry within a time budget rather than twice. While
+    // enumerating we keep the budget short, since that path runs once per output and the
+    // caller re-enumerates anyway.
+    const auto retry_budget = enumeration_only ? duplication_retry_max_delay : duplication_retry_budget;
+    const auto give_up_at = std::chrono::steady_clock::now() + retry_budget;
+    for (int attempt = 1;; ++attempt) {
       dup_t dup;
 
       // Only resynchronize the thread desktop when not enumerating displays.
@@ -544,6 +621,9 @@ namespace platf::dxgi {
 
       status = output1->DuplicateOutput((IUnknown *) device.get(), &dup);
       if (SUCCEEDED(status)) {
+        if (attempt > 1) {
+          BOOST_LOG(debug) << "DuplicateOutput() test succeeded on attempt "sv << attempt;
+        }
         return true;
       }
 
@@ -552,9 +632,15 @@ namespace platf::dxgi {
       if (enumeration_only && status == E_ACCESSDENIED) {
         break;
       }
-      else {
-        std::this_thread::sleep_for(200ms);
+
+      if (std::chrono::steady_clock::now() >= give_up_at) {
+        break;
       }
+
+      const auto delay = duplication_retry_delay(attempt);
+      BOOST_LOG(debug) << "DuplicateOutput() test failed [0x"sv << util::hex(status).to_string_view()
+                       << "] on attempt "sv << attempt << ", retrying in "sv << delay.count() << "ms"sv;
+      std::this_thread::sleep_for(delay);
     }
 
     BOOST_LOG(error) << "DuplicateOutput() test failed [0x"sv << util::hex(status).to_string_view() << ']';
@@ -1314,20 +1400,20 @@ namespace platf {
             BOOST_LOG(debug) << "[Display] Desktop Duplication test passed: " << device_name;
           }
           else {
-            BOOST_LOG(debug) << "[Display] 跳过 DXGI测试失败 不可用显示器: " << device_name;
+            BOOST_LOG(debug) << "[Display] Skipping unusable display (Desktop Duplication test failed): " << device_name;
           }
         }
         else {
-          BOOST_LOG(debug) << "[Display] 跳过 None AttachedToDesktop 不可用显示器: " << device_name;
+          BOOST_LOG(debug) << "[Display] Skipping unusable display (not attached to desktop): " << device_name;
         }
 
         if (can_capture) {
           display_names.emplace_back(std::move(device_name));
-          BOOST_LOG(debug) << "[Display] 添加可用显示器: " << device_name;
+          BOOST_LOG(debug) << "[Display] Adding available display: " << device_name;
         }
       }
     }
-    BOOST_LOG(debug) << "[Display] 显示器枚举完成，找到 " << display_names.size() << " 个可用显示器";
+    BOOST_LOG(debug) << "[Display] Display enumeration complete, found " << display_names.size() << " available display(s)";
     return display_names;
   }
 

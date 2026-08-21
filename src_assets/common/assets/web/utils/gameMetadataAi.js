@@ -188,8 +188,8 @@ export async function enhanceScannedGameNames(apps, options = {}) {
     current: 0,
     total: batches.length,
     detail: batches.length > 0
-      ? `需要清洗 ${misses.length} 个游戏名称`
-      : '名称已从缓存命中',
+      ? `Cleaning up ${misses.length} game names`
+      : 'Names resolved from cache',
   })
 
   for (let batchIndex = 0; batchIndex < batches.length; batchIndex += 1) {
@@ -199,7 +199,7 @@ export async function enhanceScannedGameNames(apps, options = {}) {
       phase: 'batch:start',
       current: batchIndex,
       total: batches.length,
-      detail: `正在清洗第 ${batchIndex + 1}/${batches.length} 批 (${batch.length} 个游戏)`,
+      detail: `Cleaning batch ${batchIndex + 1} of ${batches.length} (${batch.length} games)`,
     })
 
     try {
@@ -210,7 +210,7 @@ export async function enhanceScannedGameNames(apps, options = {}) {
         phase: 'batch:error',
         current: batchIndex + 1,
         total: batches.length,
-        detail: `第 ${batchIndex + 1}/${batches.length} 批清洗失败，继续后续步骤`,
+        detail: `Batch ${batchIndex + 1} of ${batches.length} failed to clean; continuing`,
       })
       continue
     }
@@ -229,7 +229,7 @@ export async function enhanceScannedGameNames(apps, options = {}) {
       phase: 'batch:done',
       current: batchIndex + 1,
       total: batches.length,
-      detail: `已完成 ${batchIndex + 1}/${batches.length} 批名称清洗`,
+      detail: `Finished cleaning batch ${batchIndex + 1} of ${batches.length}`,
     })
   }
 

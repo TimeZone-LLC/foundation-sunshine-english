@@ -6,32 +6,18 @@ body,
   min-height: 100%;
 }
 
+// The welcome page is generated outside the Vue build, so it repeats the body
+// contract from global.less: a flat, opaque page painted straight from the
+// tokens. The former fixed gradient wash on ::before is gone.
 body {
   margin: 0;
-  background: var(--ui-page-bg, #e6f2ff);
-  color: var(--ui-text-primary, #1e293b);
+  background: var(--ui-page-bg);
+  color: var(--ui-text-primary);
   font-family: var(--font-family-base);
   position: relative;
   min-height: 100vh;
-
-  &::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background:
-      radial-gradient(circle at 12% 0%, rgba(var(--ui-accent-rgb), 0.2), transparent 34rem),
-      linear-gradient(180deg, rgba(var(--ui-accent-rgb), 0.07), transparent 30rem);
-    pointer-events: none;
-    z-index: 0;
-  }
 }
 
 [data-bs-theme='dark'] {
   color-scheme: dark;
-}
-
-@media print {
-  body::before {
-    display: none;
-  }
 }

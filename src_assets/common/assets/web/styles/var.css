@@ -1,35 +1,88 @@
-/* 全局变量 */
+@import './fonts.css';
+
+/*
+ * Design tokens - the single source of truth for the Sunshine Web UI.
+ *
+ * The look is "gloss": a quiet professional tool. Structure is carried by
+ * hairline borders and small tonal steps between page / panel / surface, not
+ * by colour, glow or motion. Everything stays square; type is Geist at ~13px;
+ * a subtle elevation shadow is permitted, but only ever neutral - never a
+ * glow, never a coloured shadow.
+ *
+ * Mechanism: utils/theme.js writes data-bs-theme="light|dark" onto <html> and
+ * Bootstrap keys off the same attribute, so the bare :root block below carries
+ * the LIGHT palette and the [data-bs-theme="dark"] block carries the dark one.
+ * Dark is the primary look; light is a faithful inversion of the same system.
+ *
+ * Invariants baked into the values below, so callers get them for free:
+ *   - every radius token is 0
+ *   - the elevation scale is xs -> sm -> md; xs is the most a RESTING surface
+ *     may use, sm/md are reserved for overlays (dropdown, popover, dialog)
+ *   - every gradient token is a flat solid colour
+ *   - every surface is an OPAQUE hex (translucent surfaces are what forced
+ *     backdrop-filter across the app); modal scrims are the one exception
+ *   - transitions only ever touch colour/border and never exceed 120ms ease
+ *   - labels, buttons and section headers are SENTENCE CASE - the label
+ *     transform token below is `none` and the tracking token is `0`
+ *
+ * Token names are load-bearing: ~40 files consume them. Change values here,
+ * never names.
+ */
 :root {
-  --primary-color: var(--ui-accent);
-  --secondary-color: var(--ui-text-secondary);
-  --success-color: var(--ui-success);
-  --danger-color: var(--ui-danger);
-  --warning-color: var(--ui-warning);
-  --info-color: var(--ui-info);
-  --light-color: var(--ui-surface-strong);
-  --dark-color: var(--ui-text-primary);
-  --gradient-primary: linear-gradient(135deg, var(--ui-accent), var(--ui-accent-secondary));
-  --gradient-success: linear-gradient(135deg, var(--ui-success), var(--ui-success));
-  --gradient-success-hover: linear-gradient(135deg, var(--ui-success), var(--ui-success));
-  --box-shadow-sm: var(--ui-shadow-sm);
-  --box-shadow-md: var(--ui-shadow-md);
-  --box-shadow-lg: var(--ui-shadow-lg);
-  --transition-default: all 0.3s ease;
-  --border-radius-sm: var(--ui-radius-sm);
-  --border-radius-md: var(--ui-radius-md);
-  --border-radius-lg: var(--ui-radius-lg);
-  --border-radius-xl: var(--ui-radius-lg);
-  --border-radius-pill: 50rem;
-  --border-radius-circle: 50%;
-  /* Match the desktop GUI while keeping native CJK rendering on every platform. */
-  --font-family-sans: Inter, 'Segoe UI Variable Text', 'Segoe UI Variable', -apple-system,
-    BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC',
-    'Noto Sans SC', 'Noto Sans', 'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  /* ---------------------------------------------------------------------
+   * Geometry - the shared scale, stated explicitly so both frontends and
+   * every consuming component agree on it.
+   * ------------------------------------------------------------------- */
+  --ui-control-height: 32px;
+  /*
+   * Height of the top bar. The embedded Tauri shell offsets the page body by
+   * exactly this much, so both read the same token and cannot drift apart.
+   */
+  --ui-navbar-height: 46px;
+  --ui-space-1: 4px;
+  --ui-space-2: 8px;
+  --ui-space-3: 12px;
+  --ui-space-4: 16px;
+  --ui-space-5: 20px;
+  --ui-transition: 120ms ease;
+  --ui-rail-width: 240px;
+  --ui-hairline: 1px;
+
+  /* Square corners everywhere - no pills, no circles, no exceptions. */
+  --ui-radius: 0;
+  --ui-radius-xs: 0;
+  --ui-radius-sm: 0;
+  --ui-radius-md: 0;
+  --ui-radius-lg: 0;
+  --border-radius-xs: 0;
+  --border-radius-sm: 0;
+  --border-radius-md: 0;
+  --border-radius-lg: 0;
+  --border-radius-xl: 0;
+  --border-radius-pill: 0;
+  --border-radius-circle: 0;
+
+  /* Only colour and border may animate, and only briefly. */
+  --transition-default: background-color 120ms ease, color 120ms ease,
+    border-color 120ms ease, outline-color 120ms ease;
+
+  /* ---------------------------------------------------------------------
+   * Typography - self-hosted Geist, with the full fallback stack. The CJK
+   * faces stay in the sans stack because the UI is localised.
+   * ------------------------------------------------------------------- */
+  --font-family-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Noto Sans SC',
+    'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
   --font-family-base: var(--font-family-sans);
-  --font-family-mono: ui-monospace, 'Cascadia Code', 'SFMono-Regular', Menlo, Monaco, Consolas,
-    'Liberation Mono', monospace;
+  --font-family-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    'Cascadia Mono', 'Liberation Mono', monospace;
   --font-mono: var(--font-family-mono);
+  --font-sans: var(--font-family-sans);
   --bs-body-font-family: var(--font-family-base);
+
+  /* Body copy is 13px. The rem scale below stays anchored to the 16px root
+     so paddings and gaps do NOT shrink with it. */
+  --ui-font-size-base: 13px;
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-md: 1rem;
@@ -41,51 +94,142 @@
   --spacing-md: 1rem;
   --spacing-lg: 1.5rem;
   --spacing-xl: 2rem;
+  --spacing-xxl: 2.5rem;
 
-  /* Sunshine GUI-aligned design tokens: Gura blue light theme */
-  --ui-page-bg: #e6f2ff;
-  --ui-page-overlay: rgba(30, 41, 59, 0.12);
-  --ui-overlay: rgba(15, 23, 42, 0.5);
-  --ui-nav-bg: rgba(240, 248, 255, 0.92);
-  --ui-surface: rgba(255, 255, 255, 0.62);
-  --ui-surface-strong: rgba(240, 248, 255, 0.88);
-  --ui-surface-hover: rgba(255, 255, 255, 0.8);
-  --ui-border: rgba(74, 158, 255, 0.22);
-  --ui-border-strong: rgba(74, 158, 255, 0.42);
-  --ui-text-primary: #1e293b;
-  --ui-text-secondary: #64748b;
-  /* Keep secondary copy readable on translucent GUI surfaces (4.5:1 on white). */
-  --ui-text-muted: #68788e;
-  --ui-accent: #4a9eff;
-  --ui-accent-text: #306fae;
-  --ui-accent-rgb: 74, 158, 255;
-  --ui-accent-soft: rgba(74, 158, 255, 0.12);
-  --ui-accent-contrast: #ffffff;
-  --ui-accent-secondary: #7ab8ff;
-  --ui-success: #4ecdc4;
-  --ui-success-rgb: 78, 205, 196;
-  --ui-warning: #ffc107;
-  --ui-warning-rgb: 255, 193, 7;
-  --ui-danger: #ff6b6b;
-  --ui-danger-rgb: 255, 107, 107;
-  --ui-info: #7ab8ff;
-  --ui-info-rgb: 122, 184, 255;
-  --ui-success-contrast: #153c39;
-  --ui-warning-contrast: #3d2f00;
-  --ui-danger-contrast: #3f1d1d;
-  --ui-info-contrast: #17365c;
-  --ui-success-text: #267f79;
-  --ui-warning-text: #856300;
-  --ui-danger-text: #bd3f46;
-  --ui-info-text: #306fae;
-  --ui-success-soft: rgba(78, 205, 196, 0.12);
-  --ui-success-border: rgba(78, 205, 196, 0.34);
-  --ui-warning-soft: rgba(255, 193, 7, 0.13);
-  --ui-warning-border: rgba(255, 193, 7, 0.38);
-  --ui-danger-soft: rgba(255, 107, 107, 0.12);
-  --ui-danger-border: rgba(255, 107, 107, 0.34);
-  --ui-info-soft: rgba(122, 184, 255, 0.12);
-  --ui-info-border: rgba(122, 184, 255, 0.34);
+  /*
+   * Labels, buttons and section headers are sentence case. These tokens are
+   * still read by ~10 files; setting them to none/0 de-uppercases every one
+   * of those call sites without editing them. Weight is the only emphasis.
+   */
+  --ui-label-transform: none;
+  --ui-label-tracking: 0;
+  --ui-label-weight: 600;
+
+  /* ---------------------------------------------------------------------
+   * LIGHT palette. gloss light: #f7f7f8 page, white panels, #cfcfd3 hairline.
+   * ------------------------------------------------------------------- */
+  --bg-page: #f7f7f8;
+  --bg-panel: #ffffff;
+  --bg-panel-soft: #eeeeef;
+  --bg-surface: #f4f4f5;
+  --bg-raised: #ffffff;
+  /* The interaction fill. It must read as a step in BOTH directions, which is
+     why it is a base token per theme rather than an alias of --bg-raised: on a
+     pale ground the lift is downward (toward grey), on a dark one it is up. */
+  --bg-hover: #eeeeef;
+  --border: #cfcfd3;
+  --border-soft: #dedee2;
+  --border-strong: #a8a8b0;
+  --text: #15151a;
+  --text-muted: #5c5c66;
+  /*
+   * --text-faint is reserved for non-essential decoration (rules, separators,
+   * disabled glyphs). It does not clear 4.5:1 on every surface, so any text a
+   * user has to read must use --text-muted or stronger.
+   */
+  --text-faint: #85858f;
+  --accent: #15151a;
+  --accent-fg: #ffffff;
+
+  /* Neutral elevation. Never a glow, never a coloured shadow. */
+  --ui-shadow-xs: 0 1px 2px rgb(20 20 24 / 0.04);
+  --ui-shadow-sm: 0 8px 22px rgb(20 20 24 / 0.08);
+  --ui-shadow-md: 0 18px 48px rgb(20 20 24 / 0.13);
+  --ui-shadow-lg: var(--ui-shadow-md);
+
+  /* Legacy shadow names, mapped onto the same three steps. */
+  --box-shadow-sm: var(--ui-shadow-xs);
+  --box-shadow-md: var(--ui-shadow-sm);
+  --box-shadow-lg: var(--ui-shadow-md);
+  --shadow-sm: var(--ui-shadow-xs);
+
+  /* ---------------------------------------------------------------------
+   * Surface aliases. This is the layer components should read.
+   * ------------------------------------------------------------------- */
+  --ui-page-bg: var(--bg-page);
+  /* No wash over the page: the overlay layer is retired, not tinted. */
+  --ui-page-overlay: transparent;
+  /* Modal scrims are the one legitimately translucent layer. */
+  --ui-overlay: rgba(20, 20, 24, 0.42);
+  --ui-panel: var(--bg-panel);
+  --ui-panel-soft: var(--bg-panel-soft);
+  --ui-nav-bg: var(--bg-panel);
+  --ui-surface: var(--bg-surface);
+  --ui-surface-strong: var(--bg-panel-soft);
+  --ui-surface-raised: var(--bg-raised);
+  --ui-surface-hover: var(--bg-hover);
+  --ui-border: var(--border);
+  --ui-border-soft: var(--border-soft);
+  --ui-border-strong: var(--border-strong);
+  --ui-text-primary: var(--text);
+  --ui-text-secondary: #33333b;
+  --ui-text-muted: var(--text-muted);
+  --ui-text-faint: var(--text-faint);
+  --ui-accent: var(--accent);
+  --ui-accent-fg: var(--accent-fg);
+  --ui-accent-text: var(--text);
+  --ui-accent-rgb: 21, 21, 26;
+  /* "Soft" means the raised fill, so hover states stay flat and opaque. */
+  --ui-accent-soft: var(--bg-panel-soft);
+  --ui-accent-contrast: var(--accent-fg);
+  --ui-on-accent: var(--accent-fg);
+  --ui-accent-secondary: var(--text-muted);
+
+  /* ---------------------------------------------------------------------
+   * Signal colours. Muted, not neon - colour appears only where it carries
+   * meaning a user must not miss.
+   * ------------------------------------------------------------------- */
+  --ui-success: #2e7d55;
+  --ui-success-rgb: 46, 125, 85;
+  --ui-warning: #a06022;
+  --ui-warning-rgb: 160, 96, 34;
+  --ui-danger: #b3352c;
+  --ui-danger-rgb: 179, 53, 44;
+  --ui-info: #0b6bb0;
+  --ui-info-rgb: 11, 107, 176;
+
+  /* Foreground on a solid signal fill: in light mode every signal is dark. */
+  --ui-success-contrast: #ffffff;
+  --ui-warning-contrast: #ffffff;
+  --ui-danger-contrast: #ffffff;
+  --ui-info-contrast: #ffffff;
+
+  /* Signal text on a light surface: the fill hue already clears 4.5:1. */
+  --ui-success-text: var(--ui-success);
+  --ui-warning-text: var(--ui-warning);
+  --ui-danger-text: var(--ui-danger);
+  --ui-info-text: var(--ui-info);
+
+  /* Signal "soft" fills are opaque: the border and text carry the meaning. */
+  --ui-success-soft: var(--bg-panel-soft);
+  --ui-success-border: var(--ui-success-text);
+  --ui-warning-soft: var(--bg-panel-soft);
+  --ui-warning-border: var(--ui-warning-text);
+  --ui-danger-soft: var(--bg-panel-soft);
+  --ui-danger-border: var(--ui-danger-text);
+  --ui-info-soft: var(--bg-panel-soft);
+  --ui-info-border: var(--ui-info-text);
+
+  /* ---------------------------------------------------------------------
+   * Semantic aliases kept for the files that already reference them.
+   * ------------------------------------------------------------------- */
+  --primary-color: var(--ui-accent);
+  --secondary-color: var(--ui-text-secondary);
+  --success-color: var(--ui-success);
+  --danger-color: var(--ui-danger);
+  --warning-color: var(--ui-warning);
+  --info-color: var(--ui-info);
+  --light-color: var(--ui-surface-strong);
+  --dark-color: var(--ui-text-primary);
+
+  /* Gradients are flattened to solid fills: same names, no gradient. */
+  --gradient-primary: var(--ui-accent);
+  --gradient-success: var(--ui-success);
+  --gradient-success-hover: var(--ui-success);
+
+  /* ---------------------------------------------------------------------
+   * Bootstrap bridge.
+   * ------------------------------------------------------------------- */
   --bs-primary-rgb: var(--ui-accent-rgb);
   --bs-success-rgb: var(--ui-success-rgb);
   --bs-warning-rgb: var(--ui-warning-rgb);
@@ -96,70 +240,90 @@
   --bs-warning: var(--ui-warning);
   --bs-danger: var(--ui-danger);
   --bs-info: var(--ui-info);
-  --ui-skeleton-base: rgba(74, 158, 255, 0.08);
-  --ui-skeleton-highlight: rgba(74, 158, 255, 0.18);
-  --ui-radius-sm: 8px;
-  --ui-radius-md: 12px;
-  --ui-radius-lg: 16px;
-  --ui-shadow-sm: 0 4px 16px rgba(74, 158, 255, 0.1);
-  --ui-shadow-md: 0 12px 32px rgba(58, 126, 213, 0.14);
-  --ui-shadow-lg: 0 20px 48px rgba(58, 126, 213, 0.18);
+  --bs-border-radius: 0;
+  --bs-border-radius-sm: 0;
+  --bs-border-radius-lg: 0;
+  --bs-border-radius-xl: 0;
+  --bs-border-radius-xxl: 0;
+  --bs-border-radius-pill: 0;
+  --bs-border-width: 1px;
+  --bs-border-color: var(--ui-border);
+  --bs-box-shadow: var(--ui-shadow-sm);
+  --bs-box-shadow-sm: var(--ui-shadow-xs);
+  --bs-box-shadow-lg: var(--ui-shadow-md);
+  --bs-box-shadow-inset: none;
 
-  /* 动态文字颜色变量 - 根据背景图片亮度自动设置 */
+  --ui-skeleton-base: var(--bg-panel-soft);
+  --ui-skeleton-highlight: var(--border);
+
+  /*
+   * Static text colours. These used to be rewritten at runtime from the
+   * dominant colour of a remote wallpaper; the wallpaper sampler is gone, so
+   * the palette above is now the only definition.
+   */
   --text-primary-color: var(--ui-text-primary);
   --text-secondary-color: var(--ui-text-secondary);
   --text-muted-color: var(--ui-text-muted);
   --text-title-color: var(--ui-text-primary);
 }
 
-/* data-bs-theme="dark" 适配 */
-[data-bs-theme="dark"] {
-  /* Sunshine GUI-aligned design tokens: Morandi dark theme */
-  --ui-page-bg: #2d2628;
-  --ui-page-overlay: rgba(45, 38, 40, 0.5);
-  --ui-overlay: rgba(20, 16, 18, 0.72);
-  --ui-nav-bg: rgba(45, 38, 40, 0.94);
-  --ui-surface: rgba(74, 63, 66, 0.58);
-  --ui-surface-strong: rgba(61, 50, 53, 0.88);
-  --ui-surface-hover: rgba(74, 63, 66, 0.78);
-  --ui-border: rgba(230, 213, 184, 0.2);
-  --ui-border-strong: rgba(230, 213, 184, 0.42);
-  --ui-text-primary: #f7f0e3;
-  --ui-text-secondary: #d4c4a8;
-  --ui-text-muted: #a99d8a;
-  --ui-accent: #d4a5a5;
-  --ui-accent-text: #f2e3c9;
-  --ui-accent-rgb: 212, 165, 165;
-  --ui-accent-soft: rgba(212, 165, 165, 0.14);
-  --ui-accent-contrast: #2d2628;
-  --ui-accent-secondary: #e6d5b8;
-  --ui-success: #8dbbb3;
-  --ui-success-rgb: 141, 187, 179;
-  --ui-warning: #e6d5b8;
-  --ui-warning-rgb: 230, 213, 184;
-  --ui-danger: #ff6b6b;
-  --ui-danger-rgb: 255, 107, 107;
-  --ui-info: #a2d2ff;
-  --ui-info-rgb: 162, 210, 255;
-  --ui-success-contrast: #2d2628;
-  --ui-warning-contrast: #2d2628;
-  --ui-danger-contrast: #2d2628;
-  --ui-info-contrast: #2d2628;
-  --ui-success-text: #b9ddd6;
-  --ui-warning-text: #f2e3c9;
-  --ui-danger-text: #ffb3b3;
-  --ui-info-text: #c9e4ff;
-  --ui-success-soft: rgba(141, 187, 179, 0.14);
-  --ui-success-border: rgba(141, 187, 179, 0.34);
-  --ui-warning-soft: rgba(230, 213, 184, 0.14);
-  --ui-warning-border: rgba(230, 213, 184, 0.36);
-  --ui-danger-soft: rgba(255, 107, 107, 0.14);
-  --ui-danger-border: rgba(255, 107, 107, 0.36);
-  --ui-info-soft: rgba(162, 210, 255, 0.14);
-  --ui-info-border: rgba(162, 210, 255, 0.34);
-  --ui-skeleton-base: rgba(230, 213, 184, 0.08);
-  --ui-skeleton-highlight: rgba(230, 213, 184, 0.16);
-  --ui-shadow-sm: 0 4px 18px rgba(0, 0, 0, 0.2);
-  --ui-shadow-md: 0 14px 36px rgba(0, 0, 0, 0.3);
-  --ui-shadow-lg: 0 20px 48px rgba(0, 0, 0, 0.38);
+/* ---------------------------------------------------------------------------
+ * DARK palette - the primary look. Layered near-black, NOT pure black: the
+ * tonal step between #0a0a0b page, #111113 panel and #141416 surface is what
+ * gives the UI its structure, and pure #000 would flatten all of it.
+ * ------------------------------------------------------------------------- */
+[data-bs-theme='dark'] {
+  --bg-page: #0a0a0b;
+  --bg-panel: #111113;
+  --bg-panel-soft: #17171a;
+  --bg-surface: #141416;
+  --bg-raised: #1d1d21;
+  --bg-hover: #1d1d21;
+  --border: #303036;
+  --border-soft: #242429;
+  --border-strong: #3f3f47;
+  --text: #ededf0;
+  --text-muted: #9a9aa4;
+  --text-faint: #6e6e78;
+  --accent: #ededf0;
+  --accent-fg: #0a0a0b;
+
+  --ui-shadow-xs: 0 1px 2px rgb(0 0 0 / 0.22);
+  --ui-shadow-sm: 0 10px 26px rgb(0 0 0 / 0.24);
+  --ui-shadow-md: 0 24px 60px rgb(0 0 0 / 0.32);
+
+  --ui-page-overlay: transparent;
+  --ui-overlay: rgba(0, 0, 0, 0.66);
+  --ui-text-secondary: #c9c9d0;
+  --ui-accent-rgb: 237, 237, 240;
+  --ui-accent-secondary: var(--text-muted);
+
+  /* Signal hues are lifted so they read on a near-black surface. */
+  --ui-success: #4ea87b;
+  --ui-success-rgb: 78, 168, 123;
+  --ui-warning: #d0a054;
+  --ui-warning-rgb: 208, 160, 84;
+  --ui-danger: #e05a52;
+  --ui-danger-rgb: 224, 90, 82;
+  --ui-info: #4a9ede;
+  --ui-info-rgb: 74, 158, 222;
+
+  /* On a lifted hue the readable foreground is the page black. */
+  --ui-success-contrast: #0a0a0b;
+  --ui-warning-contrast: #0a0a0b;
+  --ui-danger-contrast: #0a0a0b;
+  --ui-info-contrast: #0a0a0b;
+
+  --ui-success-text: var(--ui-success);
+  --ui-warning-text: var(--ui-warning);
+  --ui-danger-text: var(--ui-danger);
+  --ui-info-text: var(--ui-info);
+
+  --ui-success-border: var(--ui-success);
+  --ui-warning-border: var(--ui-warning);
+  --ui-danger-border: var(--ui-danger);
+  --ui-info-border: var(--ui-info);
+
+  --ui-skeleton-base: var(--bg-raised);
+  --ui-skeleton-highlight: var(--border);
 }

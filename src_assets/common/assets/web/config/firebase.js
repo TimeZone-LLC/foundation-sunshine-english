@@ -46,7 +46,7 @@ const sendEvent = ({ eventName, params }) => {
   try {
     analyticsModule.logEvent(analytics, eventName, params)
   } catch (error) {
-    console.warn('记录 Firebase 事件失败:', error)
+    console.warn('Failed to log Firebase event:', error)
   }
 }
 
@@ -79,7 +79,7 @@ export function initFirebase() {
     } catch (error) {
       analyticsDisabled = true
       pendingEvents.length = 0
-      console.warn('Firebase 初始化失败:', error)
+      console.warn('Failed to initialize Firebase:', error)
       return null
     }
   })()

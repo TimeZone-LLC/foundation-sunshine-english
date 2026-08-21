@@ -141,9 +141,13 @@ onBeforeUnmount(() => {
   padding: var(--spacing-lg, 1.5rem);
   overflow: hidden;
   background: var(--ui-overlay);
-  backdrop-filter: blur(8px);
 }
 
+/*
+ * A dialog is an overlay, so it is the one place in this component tree that
+ * earns the deepest elevation step. It still sits on a panel fill with a
+ * hairline border - the shadow lifts it off the scrim, it does not decorate it.
+ */
 .confirm-dialog-panel {
   width: min(var(--confirm-dialog-max-width), 100%);
   max-height: calc(100vh - 2.5rem);
@@ -151,35 +155,34 @@ onBeforeUnmount(() => {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
+  border-radius: var(--ui-radius);
   outline: none;
-  background: var(--ui-surface-strong);
-  box-shadow: var(--ui-shadow-md);
+  background: var(--ui-panel);
   color: var(--ui-text-primary);
-  backdrop-filter: blur(20px);
+  box-shadow: var(--ui-shadow-md);
 }
 
 .confirm-dialog-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1.25rem 1.5rem;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3) var(--ui-space-4);
   border-bottom: 1px solid var(--ui-border);
 }
 
 .confirm-dialog-header h5 {
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: var(--ui-space-2);
   margin: 0;
   color: var(--ui-text-primary);
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: var(--ui-label-weight);
 }
 
 .confirm-dialog-header h5 i {
-  color: var(--ui-accent);
+  color: var(--ui-text-muted);
 }
 
 .confirm-dialog-panel--danger .confirm-dialog-header h5 i {
@@ -191,18 +194,19 @@ onBeforeUnmount(() => {
 }
 
 .confirm-dialog-close {
-  width: 2rem;
-  height: 2rem;
+  width: var(--ui-control-height);
+  height: var(--ui-control-height);
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--ui-radius);
   background: transparent;
-  color: var(--ui-text-secondary);
+  color: var(--ui-text-muted);
   cursor: pointer;
+  transition: var(--transition-default);
 }
 
 .confirm-dialog-close:hover,
@@ -210,14 +214,18 @@ onBeforeUnmount(() => {
   background: var(--ui-surface-hover);
   color: var(--ui-text-primary);
   outline: none;
-  box-shadow: 0 0 0 3px var(--ui-accent-soft);
+}
+
+.confirm-dialog-close:focus-visible {
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 .confirm-dialog-body {
   min-height: 0;
   flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
+  padding: var(--ui-space-4);
   color: var(--ui-text-secondary);
   line-height: 1.6;
 }
@@ -230,20 +238,20 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 1rem 1.5rem;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3) var(--ui-space-4);
   border-top: 1px solid var(--ui-border);
-  background: color-mix(in srgb, var(--ui-surface) 70%, transparent);
+  background: var(--ui-surface);
 }
 
 .confirm-dialog-enter-active,
 .confirm-dialog-leave-active {
-  transition: opacity 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .confirm-dialog-enter-active .confirm-dialog-panel,
 .confirm-dialog-leave-active .confirm-dialog-panel {
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .confirm-dialog-enter-from,
@@ -254,7 +262,6 @@ onBeforeUnmount(() => {
 .confirm-dialog-enter-from .confirm-dialog-panel,
 .confirm-dialog-leave-to .confirm-dialog-panel {
   opacity: 0;
-  transform: translateY(16px) scale(0.98);
 }
 
 @media (max-width: 575.98px) {
@@ -265,13 +272,13 @@ onBeforeUnmount(() => {
 
   .confirm-dialog-panel {
     max-height: calc(100vh - 1.5rem);
-    border-radius: var(--ui-radius-md);
+    border-radius: var(--ui-radius);
   }
 
   .confirm-dialog-header,
   .confirm-dialog-body,
   .confirm-dialog-footer {
-    padding: 1rem;
+    padding: var(--ui-space-3);
   }
 
   .confirm-dialog-footer {

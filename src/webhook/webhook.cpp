@@ -35,7 +35,6 @@
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
-#include "src/config.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
 #include "src/uuid.h"
@@ -58,10 +57,6 @@ namespace webhook {
     std::atomic<std::shared_ptr<const configuration_t>> active_configuration {
       std::make_shared<const configuration_t>()
     };
-
-    bool use_chinese_content() {
-      return config::sunshine.locale == "zh"sv || config::sunshine.locale == "zh_TW"sv;
-    }
 
     struct parsed_url_t {
       bool https = false;
@@ -1066,7 +1061,7 @@ namespace webhook {
       };
       auto delivery = make_delivery(
         settings,
-        generate_webhook_json(event, use_chinese_content()),
+        generate_webhook_json(event),
         event_id,
         event_type_name(event.type),
         true,
@@ -1110,7 +1105,7 @@ namespace webhook {
       }
       auto delivery = make_delivery(
         settings,
-        g_webhook_format.generate_test_json_payload(use_chinese_content()),
+        g_webhook_format.generate_test_json_payload(),
         -1,
         "webhook_test",
         false,
@@ -1181,24 +1176,24 @@ namespace webhook {
     }
   }
 
-  std::string get_alert_message(event_type_t type, bool is_chinese) {
+  std::string get_alert_message(event_type_t type) {
     switch (type) {
       case event_type_t::CONFIG_PIN_SUCCESS:
-        return is_chinese ? "🔗 配置配对成功" : "🔗 Config pairing successful";
+        return "🔗 Config pairing successful";
       case event_type_t::CONFIG_PIN_FAILED:
-        return is_chinese ? "❌ 配置配对失败" : "❌ Config pairing failed";
+        return "❌ Config pairing failed";
       case event_type_t::NV_APP_LAUNCH:
-        return is_chinese ? "🚀 应用启动" : "🚀 application launched";
+        return "🚀 application launched";
       case event_type_t::NV_APP_RESUME:
-        return is_chinese ? "▶️ 应用恢复" : "▶️ application resumed";
+        return "▶️ application resumed";
       case event_type_t::NV_APP_TERMINATE:
-        return is_chinese ? "⏹️ 应用终止" : "⏹️ application terminated";
+        return "⏹️ application terminated";
       case event_type_t::NV_SESSION_START:
-        return is_chinese ? "📱 会话开始" : "📱 session started";
+        return "📱 session started";
       case event_type_t::NV_SESSION_END:
-        return is_chinese ? "📱 会话结束" : "📱 session ended";
+        return "📱 session ended";
       default:
-        return is_chinese ? "🔔 系统通知" : "🔔 System notification";
+        return "🔔 System notification";
     }
   }
 
@@ -1249,8 +1244,8 @@ namespace webhook {
     return stream.str();
   }
 
-  std::string generate_webhook_json(const event_t &event, bool is_chinese) {
-    return g_webhook_format.generate_json_payload(event, is_chinese);
+  std::string generate_webhook_json(const event_t &event) {
+    return g_webhook_format.generate_json_payload(event);
   }
 
   const char *delivery_error_name(delivery_error_t error) noexcept {

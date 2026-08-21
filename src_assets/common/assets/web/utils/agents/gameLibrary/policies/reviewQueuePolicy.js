@@ -3,14 +3,7 @@ export const GAME_RESOURCE_REVIEW_THRESHOLDS = {
   coverConfidence: 0.7,
 }
 
-const ZH_REVIEW_MESSAGES = {
-  lowNameConfidence: (percent) => `\u540d\u79f0\u7f6e\u4fe1\u5ea6 ${percent}%`,
-  missingCanonicalName: '\u7f3a\u5c11\u89c4\u8303\u540d\u79f0',
-  missingCover: '\u7f3a\u5c11\u5c01\u9762',
-  lowCoverConfidence: (percent) => `\u5c01\u9762\u7f6e\u4fe1\u5ea6 ${percent}%`,
-}
-
-const EN_REVIEW_MESSAGES = {
+const REVIEW_MESSAGES = {
   lowNameConfidence: (percent) => `Low name confidence ${percent}%`,
   missingCanonicalName: 'Missing canonical name',
   missingCover: 'Missing cover',
@@ -23,8 +16,10 @@ function hasNumericValue(value) {
   return Number.isFinite(Number(value))
 }
 
-function getReviewMessages(locale = 'en') {
-  return String(locale || '').toLowerCase().startsWith('zh') ? ZH_REVIEW_MESSAGES : EN_REVIEW_MESSAGES
+// The product is English-only; the locale argument is retained so existing
+// call sites keep working, but it no longer selects a message set.
+function getReviewMessages() {
+  return REVIEW_MESSAGES
 }
 
 export function getGameResourceReviewReasons(app, options = {}) {
@@ -32,7 +27,7 @@ export function getGameResourceReviewReasons(app, options = {}) {
     ...GAME_RESOURCE_REVIEW_THRESHOLDS,
     ...(options.thresholds || {}),
   }
-  const messages = getReviewMessages(options.locale)
+  const messages = getReviewMessages()
   const reasons = []
   const nameConfidence = Number(app?.['ai-confidence'])
   const coverConfidence = hasNumericValue(app?.['ai-cover-confidence'])

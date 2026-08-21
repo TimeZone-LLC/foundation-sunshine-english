@@ -342,31 +342,26 @@ onMounted(async () => {
   min-height: 100vh;
   padding-bottom: var(--spacing-xl);
   color: var(--ui-text-primary);
-  background: linear-gradient(180deg, rgba(var(--ui-accent-rgb), 0.06), transparent 28rem);
+  background: var(--ui-page-bg);
 }
 
 .page-title {
   color: var(--ui-text-primary) !important;
-  font-weight: 600;
+  font-weight: var(--ui-label-weight);
 }
 
 .page-title i {
-  color: var(--ui-accent);
+  color: var(--ui-text-muted);
 }
 
 .btn {
-  border-radius: 8px;
+  border-radius: 0;
   padding: 0.5rem 1rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-}
-
-.btn:hover {
-  transform: translateY(-1px);
+  transition: var(--transition-default);
 }
 
 .alert {
-  border-radius: 8px;
+  border-radius: 0;
   font-size: 0.9rem;
   padding: 0.75rem 1rem;
 }

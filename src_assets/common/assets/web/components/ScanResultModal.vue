@@ -340,8 +340,7 @@ const selectedType = ref('all')
 const gamesOnly = ref(false)
 const reviewOnly = ref(false)
 
-const isChineseLocale = computed(() => String(locale.value || '').toLowerCase().startsWith('zh'))
-const reviewLabel = computed(() => (isChineseLocale.value ? '需要审核' : 'Review'))
+const reviewLabel = 'Review'
 
 // 重置过滤器
 watch(

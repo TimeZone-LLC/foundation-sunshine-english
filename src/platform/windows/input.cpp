@@ -243,7 +243,6 @@ namespace platf {
       if (!VIGEM_SUCCESS(status)) {
         // Log a special fatal message for this case to show the error in the web UI
         BOOST_LOG(fatal) << "ViGEmBus is not installed or running. You must install ViGEmBus for gamepad support! (If you don't need gamepad support, you can ignore this message.)"sv;
-        BOOST_LOG(fatal) << "ViGEmBus 没有安装或运行。您必须安装 ViGEmBus 才能支持游戏手柄！如果不需要使用游戏手柄，可以忽略此提示。"sv;
       }
       else {
         vigem_disconnect(client.get());
@@ -598,8 +597,11 @@ namespace platf {
   retry:
     auto send = SendInput(1, &i, sizeof(INPUT));
     if (send != 1) {
+      // syncThreadDesktop() owns the handle it returns and keeps it alive, so the value is
+      // stable while the input desktop does not change. Never close it here.
       auto hDesk = syncThreadDesktop();
       if (_lastKnownInputDesktop != hDesk) {
+        BOOST_LOG(debug) << "Input desktop switched, reattached the thread and retrying input"sv;
         _lastKnownInputDesktop = hDesk;
         goto retry;
       }
@@ -620,8 +622,10 @@ namespace platf {
   inject_synthetic_pointer_input(input_raw_t *input, HSYNTHETICPOINTERDEVICE device, const POINTER_TYPE_INFO *pointerInfo, UINT32 count) {
   retry:
     if (!input->fnInjectSyntheticPointerInput(device, pointerInfo, count)) {
+      // See send_input(): the handle belongs to syncThreadDesktop() and must not be closed.
       auto hDesk = syncThreadDesktop();
       if (_lastKnownInputDesktop != hDesk) {
+        BOOST_LOG(debug) << "Input desktop switched, reattached the thread and retrying pointer input"sv;
         _lastKnownInputDesktop = hDesk;
         goto retry;
       }
@@ -2403,24 +2407,24 @@ namespace platf {
     if (raw->dsu_server) {
       if (motion.motionType == LI_MOTION_TYPE_ACCEL) {
         // 发送加速度数据
-        BOOST_LOG(debug) << "发送加速度数据到DSU服务器";
+        BOOST_LOG(debug) << "Sending accelerometer data to the DSU server";
         raw->dsu_server->send_motion_data(motion.id.globalIndex,
           motion.x, motion.y, motion.z,
           0.0f, 0.0f, 0.0f);
       }
       else if (motion.motionType == LI_MOTION_TYPE_GYRO) {
         // 发送陀螺仪数据
-        BOOST_LOG(debug) << "发送陀螺仪数据到DSU服务器";
+        BOOST_LOG(debug) << "Sending gyroscope data to the DSU server";
         raw->dsu_server->send_motion_data(motion.id.globalIndex,
           0.0f, 0.0f, 0.0f,
           motion.x, motion.y, motion.z);
       }
       else {
-        BOOST_LOG(debug) << "未知的运动数据类型: " << (int) motion.motionType;
+        BOOST_LOG(debug) << "Unknown motion data type: " << (int) motion.motionType;
       }
     }
     else {
-      BOOST_LOG(warning) << "DSU服务器未初始化，无法发送运动数据";
+      BOOST_LOG(warning) << "DSU server is not initialized, cannot send motion data";
     }
   }
 

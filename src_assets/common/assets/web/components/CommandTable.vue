@@ -240,12 +240,12 @@ const onDragEnd = () => emitOrderChanged()
   margin-bottom: var(--spacing-md);
   overflow-x: auto;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
 }
 
 .monospace {
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-family-mono);
 }
 
 .drag-column {
@@ -278,11 +278,11 @@ const onDragEnd = () => emitOrderChanged()
 
   thead th {
     &:first-child {
-      border-radius: 12px 0 0 0;
+      border-radius: 0;
     }
 
     &:last-child {
-      border-radius: 0 12px 0 0;
+      border-radius: 0;
       text-align: center;
     }
   }
@@ -296,7 +296,7 @@ const onDragEnd = () => emitOrderChanged()
     border-color: var(--ui-border);
     padding: 0.75rem;
     background: var(--ui-surface);
-    transition: background 0.3s ease;
+    transition: var(--transition-default);
   }
 
   tbody tr {
@@ -306,11 +306,11 @@ const onDragEnd = () => emitOrderChanged()
 
     &:last-child td {
       &:first-child {
-        border-radius: 0 0 0 12px;
+        border-radius: 0;
       }
 
       &:last-child {
-        border-radius: 0 0 12px 0;
+        border-radius: 0;
       }
     }
 
@@ -329,14 +329,14 @@ const onDragEnd = () => emitOrderChanged()
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   color: var(--ui-text-primary);
-  border-radius: 8px;
-  backdrop-filter: blur(5px);
-  transition: all 0.3s ease;
+  border-radius: 0;
+  transition: var(--transition-default);
 
   &:focus {
     background: var(--ui-surface-hover);
     border-color: var(--ui-accent);
-    box-shadow: 0 0 0 0.2rem var(--ui-accent-soft);
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 
   &::placeholder {
@@ -347,8 +347,8 @@ const onDragEnd = () => emitOrderChanged()
 .btn-sm {
   padding: 0.25rem 0.5rem;
   font-size: 0.75rem;
-  border-radius: 8px;
-  transition: all 0.3s ease;
+  border-radius: 0;
+  transition: var(--transition-default);
 }
 
 .form-check {
@@ -391,7 +391,7 @@ const onDragEnd = () => emitOrderChanged()
   padding: 0.5rem;
   opacity: 0;
   cursor: move;
-  transition: opacity 0.3s ease, color 0.3s ease;
+  transition: var(--transition-default);
 
   &:hover {
     color: var(--ui-accent);
@@ -417,8 +417,6 @@ const onDragEnd = () => emitOrderChanged()
 
 .command-row-drag {
   opacity: 0.95;
-  transform: rotate(2deg);
-  box-shadow: var(--ui-shadow-md);
   z-index: 1001;
   position: relative;
 }

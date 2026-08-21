@@ -92,25 +92,19 @@ const modes = [
   height: 100%;
   padding: 0.85rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .display-prep-option:hover .display-prep-option-content {
   border-color: var(--ui-border-strong);
   background: var(--ui-surface-hover);
-  transform: translateY(-1px);
 }
 
 .display-prep-option.is-selected .display-prep-option-content {
   border-color: var(--ui-accent);
   background: var(--ui-accent-soft);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--ui-accent) 28%, transparent);
 }
 
 .display-prep-option input:focus-visible + .display-prep-option-content {
@@ -151,7 +145,7 @@ const modes = [
   height: 1.75rem;
   place-items: center;
   border: 2px solid var(--ui-border-strong);
-  border-radius: 0.3rem;
+  border-radius: 0;
   background: var(--ui-surface-strong);
   color: var(--ui-text-muted);
 }
@@ -183,11 +177,10 @@ const modes = [
   height: 1rem;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--ui-accent);
   color: var(--ui-on-accent, #fff);
   font-size: 0.48rem;
-  box-shadow: 0 0 0 2px var(--ui-surface);
 }
 
 .topology-off-mark {

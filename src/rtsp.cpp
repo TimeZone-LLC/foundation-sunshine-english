@@ -29,6 +29,7 @@ extern "C" {
 #include "config.h"
 #include "cursor_channel.h"
 #include "globals.h"
+#include "httpcommon.h"
 #include "input.h"
 #include "logging.h"
 #include "network.h"
@@ -677,6 +678,14 @@ namespace rtsp_stream {
 
     int
     bind(net::af_e af, std::uint16_t port, boost::system::error_code &ec) {
+      // Never leave a half-opened acceptor behind: the caller retries a failed bind, and a
+      // still-open acceptor would make every further attempt fail with "already open" instead
+      // of with the real reason the port was unavailable.
+      auto close_on_failure = util::fail_guard([this]() {
+        boost::system::error_code close_ec;
+        acceptor.close(close_ec);
+      });
+
       acceptor.open(af == net::IPV4 ? tcp::v4() : tcp::v6(), ec);
       if (ec) {
         return -1;
@@ -706,6 +715,8 @@ namespace rtsp_stream {
       acceptor.async_accept(next_socket->sock, [this](const auto &ec) {
         handle_accept(ec);
       });
+
+      close_on_failure.disable();
 
       return 0;
     }
@@ -1675,11 +1686,26 @@ namespace rtsp_stream {
     server.map("ANNOUNCE"sv, &cmd_announce);
     server.map("PLAY"sv, &cmd_play);
 
-    boost::system::error_code ec;
-    if (server.bind(net::af_from_enum_string(config::sunshine.address_family), net::map_port(rtsp_stream::RTSP_SETUP_PORT), ec)) {
-      BOOST_LOG(fatal) << "Couldn't bind RTSP server to port ["sv << net::map_port(rtsp_stream::RTSP_SETUP_PORT) << "], " << ec.message();
-      shutdown_event->raise(true);
+    // A port still held by a previous sunshine.exe is the common case here, and it clears on
+    // its own within seconds. Retry the bind with escalating backoff instead of ending the
+    // process on the first collision; a permanent error such as a bad bind address still
+    // fails immediately, and either way the exit code is non-zero.
+    const auto rtsp_port = net::map_port(rtsp_stream::RTSP_SETUP_PORT);
+    const auto address_family = net::af_from_enum_string(config::sunshine.address_family);
+    const auto bind_outcome = http::start_with_bind_retry(
+      http::listener_e::rtsp, rtsp_port, [rtsp_port, address_family]() -> boost::system::error_code {
+        boost::system::error_code ec;
+        if (server.bind(address_family, rtsp_port, ec)) {
+          // Every failure path in bind() sets ec; fall back to a permanent error so an
+          // unexpected one is reported rather than retried forever.
+          return ec ? ec : boost::system::error_code { boost::asio::error::fault };
+        }
 
+        http::listener_ready(http::listener_e::rtsp, rtsp_port);
+        return {};
+      });
+
+    if (bind_outcome != http::bind_outcome_e::bound) {
       return;
     }
 

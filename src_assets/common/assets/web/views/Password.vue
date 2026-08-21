@@ -183,19 +183,15 @@ async function save() {
 </style>
 
 <style lang="less" scoped>
-@transition-duration: 0.2s;
-@transition-timing: ease;
-@success-bg-opacity: 0.1;
-
 .icon-wrapper {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 56px;
   height: 56px;
-  background: var(--ui-accent-soft);
+  background: var(--ui-surface-strong);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
 }
 
 .section-icon {
@@ -204,42 +200,32 @@ async function save() {
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: var(--ui-accent-soft);
-  border-radius: var(--ui-radius-sm);
+  background: var(--ui-surface-strong);
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
   font-size: 1rem;
 
   &-success {
-    background: rgba(47, 155, 98, @success-bg-opacity);
+    border-color: var(--ui-success-border);
+    color: var(--ui-success-text);
   }
 }
 
 .form-control {
   padding: 0.5rem 0.75rem;
-  border-radius: var(--ui-radius-sm);
-  transition: border-color @transition-duration @transition-timing,
-              box-shadow @transition-duration @transition-timing;
+  border-radius: 0;
+  transition: var(--transition-default);
 
   &:focus {
     border-color: var(--ui-border-strong);
-    box-shadow: 0 0 0 3px var(--ui-accent-soft);
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 }
 
 .card {
-  transition: transform @transition-duration @transition-timing;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border) !important;
-  box-shadow: var(--ui-shadow-sm) !important;
-}
-
-.btn-primary {
-  transition: transform @transition-duration @transition-timing,
-              box-shadow @transition-duration @transition-timing;
-
-  &:hover {
-    transform: translateY(-1px);
-    box-shadow: var(--ui-shadow-sm);
-  }
 }
 
 hr {
@@ -250,15 +236,15 @@ hr {
 .password-page {
   min-height: 100vh;
   color: var(--ui-text-primary);
-  background: linear-gradient(180deg, rgba(var(--ui-accent-rgb), 0.06), transparent 28rem);
+  background: var(--ui-page-bg);
 
   .page-title {
     color: var(--ui-text-primary) !important;
-    font-weight: 600;
+    font-weight: var(--ui-label-weight);
   }
 
   :deep(.text-primary) {
-    color: var(--ui-accent) !important;
+    color: var(--ui-text-primary) !important;
   }
 }
 </style>

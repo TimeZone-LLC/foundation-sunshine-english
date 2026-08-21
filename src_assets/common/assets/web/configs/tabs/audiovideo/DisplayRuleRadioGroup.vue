@@ -56,7 +56,7 @@ const emit = defineEmits(['update:modelValue'])
   min-width: 0;
   padding: 0.85rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
 }
 
@@ -79,15 +79,12 @@ const emit = defineEmits(['update:modelValue'])
   margin: 0;
   padding: 0.55rem 0.65rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   color: var(--ui-text-secondary);
   font-size: 0.8rem;
   line-height: 1.35;
   cursor: pointer;
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    color 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .display-rule-option:hover {

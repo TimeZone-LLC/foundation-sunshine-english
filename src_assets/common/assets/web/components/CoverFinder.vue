@@ -355,7 +355,6 @@ export default {
   justify-content: center;
   padding: 2rem;
   background: var(--ui-overlay);
-  backdrop-filter: blur(6px);
 }
 
 .cover-finder-panel {
@@ -367,8 +366,7 @@ export default {
   color: var(--ui-text-primary);
   background: var(--ui-surface-strong);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  box-shadow: var(--ui-shadow-lg);
+  border-radius: 0;
 }
 
 .cover-finder__header {
@@ -403,13 +401,9 @@ export default {
   width: 36px;
   height: 36px;
   padding: 0;
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   cursor: pointer;
-  transition:
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease,
-    transform 0.18s ease;
+  transition: var(--transition-default);
 
   &:focus-visible {
     outline: 3px solid var(--ui-accent-soft);
@@ -439,16 +433,14 @@ export default {
     padding: 0 0.45rem;
     background: var(--ui-surface);
     border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius-md);
-    transition:
-      border-color 0.18s ease,
-      box-shadow 0.18s ease,
-      background-color 0.18s ease;
+    border-radius: 0;
+    transition: var(--transition-default);
 
     &:focus-within {
       background: var(--ui-surface-hover);
       border-color: var(--ui-accent);
-      box-shadow: 0 0 0 3px var(--ui-accent-soft);
+      outline: 2px solid var(--ui-text-primary);
+      outline-offset: 0;
     }
   }
 
@@ -488,14 +480,6 @@ export default {
     background: var(--ui-accent);
     border: 1px solid var(--ui-accent);
 
-    &:hover:not(:disabled) {
-      transform: translateY(-1px);
-    }
-
-    &:active:not(:disabled) {
-      transform: scale(0.96);
-    }
-
     &:disabled {
       color: var(--ui-text-muted);
       cursor: not-allowed;
@@ -529,11 +513,8 @@ export default {
   cursor: pointer;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  transition:
-    background-color 0.18s ease,
-    border-color 0.18s ease,
-    color 0.18s ease;
+  border-radius: 0;
+  transition: var(--transition-default);
 
   &:hover {
     color: var(--ui-text-primary);
@@ -559,7 +540,7 @@ export default {
     font-size: 0.72rem;
     text-align: center;
     background: var(--ui-accent-soft);
-    border-radius: 999px;
+    border-radius: 0;
   }
 }
 
@@ -576,7 +557,7 @@ export default {
 
   &::-webkit-scrollbar-thumb {
     background: var(--ui-border-strong);
-    border-radius: 999px;
+    border-radius: 0;
   }
 }
 
@@ -592,7 +573,7 @@ export default {
     height: 40px;
     border: 3px solid var(--ui-accent-soft);
     border-top-color: var(--ui-accent);
-    border-radius: 50%;
+    border-radius: 0;
     animation: cover-finder-spin 1s linear infinite;
   }
 
@@ -623,16 +604,11 @@ export default {
   cursor: pointer;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
-  transition:
-    transform 0.18s ease,
-    border-color 0.18s ease,
-    box-shadow 0.18s ease;
+  border-radius: 0;
+  transition: var(--transition-default);
 
   &:hover {
     border-color: var(--ui-border-strong);
-    box-shadow: var(--ui-shadow-sm);
-    transform: translateY(-2px);
 
     .cover-finder__card-overlay {
       opacity: 1;
@@ -664,11 +640,11 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--ui-accent-contrast);
+    color: #ffffff;
     font-size: 2rem;
-    background: rgba(var(--ui-accent-rgb), 0.82);
+    background: var(--ui-overlay);
     opacity: 0;
-    transition: opacity 0.18s ease;
+    transition: var(--transition-default);
   }
 
   &-badge {
@@ -680,19 +656,11 @@ export default {
     justify-content: center;
     width: 26px;
     height: 26px;
-    color: #fff;
+    color: var(--ui-text-primary);
     font-size: 0.72rem;
-    border: 1px solid rgba(255, 255, 255, 0.24);
-    border-radius: 7px;
-    box-shadow: var(--ui-shadow-sm);
-
-    &--steam {
-      background: #1b2838;
-    }
-
-    &--igdb {
-      background: #9147ff;
-    }
+    border: 1px solid var(--ui-border-strong);
+    border-radius: 0;
+    background: var(--ui-surface-strong);
   }
 
   &-info {
@@ -737,7 +705,7 @@ export default {
     color: var(--ui-accent);
     background: var(--ui-accent-soft);
     border: 1px solid var(--ui-border);
-    border-radius: 50%;
+    border-radius: 0;
 
     i {
       font-size: 1.8rem;
@@ -762,7 +730,7 @@ export default {
 
 .finder-fade-enter-active,
 .finder-fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .finder-fade-enter-from,

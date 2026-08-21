@@ -186,7 +186,7 @@ namespace display_device {
             parsed_config.resolution = boost::none;
           }
           else if (session.width > 16384 || session.height > 16384) {
-            BOOST_LOG(warning) << "奇怪的分辨率增加了...";
+            BOOST_LOG(warning) << "Client requested an unreasonably large resolution; ignoring it.";
             parsed_config.resolution = boost::none;
           }
           else if (session.width >= 0 && session.height >= 0) {
@@ -526,7 +526,7 @@ namespace display_device {
         case device_prep_e::ensure_primary:
         case device_prep_e::ensure_only_display:
         case device_prep_e::ensure_secondary:
-          BOOST_LOG(debug) << "客户端自定义屏幕模式: "sv << session.custom_screen_mode;
+          BOOST_LOG(debug) << "Client custom screen mode: "sv << session.custom_screen_mode;
           return static_cast<device_prep_e>(session.custom_screen_mode);
         default:
           return configured;
@@ -543,7 +543,7 @@ namespace display_device {
       if (std::string client_display_name = it->to_string(); !client_display_name.empty()) {
         device_id = std::move(client_display_name);
         client_named_it = true;
-        BOOST_LOG(debug) << "使用客户端指定的显示器: "sv << device_id;
+        BOOST_LOG(debug) << "Using client-specified display: "sv << device_id;
       }
     }
 
@@ -598,14 +598,14 @@ namespace display_device {
       if (client_named_it) {
         // The client picked this display for this stream, so quietly streaming a
         // different one is worse than telling it the display is gone.
-        BOOST_LOG(error) << "客户端指定的物理显示器不存在，拒绝回退到其他显示器: "sv << intent.device_id;
+        BOOST_LOG(error) << "Client-specified physical display does not exist, refusing to fall back to another display: "sv << intent.device_id;
         intent.target = display_intent_t::target_e::unavailable;
         return intent;
       }
 
       // A stale entry in the host config. Aim at the primary display; whether a
       // virtual display is a better answer is decided during stream startup.
-      BOOST_LOG(warning) << "配置的显示器不存在，改用主显示器: "sv << intent.device_id;
+      BOOST_LOG(warning) << "Configured display does not exist, using the primary display instead: "sv << intent.device_id;
       intent.device_id.clear();
       intent.user_named_display = false;
     }
@@ -726,17 +726,17 @@ namespace display_device {
     }
 
     // 记录解析后的配置信息
-    BOOST_LOG(debug) << "解析后的显示设备配置:"sv
-                     << "\n设备ID: "sv << parsed_config.device_id
-                     << "\n设备准备模式: "sv << static_cast<int>(parsed_config.device_prep)
-                     << "\nHDR状态: "sv << (parsed_config.change_hdr_state ? (*parsed_config.change_hdr_state ? "启用" : "禁用") : "不变")
-                     << "\n分辨率: "sv << (parsed_config.resolution ? to_string(*parsed_config.resolution) : "不变")
-                     << "\n刷新率: "sv << (parsed_config.refresh_rate ? to_string(*parsed_config.refresh_rate) : "不变")
+    BOOST_LOG(debug) << "Parsed display device config:"sv
+                     << "\nDevice ID: "sv << parsed_config.device_id
+                     << "\nDevice prep mode: "sv << static_cast<int>(parsed_config.device_prep)
+                     << "\nHDR state: "sv << (parsed_config.change_hdr_state ? (*parsed_config.change_hdr_state ? "enabled" : "disabled") : "unchanged")
+                     << "\nResolution: "sv << (parsed_config.resolution ? to_string(*parsed_config.resolution) : "unchanged")
+                     << "\nRefresh rate: "sv << (parsed_config.refresh_rate ? to_string(*parsed_config.refresh_rate) : "unchanged")
                      << "\n"sv;
 
     // 不需要VDD时，使用物理模式映射
     if (intent.target != display_intent_t::target_e::vdd) {
-      BOOST_LOG(debug) << "使用物理显示器，跳过VDD准备"sv;
+      BOOST_LOG(debug) << "Using a physical display, skipping VDD preparation"sv;
       parsed_config.use_vdd = false;
       parsed_config.device_prep = parsed_config_t::to_physical_device_prep(parsed_config.device_prep);
       parsed_config.vdd_prep = parsed_config_t::vdd_prep_e::no_operation;
@@ -747,8 +747,8 @@ namespace display_device {
     // device_prep 保留原始统一值（用于 apply_config 中的 display_may_change 等判断）
     parsed_config.use_vdd = true;
     parsed_config.vdd_prep = parsed_config_t::to_vdd_prep(parsed_config.device_prep);
-    BOOST_LOG(debug) << "VDD模式：统一值 " << static_cast<int>(parsed_config.device_prep)
-                     << " 映射为 vdd_prep=" << static_cast<int>(parsed_config.vdd_prep);
+    BOOST_LOG(debug) << "VDD mode: unified value " << static_cast<int>(parsed_config.device_prep)
+                     << " mapped to vdd_prep=" << static_cast<int>(parsed_config.vdd_prep);
 
     return parsed_config;
   }

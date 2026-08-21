@@ -7,7 +7,9 @@
   justify-content: center;
   padding: 0.375rem 0.75rem;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: var(--ui-label-weight);
+  text-transform: var(--ui-label-transform);
+  letter-spacing: var(--ui-label-tracking);
   line-height: 1.5;
   text-align: center;
   text-decoration: none;
@@ -15,8 +17,8 @@
   cursor: pointer;
   user-select: none;
   border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
-  .transition-transform();
+  border-radius: 0;
+  .transition-default();
   background: var(--ui-accent);
   color: var(--ui-accent-contrast);
 
@@ -24,24 +26,16 @@
     background: var(--ui-accent);
     border-color: var(--ui-accent);
     color: var(--ui-accent-contrast);
-    transform: translateY(-1px);
-    box-shadow: var(--ui-shadow-sm);
   }
 
-  &:active {
-    transform: translateY(0);
-    box-shadow: none;
-  }
-
-  &:focus {
-    outline: 0;
-    box-shadow: 0 0 0 3px var(--ui-accent-soft);
+  &:focus-visible {
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 
   &:disabled {
     opacity: 0.65;
     cursor: not-allowed;
-    transform: none;
   }
 
   &.absolute {
@@ -50,7 +44,6 @@
     right: 10px;
     z-index: 10;
   }
-
 }
 
 // ============================================================================
@@ -69,11 +62,11 @@
 .apps-page {
   min-height: 100vh;
   padding-bottom: var(--spacing-xl);
-  background: linear-gradient(180deg, rgba(var(--ui-accent-rgb), 0.06), transparent 28rem);
+  background: var(--ui-page-bg);
 
   .page-title {
-    color: var(--text-title-color, var(--ui-text-primary)) !important;
-    font-weight: 600;
+    color: var(--ui-text-primary) !important;
+    font-weight: var(--ui-label-weight);
   }
 
   .page-subtitle {
@@ -92,19 +85,17 @@
 .search-input {
   background: var(--ui-surface-strong);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
-  padding: 12px 20px 12px 56px;
+  border-radius: 0;
+  padding: 12px 20px 12px 48px;
   font-size: 1.1rem;
   color: var(--ui-text-primary);
-  .glass-effect-light();
   .transition-default();
-  box-shadow: var(--ui-shadow-sm);
 
   &:focus {
-    outline: none;
     border-color: var(--ui-border-strong);
     background: var(--ui-surface-hover);
-    box-shadow: 0 0 0 3px var(--ui-accent-soft), var(--ui-shadow-sm);
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 
   &::placeholder {
@@ -114,39 +105,36 @@
 
 .search-icon {
   position: absolute;
-  left: 14px;
+  left: 16px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
-  width: 30px;
-  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
-  font-size: 1.1rem;
+  color: var(--ui-text-muted);
+  font-size: 1rem;
   pointer-events: none;
 }
 
 .btn-clear-search {
   position: absolute;
-  right: 15px;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 2;
-  background: none;
-  border: none;
+  background: transparent;
+  border: 1px solid transparent;
   color: var(--ui-text-secondary);
   cursor: pointer;
-  padding: 5px;
-  border-radius: 50%;
+  padding: 5px 8px;
+  border-radius: 0;
   .transition-default();
 
   &:hover {
     color: var(--ui-text-primary);
-    background: var(--ui-accent-soft);
+    background: var(--ui-surface-hover);
+    border-color: var(--ui-border-strong);
   }
 }
 
@@ -166,10 +154,9 @@
   gap: 8px 14px;
   padding: 10px 14px;
   border: 1px solid var(--ui-info-border);
-  border-radius: var(--border-radius-md, 8px);
+  border-radius: 0;
   background: var(--ui-info-soft);
   color: var(--ui-text-primary);
-  box-shadow: var(--box-shadow-sm);
 }
 
 .scan-progress-copy {
@@ -186,7 +173,7 @@
   span {
     min-width: 0;
     font-size: var(--font-size-sm);
-    font-weight: 700;
+    font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -202,40 +189,35 @@
 }
 
 .scan-progress-count {
+  font-family: var(--font-family-mono);
   font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
   color: var(--ui-text-secondary);
 }
 
+// Determinate progress: a flat bar whose width is the real completion ratio.
 .scan-progress-bar {
   grid-column: 1 / -1;
   position: relative;
   height: 4px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--ui-surface-strong);
+  border: 1px solid var(--ui-border);
 
   span {
     position: absolute;
     inset: 0 auto 0 0;
-    min-width: 24px;
-    border-radius: inherit;
-    background: linear-gradient(90deg, var(--ui-info), var(--ui-success));
-    transition: width 0.24s ease;
+    min-width: 2px;
+    background: var(--ui-accent);
   }
 }
 
+// Indeterminate progress: no percentage is known, so the whole track is filled
+// at a lower emphasis instead of sliding a decorative chunk back and forth.
 .scan-progress-bar--indeterminate span {
-  animation: scanProgressSlide 1.2s ease-in-out infinite;
-}
-
-@keyframes scanProgressSlide {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(260%);
-  }
+  width: 100% !important;
+  background: var(--ui-border-strong);
 }
 
 // ============================================================================
@@ -244,162 +226,116 @@
 
 .view-toggle-group {
   display: flex;
+  gap: 4px;
   background: var(--ui-surface-strong);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   padding: 4px;
-  .glass-effect();
   border: 1px solid var(--ui-border);
-  box-shadow: var(--ui-shadow-sm);
 }
 
 .view-toggle-btn {
-  .btn-rounded();
+  .btn-square();
   flex: 0 0 40px;
   min-width: 40px;
   min-height: 40px;
   padding: 0;
+  border: 1px solid transparent;
   background: transparent;
   color: var(--ui-text-muted);
   font-size: var(--font-size-md);
-  transition: all 0.3s ease;
 
   &:hover {
     color: var(--ui-text-primary);
-    background: var(--ui-accent-soft);
+    background: var(--ui-surface-hover);
+    border-color: var(--ui-border-strong);
+  }
 
-    i {
-      transform: scale(1.1);
-    }
+  &:focus-visible {
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 
   &.active {
     background: var(--ui-accent);
+    border-color: var(--ui-accent);
     color: var(--ui-accent-contrast);
-    box-shadow: var(--ui-shadow-sm);
-    transform: none;
   }
-
-  i {
-    transition: transform 0.3s ease;
-  }
-
 }
 
 // ============================================================================
-// CUTE BUTTONS
+// TOOL BUTTONS
+//
+// The square icon buttons of the page toolbar. Formerly ".cute-btn": circular
+// fabs with a ripple, a lift on hover and a pulsing "unsaved" state. They are
+// now plain framed squares whose only hover feedback is a background change.
 // ============================================================================
 
-.cute-btn {
-  .btn-rounded(46px);
-  flex: 0 0 48px;
-  min-width: 48px;
-  min-height: 48px;
+.tool-btn {
+  .btn-square(44px);
+  flex: 0 0 44px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 0;
-  color: var(--ui-text-primary);
-  font-size: var(--font-size-lg);
-  .transition-default();
-  box-shadow: var(--ui-shadow-sm);
   position: relative;
-  overflow: hidden;
-  animation: fadeIn 0.35s ease-out;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    background: rgba(255, 255, 255, 0.18);
-    border-radius: 50%;
-    transition: all 0.6s ease;
-    transform: translate(-50%, -50%);
-  }
+  border: 1px solid var(--ui-border-strong);
+  background: transparent;
+  color: var(--ui-text-primary);
+  font-size: var(--font-size-md);
+  .transition-default();
 
   &:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--ui-shadow-md);
-
-    &::before {
-      width: 100%;
-      height: 100%;
-    }
-
-    i {
-      transform: scale(1.08);
-    }
+    background: var(--ui-surface-hover);
   }
 
-  &:active {
-    transform: translateY(0);
-    transition: all 0.1s ease;
+  &:focus-visible {
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 
   &:disabled {
     opacity: 0.55;
     cursor: not-allowed;
-    transform: none !important;
-  }
-
-  i {
-    position: relative;
-    z-index: 2;
-    .transition-default();
-  }
-
-  // Stagger animation
-  &:nth-child(1) {
-    animation-delay: 0.1s;
-  }
-  &:nth-child(2) {
-    animation-delay: 0.2s;
-  }
-  &:nth-child(3) {
-    animation-delay: 0.3s;
   }
 }
 
-// Cute button variants mixin
-.cute-btn-variant(@gradient, @gradient-hover) {
-  background: @gradient;
-  border: 1px solid var(--ui-border-strong);
+// Tool button variants: fill and text only, the frame never changes.
+.tool-btn-variant(@background, @foreground) {
+  background: @background;
+  border-color: var(--ui-border-strong);
+  color: @foreground;
 
   &:hover {
-    background: @gradient-hover;
+    background: @background;
     border-color: var(--ui-border-strong);
+    color: @foreground;
   }
 }
 
-.cute-btn-primary {
-  .cute-btn-variant(var(--ui-accent), var(--ui-accent));
-  color: var(--ui-accent-contrast);
+.tool-btn-primary {
+  .tool-btn-variant(var(--ui-accent), var(--ui-accent-contrast));
 
-  &.has-changes {
-    animation: pulse 2s infinite;
-    box-shadow: 0 4px 15px rgba(var(--ui-warning-rgb), 0.48);
-
-    .unsaved-indicator {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      width: 8px;
-      height: 8px;
-      background: var(--ui-warning);
-      border-radius: 50%;
-      box-shadow: 0 0 8px rgba(var(--ui-warning-rgb), 0.62);
-      animation: blink 1.5s infinite;
-    }
+  // Unsaved work is flagged by a square marker, not by a pulsing glow.
+  &.has-changes .unsaved-indicator {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 8px;
+    height: 8px;
+    background: var(--ui-warning);
+    border-radius: 0;
   }
 }
 
-.cute-btn-secondary {
-  .cute-btn-variant(var(--ui-surface-strong), var(--ui-surface-hover));
-  color: var(--ui-text-secondary);
+.tool-btn-secondary {
+  .tool-btn-variant(transparent, var(--ui-text-primary));
+
+  &:hover {
+    background: var(--ui-surface-hover);
+  }
 }
 
-.cute-btn-warning {
-  .cute-btn-variant(var(--ui-warning), var(--ui-warning));
-  color: var(--ui-warning-contrast);
+.tool-btn-warning {
+  .tool-btn-variant(var(--ui-warning), var(--ui-warning-contrast));
 }
 
 // ============================================================================

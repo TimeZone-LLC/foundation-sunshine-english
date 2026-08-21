@@ -215,11 +215,7 @@ const handleDevTap = () => {
 }
 
 .input-group .btn:last-of-type {
-  border-radius: 0 0.375rem 0.375rem 0;
-}
-
-.input-group .btn:hover {
-  transform: none;
+  border-radius: 0;
 }
 
 .match-mode-btn {
@@ -228,7 +224,7 @@ const handleDevTap = () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .match-mode-btn i {
@@ -254,26 +250,26 @@ const handleDevTap = () => {
 
 .logs-container {
   position: relative;
-  background: #1e1e1e;
+  background: var(--ui-surface-strong);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   overflow: hidden;
 }
 
 .logs-content {
   margin: 0;
   padding: 1.25rem;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-family: var(--font-family-mono);
   font-size: 0.85rem;
   line-height: 1.5;
-  color: #d4d4d4;
+  color: var(--ui-text-primary);
   overflow: auto;
   max-height: 450px;
   min-height: 300px;
   white-space: pre-wrap;
   word-break: break-all;
   scrollbar-width: thin;
-  scrollbar-color: #666 #1e1e1e;
+  scrollbar-color: var(--ui-border-strong) var(--ui-surface-strong);
 }
 
 .logs-content::-webkit-scrollbar {
@@ -282,17 +278,17 @@ const handleDevTap = () => {
 }
 
 .logs-content::-webkit-scrollbar-track {
-  background: #1e1e1e;
-  border-radius: 4px;
+  background: var(--ui-surface-strong);
+  border-radius: 0;
 }
 
 .logs-content::-webkit-scrollbar-thumb {
-  background: #666;
-  border-radius: 4px;
+  background: var(--ui-border-strong);
+  border-radius: 0;
 }
 
 .logs-content::-webkit-scrollbar-thumb:hover {
-  background: #888;
+  background: var(--ui-text-muted);
 }
 
 .copy-btn {
@@ -304,18 +300,13 @@ const handleDevTap = () => {
   color: var(--ui-accent-contrast);
   background: var(--ui-accent);
   border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
-  transition: all 0.2s ease;
+  border-radius: 0;
+  transition: var(--transition-default);
   z-index: 10;
 }
 
 .copy-btn:hover {
   background: var(--ui-accent);
-  transform: translateY(-1px);
-}
-
-.copy-btn:active {
-  transform: scale(0.95);
 }
 
 .input-group-text {
@@ -332,12 +323,14 @@ const handleDevTap = () => {
 
 .input-group .form-control:focus {
   border-color: var(--ui-border);
-  box-shadow: none;
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 .input-group:focus-within {
-  box-shadow: 0 0 0 3px var(--ui-accent-soft);
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 .input-group:focus-within .input-group-text,

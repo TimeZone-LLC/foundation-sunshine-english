@@ -680,13 +680,13 @@ onBeforeUnmount(cleanup)
 
   &::-webkit-scrollbar-track {
     background: transparent;
-    border-radius: 3px;
+    border-radius: 0;
   }
 
   &::-webkit-scrollbar-thumb {
     background: var(--ui-border-strong);
-    border-radius: 3px;
-    transition: background 0.2s ease;
+    border-radius: 0;
+    transition: var(--transition-default);
 
     &:hover {
       background: var(--ui-accent);
@@ -718,13 +718,13 @@ onBeforeUnmount(cleanup)
 }
 
 .monospace {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--font-family-mono);
 }
 
 .cmd-examples {
   margin-top: 0.5rem;
   padding: 0.75rem;
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
 
@@ -749,25 +749,23 @@ onBeforeUnmount(cleanup)
   align-items: center;
   gap: 0.375rem;
   padding: 0.375rem 0.625rem;
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   font-size: 0.75rem;
-  transition: all 0.2s ease;
+  transition: var(--transition-default);
   
   background: var(--ui-surface-strong);
   border: 1px solid var(--ui-border);
 
   &:hover {
-    transform: translateY(-1px);
     background: var(--ui-surface-hover);
     border-color: var(--ui-border-strong);
-    box-shadow: var(--ui-shadow-sm);
   }
 
   code {
-    font-family: monospace;
+    font-family: var(--font-family-mono);
     font-size: 0.7rem;
     padding: 0.125rem 0.5rem;
-    border-radius: 5px;
+    border-radius: 0;
     border: none;
     
     background: var(--ui-accent-soft);

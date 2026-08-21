@@ -471,11 +471,11 @@ watch(clients, initTooltips, { deep: true })
   min-height: 100vh;
   padding-bottom: var(--spacing-xl);
   color: var(--ui-text-primary);
-  background: linear-gradient(180deg, rgba(var(--ui-accent-rgb), 0.06), transparent 28rem);
+  background: var(--ui-page-bg);
 
   .page-title {
     color: var(--ui-text-primary) !important;
-    font-weight: 600;
+    font-weight: var(--ui-label-weight);
   }
 
   #form > .card {
@@ -486,7 +486,7 @@ watch(clients, initTooltips, { deep: true })
     --bs-table-bg: transparent;
     --bs-table-color: var(--ui-text-primary);
     --bs-table-border-color: var(--ui-border);
-    --bs-table-hover-bg: var(--ui-accent-soft);
+    --bs-table-hover-bg: var(--ui-surface-hover);
     --bs-table-hover-color: var(--ui-text-primary);
   }
 
@@ -506,27 +506,27 @@ watch(clients, initTooltips, { deep: true })
     gap: 0.65rem;
     padding: 0.7rem 0.85rem;
     color: var(--ui-text-secondary);
-    background: color-mix(in srgb, var(--ui-accent) 8%, transparent);
-    border-left: 3px solid var(--ui-accent);
-    border-radius: var(--ui-radius-sm, 6px);
+    background: var(--ui-surface-strong);
+    border-left: 3px solid var(--ui-border-strong);
+    border-radius: 0;
     font-size: 0.875rem;
     line-height: 1.45;
 
     i {
       margin-top: 0.2rem;
-      color: var(--ui-accent);
+      color: var(--ui-text-muted);
     }
   }
 
   .table-responsive {
-    border-radius: var(--border-radius-md, 8px);
+    border-radius: 0;
     overflow-x: auto;
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
   }
 
   .table {
-    border-radius: var(--border-radius-md, 12px);
+    border-radius: 0;
     overflow: hidden;
     margin-bottom: 0;
   }
@@ -537,6 +537,7 @@ watch(clients, initTooltips, { deep: true })
     min-width: 0;
   }
 
+  // A framed label, square like everything else - it was a rounded pill.
   .setting-pill {
     display: inline-flex;
     align-items: center;
@@ -544,14 +545,14 @@ watch(clients, initTooltips, { deep: true })
     gap: 0.45rem;
     padding: 0.3rem 0.55rem;
     color: var(--ui-text-primary);
-    background: var(--ui-accent-soft);
-    border: 1px solid color-mix(in srgb, var(--ui-accent) 22%, var(--ui-border));
-    border-radius: 999px;
+    background: var(--ui-surface-strong);
+    border: 1px solid var(--ui-border-strong);
+    border-radius: 0;
     font-size: 0.82rem;
     font-weight: 600;
 
     i {
-      color: var(--ui-accent);
+      color: var(--ui-text-muted);
       font-size: 0.75rem;
     }
   }
@@ -567,9 +568,9 @@ watch(clients, initTooltips, { deep: true })
     grid-template-columns: repeat(3, minmax(7rem, 1fr));
     gap: 0.5rem;
     padding: 0.65rem;
-    background: color-mix(in srgb, var(--ui-surface) 84%, transparent);
+    background: var(--ui-surface);
     border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius-sm, 6px);
+    border-radius: 0;
   }
 
   .brightness-field {
@@ -597,7 +598,7 @@ watch(clients, initTooltips, { deep: true })
   }
 
   .runtime-source {
-    color: var(--ui-success, #198754);
+    color: var(--ui-success-text);
     font-size: 0.78rem;
     font-weight: 600;
 
@@ -608,6 +609,7 @@ watch(clients, initTooltips, { deep: true })
 
   .runtime-values {
     color: var(--ui-text-muted);
+    font-family: var(--font-family-mono);
     font-size: 0.72rem;
   }
 }
@@ -616,7 +618,7 @@ watch(clients, initTooltips, { deep: true })
   background-color: var(--ui-warning-soft) !important;
 }
 
-/* Delete Client Modal - 使用 ScanResultModal 样式 */
+/* Delete client modal: an opaque panel over a plain scrim. */
 .delete-client-overlay {
   position: fixed;
   top: 0;
@@ -626,41 +628,24 @@ watch(clients, initTooltips, { deep: true })
   width: 100vw;
   height: 100vh;
   margin: 0;
-  background: var(--modal-backdrop-bg, rgba(45, 38, 40, 0.72));
-  backdrop-filter: blur(8px);
+  background: var(--ui-overlay);
   z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--spacing-lg, 20px);
   overflow: hidden;
-
 }
 
 .delete-client-modal {
   background: var(--ui-surface-strong);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 0;
   width: 100%;
   max-width: 500px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(20px);
-  box-shadow: var(--ui-shadow-md);
-  animation: modalSlideUp 0.3s ease;
-
-}
-
-@keyframes modalSlideUp {
-  from {
-    transform: translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
 }
 
 .delete-client-header {
@@ -674,12 +659,13 @@ watch(clients, initTooltips, { deep: true })
     margin: 0;
     color: var(--ui-text-primary);
     font-size: var(--font-size-lg, 1.1rem);
-    font-weight: 600;
+    font-weight: var(--ui-label-weight);
+    text-transform: var(--ui-label-transform);
+    letter-spacing: var(--ui-label-tracking);
     display: flex;
     align-items: center;
     gap: var(--spacing-sm, 8px);
   }
-
 }
 
 .delete-client-body {
@@ -705,18 +691,7 @@ watch(clients, initTooltips, { deep: true })
   }
 }
 
-/* Vue 过渡动画 */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-/* 响应式优化 */
+/* Responsive */
 @media (max-width: 768px) {
   .client-list-container {
     .brightness-guidance {
@@ -726,7 +701,6 @@ watch(clients, initTooltips, { deep: true })
 
     .table-responsive {
       overflow: visible;
-      border-radius: 0;
     }
 
     .table {
@@ -746,7 +720,7 @@ watch(clients, initTooltips, { deep: true })
       tr {
         display: block;
         border: 1px solid var(--ui-border);
-        border-radius: var(--border-radius-md, 8px);
+        border-radius: 0;
         background: var(--ui-surface);
         overflow: hidden;
       }
@@ -835,7 +809,11 @@ watch(clients, initTooltips, { deep: true })
   }
 }
 
-/* QR Code Pairing Styles */
+/*
+ * QR code pairing. The code itself is functional imagery: it keeps its white
+ * quiet zone so scanners still read it, framed by a hairline instead of a
+ * rounded, shadowed card.
+ */
 .qr-pair-card {
   max-width: 480px;
   margin-left: auto;
@@ -846,15 +824,15 @@ watch(clients, initTooltips, { deep: true })
   display: inline-block;
   padding: 12px;
   background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 0;
 }
 
 .qr-image {
   display: block;
   width: 280px;
   height: 280px;
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 .divider-text {
@@ -874,6 +852,5 @@ watch(clients, initTooltips, { deep: true })
   span {
     padding: 0 1rem;
   }
-
 }
 </style>

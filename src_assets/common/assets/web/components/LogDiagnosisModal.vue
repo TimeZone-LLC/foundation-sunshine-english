@@ -183,42 +183,20 @@ defineEmits(['close', 'diagnose'])
 const showConfig = ref(false)
 
 const DIAGNOSIS_TEXT = {
-  en: {
-    managedConfig: 'AI configuration is managed in the Mita AI Assistant control panel. This dialog only uses the shared Sunshine AI proxy.',
-    status: 'Status',
-    enabled: 'Enabled',
-    disabled: 'Disabled',
-    compatibility: 'Compatibility',
-    keysLocal: "API keys stay in Sunshine's local config and are not edited here.",
-    localPreDiagnosis: 'Local pre-diagnosis',
-    suggestedFixes: 'Suggested fixes',
-    loadingConfig: 'Loading AI configuration...',
-    savingConfig: 'Saving AI configuration...',
-  },
-  zh: {
-    managedConfig: 'AI \u914d\u7f6e\u7531\u7c73\u5854 AI \u52a9\u624b\u63a7\u5236\u9762\u677f\u7edf\u4e00\u7ba1\u7406\u3002\u6b64\u5f39\u7a97\u53ea\u4f7f\u7528 Sunshine \u5171\u4eab AI \u4ee3\u7406\u3002',
-    status: '\u72b6\u6001',
-    enabled: '\u5df2\u542f\u7528',
-    disabled: '\u5df2\u7981\u7528',
-    compatibility: '\u517c\u5bb9\u6a21\u5f0f',
-    keysLocal: 'API \u5bc6\u94a5\u4fdd\u5b58\u5728 Sunshine \u672c\u5730\u914d\u7f6e\u4e2d\uff0c\u6b64\u5904\u4e0d\u4f1a\u7f16\u8f91\u3002',
-    localPreDiagnosis: '\u672c\u5730\u9884\u8bca\u65ad',
-    suggestedFixes: '\u5efa\u8bae\u4fee\u590d',
-    loadingConfig: '\u6b63\u5728\u52a0\u8f7d AI \u914d\u7f6e...',
-    savingConfig: '\u6b63\u5728\u4fdd\u5b58 AI \u914d\u7f6e...',
-  },
-}
-
-function getCurrentLocale() {
-  const documentLocale = typeof document !== 'undefined'
-    ? document.documentElement?.getAttribute?.('lang')
-    : ''
-  return String(locale.value || documentLocale || '').toLowerCase()
+  managedConfig: 'AI configuration is managed elsewhere. This dialog only uses the shared Sunshine AI proxy.',
+  status: 'Status',
+  enabled: 'Enabled',
+  disabled: 'Disabled',
+  compatibility: 'Compatibility',
+  keysLocal: "API keys stay in Sunshine's local config and are not edited here.",
+  localPreDiagnosis: 'Local pre-diagnosis',
+  suggestedFixes: 'Suggested fixes',
+  loadingConfig: 'Loading AI configuration...',
+  savingConfig: 'Saving AI configuration...',
 }
 
 function diagnosisText(key) {
-  const bucket = getCurrentLocale().startsWith('zh') ? DIAGNOSIS_TEXT.zh : DIAGNOSIS_TEXT.en
-  return bucket[key] || DIAGNOSIS_TEXT.en[key] || key
+  return DIAGNOSIS_TEXT[key] || key
 }
 
 const loadingStatusText = computed(() => (
@@ -233,23 +211,14 @@ function copyResult() {
 }
 
 function getFindingLabel(finding) {
-  if (getCurrentLocale().startsWith('zh') && finding?.labels?.zh) {
-    return finding.labels.zh
-  }
   return finding?.message || finding?.type || ''
 }
 
 function getSuggestionTitle(suggestion) {
-  if (getCurrentLocale().startsWith('zh') && suggestion?.labels?.zh) {
-    return suggestion.labels.zh
-  }
   return suggestion?.title || suggestion?.findingType || ''
 }
 
 function getSuggestionActions(suggestion) {
-  if (getCurrentLocale().startsWith('zh') && Array.isArray(suggestion?.actionLabels?.zh)) {
-    return suggestion.actionLabels.zh
-  }
   return Array.isArray(suggestion?.actions) ? suggestion.actions : []
 }
 
@@ -284,19 +253,17 @@ function renderMarkdown(text) {
   align-items: center;
   justify-content: center;
   z-index: 1050;
-  backdrop-filter: blur(4px);
 }
 
 .diagnosis-modal {
   background: var(--ui-surface-strong);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
+  border-radius: 0;
   width: 100%;
   max-width: 700px;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--ui-shadow-md);
   color: var(--ui-text-primary);
 }
 
@@ -322,13 +289,13 @@ function renderMarkdown(text) {
 .config-form {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   padding: 1rem;
 }
 
 .local-diagnostics {
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   padding: 0.75rem;
   background: var(--ui-surface);
 }
@@ -353,21 +320,21 @@ function renderMarkdown(text) {
 
 .local-finding {
   border-left: 4px solid var(--ui-accent);
-  border-radius: 6px;
+  border-radius: 0;
   padding: 0.5rem 0.65rem;
   background: var(--ui-surface-strong);
 }
 
 .local-suggestions {
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   padding: 0.75rem;
   background: var(--ui-surface);
 }
 
 .local-suggestion {
   border-left: 4px solid var(--ui-accent);
-  border-radius: 6px;
+  border-radius: 0;
   padding: 0.5rem 0.65rem;
   background: var(--ui-surface-strong);
 }
@@ -398,7 +365,7 @@ function renderMarkdown(text) {
   color: var(--ui-text-secondary);
   background: var(--ui-accent-soft);
   padding: 0.25rem 0.4rem;
-  border-radius: 4px;
+  border-radius: 0;
 }
 
 .local-suggestion-actions {
@@ -419,7 +386,7 @@ function renderMarkdown(text) {
 .result-content {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   padding: 1rem 1.25rem;
   font-size: 0.9rem;
   line-height: 1.6;
@@ -431,15 +398,16 @@ function renderMarkdown(text) {
   background: var(--ui-accent-soft);
   color: var(--ui-text-primary);
   padding: 0.15em 0.4em;
-  border-radius: 3px;
+  border-radius: 0;
   font-size: 0.85em;
 }
 
 .result-content :deep(.code-block) {
-  background: #1e1e1e;
-  color: #d4d4d4;
+  background: var(--ui-surface-strong);
+  color: var(--ui-text-primary);
+  font-family: var(--font-family-mono);
   padding: 0.75rem 1rem;
-  border-radius: 6px;
+  border-radius: 0;
   font-size: 0.8rem;
   overflow-x: auto;
 }
@@ -455,7 +423,7 @@ function renderMarkdown(text) {
 
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .fade-enter-from,

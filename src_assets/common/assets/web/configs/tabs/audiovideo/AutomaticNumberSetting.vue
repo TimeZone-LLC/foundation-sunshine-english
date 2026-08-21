@@ -111,7 +111,7 @@ function useAutomaticValue() {
 .automatic-badge {
   flex: 0 0 auto;
   padding: 0.15rem 0.5rem;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--ui-accent-soft);
   color: var(--ui-accent);
   font-size: 0.72rem;

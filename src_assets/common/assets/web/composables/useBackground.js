@@ -1,9 +1,30 @@
 import { getCurrentScope, onScopeDispose } from 'vue'
-import { extractColors, rgbToHsl as rgbToHslValues, selectAccentColor } from '../utils/colorPalette.js'
 
-const DEFAULT_BACKGROUND = 'https://assets.alkaidlab.com/sunshine-bg0.webp'
+/**
+ * Page background management.
+ *
+ * The default background is the flat page token from styles/var.css, so the
+ * static brutalist palette is always what renders. Two behaviours were removed
+ * from this module:
+ *
+ *   1. A remote decorative wallpaper (assets.alkaidlab.com) that was painted
+ *      onto <body> on every page load. Dropping it removes a third-party
+ *      network request from every WebUI page load, and lets the OLED page
+ *      token show through.
+ *   2. A runtime canvas sampler that read the wallpaper's dominant color and
+ *      overwrote --text-primary-color / --text-secondary-color /
+ *      --text-muted-color / --text-title-color as inline styles on <html>.
+ *      Inline styles beat every stylesheet, so the sampler permanently fought
+ *      the design tokens. The palette in var.css is now the only definition.
+ *
+ * A user-supplied background is still honoured, but only from a local
+ * data:/blob: URL produced by the drag-and-drop importer below; remote URLs
+ * are never painted onto the page.
+ */
+
+// Empty means "no image": the CSS page token from styles/var.css renders.
+const DEFAULT_BACKGROUND = ''
 const STORAGE_KEY = 'customBackground'
-const THUMBNAIL_MAX_SIZE = 200
 const TEXT_COLOR_PROPERTIES = [
   '--text-primary-color',
   '--text-secondary-color',
@@ -11,154 +32,13 @@ const TEXT_COLOR_PROPERTIES = [
   '--text-title-color',
 ]
 
-const COLOR_CONFIG = {
-  textLightnessRange: { min: 15, max: 95 },
-  brightnessThreshold: 50,
-  paletteSize: 6,
-}
-
-const createDefaultColorInfo = () => ({
-  dominantColor: { r: 128, g: 128, b: 128 },
-  hsl: { h: 0, s: 0, l: 50 },
-  palette: [],
-})
-
-const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
-
 const isLocalImage = (imageUrl) =>
   typeof imageUrl === 'string' && (imageUrl.startsWith('data:') || imageUrl.startsWith('blob:'))
 
-const loadImage = (imageUrl) =>
-  new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error('图片加载失败'))
-    img.src = imageUrl
-  })
-
-const rgbToRoundedHsl = (r, g, b) => {
-  const [h, s, l] = rgbToHslValues(r, g, b)
-  return { h: Math.round(h), s: Math.round(s), l: Math.round(l) }
-}
-
-const hslToRgb = (h, s, l) => {
-  h /= 360
-  s /= 100
-  l /= 100
-
-  if (s === 0) {
-    const val = Math.round(l * 255)
-    return { r: val, g: val, b: val }
-  }
-
-  const hue2rgb = (p, q, t) => {
-    if (t < 0) t += 1
-    if (t > 1) t -= 1
-    if (t < 1 / 6) return p + (q - p) * 6 * t
-    if (t < 1 / 2) return q
-    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
-    return p
-  }
-
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s
-  const p = 2 * l - q
-
-  return {
-    r: Math.round(hue2rgb(p, q, h + 1 / 3) * 255),
-    g: Math.round(hue2rgb(p, q, h) * 255),
-    b: Math.round(hue2rgb(p, q, h - 1 / 3) * 255),
-  }
-}
-
-const rgbToHex = (r, g, b) => {
-  const toHex = (x) => Math.round(x).toString(16).padStart(2, '0')
-  return `#${toHex(r)}${toHex(g)}${toHex(b)}`
-}
-
-const analyzeImageColors = (img) => {
-  if (!img.complete || !img.width || !img.height) return createDefaultColorInfo()
-
-  try {
-    const canvas = document.createElement('canvas')
-    const scale = Math.min(1, THUMBNAIL_MAX_SIZE / Math.max(img.width, img.height))
-    canvas.width = Math.max(1, Math.round(img.width * scale))
-    canvas.height = Math.max(1, Math.round(img.height * scale))
-
-    const context = canvas.getContext('2d', { willReadFrequently: true })
-    if (!context) return createDefaultColorInfo()
-
-    context.drawImage(img, 0, 0, canvas.width, canvas.height)
-    const palette = extractColors(context.getImageData(0, 0, canvas.width, canvas.height), COLOR_CONFIG.paletteSize)
-    const accentColor = selectAccentColor(palette)
-    if (!accentColor) return createDefaultColorInfo()
-
-    const [r, g, b] = accentColor
-    return {
-      dominantColor: { r, g, b },
-      hsl: rgbToRoundedHsl(r, g, b),
-      palette,
-    }
-  } catch {
-    return createDefaultColorInfo()
-  }
-}
-
-const detectImageColorInfo = async (imageUrl) => {
-  try {
-    const img = await loadImage(imageUrl)
-    return analyzeImageColors(img)
-  } catch {
-    return createDefaultColorInfo()
-  }
-}
-
-const calculateTextColors = (colorInfo) => {
-  const { hsl } = colorInfo
-  const { textLightnessRange, brightnessThreshold } = COLOR_CONFIG
-  const isLightBg = hsl.l > brightnessThreshold
-
-  const textH = hsl.h
-  let textS = hsl.s
-  let textL
-
-  if (isLightBg) {
-    textL = Math.max(textLightnessRange.min, hsl.l - 60)
-    if (hsl.s < 30) textS = Math.min(20, hsl.s)
-  } else {
-    textL = Math.min(textLightnessRange.max, hsl.l + 70)
-    textS = Math.min(40, hsl.s * 0.6)
-  }
-
-  const createColor = (s, l) => {
-    const rgb = hslToRgb(textH, s, l)
-    return rgbToHex(rgb.r, rgb.g, rgb.b)
-  }
-
-  return {
-    primary: createColor(textS, textL),
-    secondary: createColor(textS * 0.7, clamp(isLightBg ? textL - 15 : textL + 10, 10, 90)),
-    muted: createColor(textS * 0.4, clamp(isLightBg ? textL - 25 : textL + 20, 5, 85)),
-    title: createColor(textS * 0.3, isLightBg ? textLightnessRange.min : textLightnessRange.max),
-    bgClass: isLightBg ? 'bg-light' : 'bg-dark',
-  }
-}
-
-const setTextColorTheme = (colorInfo) => {
-  const root = document.documentElement
-  const textColors = calculateTextColors(colorInfo)
-
-  root.style.setProperty('--text-primary-color', textColors.primary)
-  root.style.setProperty('--text-secondary-color', textColors.secondary)
-  root.style.setProperty('--text-muted-color', textColors.muted)
-  root.style.setProperty('--text-title-color', textColors.title)
-
-  document.body.classList.remove('bg-light', 'bg-dark')
-  document.body.classList.add(textColors.bgClass)
-
-  root.classList.add('text-color-transitioning')
-  setTimeout(() => root.classList.remove('text-color-transitioning'), 500)
-}
-
+/**
+ * Clear any text-color overrides and background classes left behind by the
+ * retired color sampler, so the static palette is the only thing in play.
+ */
 const resetTextColorTheme = () => {
   const root = document.documentElement
   TEXT_COLOR_PROPERTIES.forEach((property) => root.style.removeProperty(property))
@@ -167,7 +47,7 @@ const resetTextColorTheme = () => {
 }
 
 /**
- * 背景图片管理组合式函数
+ * Background image management composable.
  */
 export function useBackground(options = {}) {
   const {
@@ -188,37 +68,21 @@ export function useBackground(options = {}) {
     }
   }
 
-  let colorUpdateId = 0
+  const setBackground = (imageUrl) => {
+    resetTextColorTheme()
 
-  const refreshTextColorTheme = async (imageUrl) => {
-    const updateId = ++colorUpdateId
-    if (!isLocalImage(imageUrl)) {
-      resetTextColorTheme()
-      return
+    // Clearing the inline style hands the page back to the --ui-page-bg token.
+    document.body.style.background = ''
+    if (isDevMode() || !isLocalImage(imageUrl)) {
+      return Promise.resolve()
     }
 
-    try {
-      const colorInfo = await detectImageColorInfo(imageUrl)
-      if (updateId === colorUpdateId) setTextColorTheme(colorInfo)
-    } catch {
-      // 静默失败
-    }
-  }
-
-  const setBackground = async (imageUrl) => {
-    if (isDevMode()) {
-      colorUpdateId++
-      document.body.style.background = ''
-      resetTextColorTheme()
-      return
-    }
     document.body.style.background = `url(${imageUrl}) center/cover fixed no-repeat`
-    await refreshTextColorTheme(imageUrl)
+    return Promise.resolve()
   }
 
-  const recheckBackgroundBrightness = async () => {
-    await refreshTextColorTheme(getCurrentBackground())
-  }
+  // Kept for API compatibility: brightness is no longer sampled at runtime.
+  const recheckBackgroundBrightness = () => Promise.resolve()
 
   const loadBackground = () => setBackground(getCurrentBackground())
 
@@ -232,7 +96,7 @@ export function useBackground(options = {}) {
         try {
           localStorage.setItem(storageKey, imageData)
         } catch {
-          throw new Error('图片太大，无法存储。请选择更小的图片或降低图片质量。')
+          throw new Error('This image is too large to store. Choose a smaller image or lower its quality.')
         }
       } else {
         throw error
@@ -269,12 +133,12 @@ export function useBackground(options = {}) {
         img.onload = () => {
           const { width, height } = calculateResizedDimensions(img.width, img.height)
           const result = compressWithQuality(img, width, height, initialQuality)
-          result ? resolve(result) : reject(new Error('图片太大，无法存储。请选择更小的图片。'))
+          result ? resolve(result) : reject(new Error('This image is too large to store. Please choose a smaller image.'))
         }
-        img.onerror = () => reject(new Error('图片加载失败'))
+        img.onerror = () => reject(new Error('Failed to load the image'))
         img.src = event.target.result
       }
-      reader.onerror = () => reject(new Error('文件读取失败'))
+      reader.onerror = () => reject(new Error('Failed to read the file'))
       reader.readAsDataURL(file)
     })
 
@@ -297,7 +161,7 @@ export function useBackground(options = {}) {
     try {
       await saveBackground(await compressImage(file))
     } catch (error) {
-      onError?.(error) ?? alert(error.message || '处理图片时发生错误')
+      onError?.(error) ?? alert(error.message || 'Something went wrong while processing the image')
     }
   }
 
@@ -318,19 +182,8 @@ export function useBackground(options = {}) {
     return setBackground(defaultBackground)
   }
 
-  // 监听主题切换
+  // Listen for the developer background bypass toggle
   if (typeof document !== 'undefined') {
-    const handleThemeChange = () => setTimeout(recheckBackgroundBrightness, 100)
-    const observerConfig = { attributes: true, attributeFilter: ['data-bs-theme'] }
-    const observer = new MutationObserver(handleThemeChange)
-    observer.observe(document.documentElement, observerConfig)
-    observer.observe(document.body, observerConfig)
-
-    if (getCurrentScope()) {
-      onScopeDispose(() => observer.disconnect())
-    }
-
-    // 监听背景旁路切换
     const onBackgroundBypass = (e) => {
       if (e.detail?.enabled) {
         document.body.style.background = ''

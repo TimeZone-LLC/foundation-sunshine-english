@@ -58,12 +58,8 @@ const rel = computed(() => (props.target === '_blank' ? 'noopener noreferrer' : 
   align-items: center;
   padding: 0.6em 0.8em;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  background: linear-gradient(
-    135deg,
-    color-mix(in srgb, var(--ui-surface-strong) 86%, rgba(var(--link-color), 0.18)),
-    color-mix(in srgb, var(--ui-surface) 92%, transparent)
-  );
+  border-radius: 0;
+  background: var(--ui-surface-strong);
   color: var(--ui-text-primary);
   isolation: isolate;
   position: relative;
@@ -72,33 +68,20 @@ const rel = computed(() => (props.target === '_blank' ? 'noopener noreferrer' : 
   text-align: left;
   cursor: pointer;
   appearance: none;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.resource-link::before {
-  position: absolute;
-  z-index: -1;
-  inset: 0;
-  border-radius: inherit;
-  background: color-mix(in srgb, var(--ui-surface-hover) 90%, rgba(var(--link-color), 0.12));
-  content: '';
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .resource-link:hover,
 .resource-link:focus-visible {
-  border-color: rgba(var(--link-color), 0.4);
-  box-shadow: var(--ui-shadow-sm);
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-hover);
   color: var(--ui-text-primary);
   text-decoration: none;
-  transform: translateY(-1px);
 }
 
-.resource-link:hover::before,
-.resource-link:focus-visible::before {
-  opacity: 1;
+.resource-link:focus-visible {
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 .resource-link--compact {
@@ -114,9 +97,9 @@ const rel = computed(() => (props.target === '_blank' ? 'noopener noreferrer' : 
   align-items: center;
   justify-content: center;
   margin-right: 0.8em;
-  border-radius: 8px;
-  border: 1px solid rgba(var(--link-color), 0.2);
-  background: rgba(var(--link-color), 0.12);
+  border-radius: 0;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface-hover);
   color: var(--link-foreground);
   font-size: 1.1rem;
 }
@@ -125,17 +108,21 @@ const rel = computed(() => (props.target === '_blank' ? 'noopener noreferrer' : 
   width: 32px;
   height: 32px;
   margin-right: 0.45rem;
-  border-radius: 0.56rem;
+  border-radius: 0;
   font-size: 0.76rem;
 }
 
+/*
+ * A white plate, not a palette choice: the partner logos are dark-on-transparent
+ * PNGs supplied by their owners and are unreadable on the dark ground. The plate
+ * is scoped to those images only.
+ */
 .resource-icon--logo {
   width: 86px;
   height: 44px;
   padding: 4px;
   overflow: visible;
   background: #fff;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
 
 .resource-logo {
@@ -185,12 +172,7 @@ const rel = computed(() => (props.target === '_blank' ? 'noopener noreferrer' : 
   margin-left: 0.5rem;
   color: var(--ui-text-muted);
   font-size: 0.8rem;
-  transition: transform 0.2s ease;
-}
-
-.resource-link:hover .resource-arrow,
-.resource-link:focus-visible .resource-arrow {
-  transform: translateX(3px);
+  transition: var(--transition-default);
 }
 
 .resource-link--accent-alt {
@@ -222,10 +204,6 @@ const rel = computed(() => (props.target === '_blank' ? 'noopener noreferrer' : 
 .resource-link--moonlink {
   --link-color: 142, 126, 173;
   --link-foreground: var(--ui-text-secondary);
-}
-
-[data-bs-theme='dark'] .resource-link {
-  background: linear-gradient(135deg, rgba(var(--link-color), 0.13), color-mix(in srgb, var(--ui-surface) 86%, transparent));
 }
 
 [data-bs-theme='dark'] .resource-link--apple {

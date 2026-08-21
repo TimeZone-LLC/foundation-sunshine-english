@@ -12,6 +12,7 @@
 #include <chrono>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <shared_mutex>
 #include <sstream>
 #include <string>
@@ -1016,7 +1017,16 @@ namespace nvhttp {
     }
 
     if (!clean_slate) {
-      pairing::load_state();
+      try {
+        pairing::load_state();
+      }
+      catch (std::exception &err) {
+        // A half-written client state file used to throw straight off this bare thread and
+        // terminate Sunshine without a log line. Losing the paired clients is recoverable by
+        // pairing them again; a silent death is not.
+        BOOST_LOG(error) << "Couldn't load the paired client state: "sv << err.what()
+                         << ". Clients may have to be paired again."sv;
+      }
     }
 
     auto pkey = file_handler::read_file(config::nvhttp.pkey.c_str());
@@ -1053,7 +1063,26 @@ namespace nvhttp {
     file_mapping_service.start(std::move(file_mapping_config));
 
     network_probe::service_t network_probe_service;
-    https_server_t https_server { config::nvhttp.cert, config::nvhttp.pkey };
+
+    // Constructing the HTTPS server loads the certificate and the private key, and throws when
+    // either file is missing, corrupt or locked by another program. This runs on a bare
+    // std::thread, so an escaping exception used to terminate the whole process with no log
+    // line at all. Build it inside the guard and name the file that could not be read.
+    std::optional<https_server_t> https_server_storage;
+    try {
+      https_server_storage.emplace(config::nvhttp.cert, config::nvhttp.pkey);
+    }
+    catch (std::exception &err) {
+      BOOST_LOG(fatal) << "Couldn't load the TLS credentials for the GameStream HTTPS server on port ["sv
+                       << port_https << "]: "sv << err.what() << ". Certificate ["sv << config::nvhttp.cert
+                       << "], private key ["sv << config::nvhttp.pkey << ']';
+      http::listener_failed(http::listener_e::nvhttps, port_https);
+      http::listener_failed(http::listener_e::nvhttp, port_http);
+      lifetime::exit_sunshine(http::exit_code::CREDENTIALS_UNUSABLE, true);
+      return;
+    }
+    auto &https_server = *https_server_storage;
+
     http_server_t http_server;
 
     // Verify certificates after establishing connection
@@ -1199,36 +1228,65 @@ namespace nvhttp {
     http_server.config.address = net::get_bind_address(address_family);
     http_server.config.port = port_http;
 
+    // Both listeners hand their bind to http::start_with_bind_retry, which repeats a transient
+    // failure - typically a port a previous sunshine.exe has not released yet - with escalating
+    // backoff, and only concedes once the whole retry window is used up. It reports the failure
+    // through lifetime so the exit code is non-zero rather than looking like a clean stop.
     auto accept_and_run_https = [&](nvhttp::https_server_t *server) {
+      const auto port = server->config.port;
       try {
-        BOOST_LOG(info) << "Starting nvhttps server on port ["sv << server->config.port << "]";
-        server->start();
+        http::start_with_bind_retry(http::listener_e::nvhttps, port, [server, port]() -> boost::system::error_code {
+          try {
+            BOOST_LOG(info) << "Starting nvhttps server on port ["sv << port << ']';
+            server->start([](unsigned short bound_port) {
+              http::listener_ready(http::listener_e::nvhttps, bound_port);
+            });
+          }
+          catch (boost::system::system_error &err) {
+            // Close the acceptor again so the next attempt is able to reopen it.
+            server->stop();
+            return err.code();
+          }
+          return {};
+        });
       }
-      catch (boost::system::system_error &err) {
+      catch (std::exception &err) {
         // It's possible the exception gets thrown after calling server->stop() from a different thread
         if (shutdown_event->peek()) {
           return;
         }
-        BOOST_LOG(fatal) << "Couldn't start nvhttps server on ports ["sv << server->config.port << "]: "sv << err.what();
-        shutdown_event->raise(true);
-        return;
+        BOOST_LOG(fatal) << "nvhttps server on port ["sv << port << "] failed: "sv << err.what();
+        http::listener_failed(http::listener_e::nvhttps, port);
+        lifetime::exit_sunshine(http::exit_code::PORT_UNAVAILABLE, true);
       }
     };
 
     auto accept_and_run_http = [&](nvhttp::http_server_t *server) {
+      const auto port = server->config.port;
       try {
-        BOOST_LOG(info) << "Starting nvhttp server on port ["sv << server->config.port << "]";
-        server->start();
+        http::start_with_bind_retry(http::listener_e::nvhttp, port, [server, port]() -> boost::system::error_code {
+          try {
+            BOOST_LOG(info) << "Starting nvhttp server on port ["sv << port << ']';
+            server->start([](unsigned short bound_port) {
+              http::listener_ready(http::listener_e::nvhttp, bound_port);
+            });
+          }
+          catch (boost::system::system_error &err) {
+            // Close the acceptor again so the next attempt is able to reopen it.
+            server->stop();
+            return err.code();
+          }
+          return {};
+        });
       }
-      catch (boost::system::system_error &err) {
+      catch (std::exception &err) {
         // It's possible the exception gets thrown after calling server->stop() from a different thread
         if (shutdown_event->peek()) {
           return;
         }
-
-        BOOST_LOG(fatal) << "Couldn't start nvhttp server on ports ["sv << server->config.port << "]: "sv << err.what();
-        shutdown_event->raise(true);
-        return;
+        BOOST_LOG(fatal) << "nvhttp server on port ["sv << port << "] failed: "sv << err.what();
+        http::listener_failed(http::listener_e::nvhttp, port);
+        lifetime::exit_sunshine(http::exit_code::PORT_UNAVAILABLE, true);
       }
     };
     std::thread ssl { accept_and_run_https, &https_server };

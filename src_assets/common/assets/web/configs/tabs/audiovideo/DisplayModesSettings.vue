@@ -53,7 +53,7 @@ const config = ref(props.config)
 .display-modes-card {
   overflow: hidden;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
 }
 

@@ -214,7 +214,7 @@ test('game library curator capabilities expose user-selectable skills', () => {
   )
   assert.equal(getGameLibraryCapabilityIcon(GAME_LIBRARY_SKILL_IDS.titleNormalize), 'fa-wand-magic-sparkles')
   assert.equal(getGameLibraryCapabilityLabel(GAME_LIBRARY_SKILL_IDS.coverSelection), 'AI cover matching')
-  assert.equal(getGameLibraryCapabilityLabel(GAME_LIBRARY_SKILL_IDS.coverSelection, { locale: 'zh-CN' }), 'AI \u5c01\u9762\u5339\u914d')
+  assert.equal(getGameLibraryCapabilityLabel(GAME_LIBRARY_SKILL_IDS.coverSelection, { locale: 'zh-CN' }), 'AI cover matching')
 })
 
 test('game library curator skill id helpers keep required skills enabled', () => {
@@ -247,13 +247,13 @@ test('game library curator supports registering extension skills', async () => {
     capability: {
       icon: 'fa-vial',
       defaultEnabled: false,
-      labels: { zh: '\u6d4b\u8bd5\u6807\u6ce8' },
+      labels: { zh: 'Test annotation' },
     },
   })
 
   try {
     assert.equal(getGameLibraryCapabilityIcon('game.test.annotate'), 'fa-vial')
-    assert.equal(getGameLibraryCapabilityLabel('game.test.annotate', { locale: 'zh-CN' }), '\u6d4b\u8bd5\u6807\u6ce8')
+    assert.equal(getGameLibraryCapabilityLabel('game.test.annotate', { locale: 'zh-CN' }), 'Test annotation')
     assert.ok(getGameLibrarySelectableCapabilities().some((capability) => capability.skillId === 'game.test.annotate'))
     assert.ok(!getDefaultEnabledGameLibrarySkillIds().includes('game.test.annotate'))
 
@@ -299,9 +299,9 @@ test('game resource review policy flags low confidence and missing cover', () =>
     'Missing cover',
   ])
   assert.deepEqual(getGameResourceReviewReasons(app, { locale: 'zh-CN' }), [
-    '\u540d\u79f0\u7f6e\u4fe1\u5ea6 50%',
-    '\u7f3a\u5c11\u89c4\u8303\u540d\u79f0',
-    '\u7f3a\u5c11\u5c01\u9762',
+    'Low name confidence 50%',
+    'Missing canonical name',
+    'Missing cover',
   ])
 })
 

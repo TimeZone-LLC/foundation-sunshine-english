@@ -83,7 +83,7 @@ test('diagnostics capabilities expose selectable skills', () => {
   assert.equal(getDiagnosticsCapabilityIcon(DIAGNOSTICS_SKILL_IDS.logPatterns), 'fa-magnifying-glass-chart')
   assert.equal(getDiagnosticsCapabilityIcon(DIAGNOSTICS_SKILL_IDS.logRemediation), 'fa-screwdriver-wrench')
   assert.equal(getDiagnosticsCapabilityLabel(DIAGNOSTICS_SKILL_IDS.logSeverity), 'Log severity summary')
-  assert.equal(getDiagnosticsCapabilityLabel(DIAGNOSTICS_SKILL_IDS.logSeverity, { locale: 'zh-CN' }), '日志严重度摘要')
+  assert.equal(getDiagnosticsCapabilityLabel(DIAGNOSTICS_SKILL_IDS.logSeverity), 'Log severity summary')
 })
 
 test('diagnostics supports extension skills', async () => {
@@ -109,7 +109,7 @@ test('diagnostics supports extension skills', async () => {
     }),
     capability: {
       icon: 'fa-vial',
-      labels: { zh: '测试诊断能力' },
+      label: 'Test diagnostics capability',
       defaultEnabled: false,
       userSelectable: true,
     },
@@ -117,7 +117,7 @@ test('diagnostics supports extension skills', async () => {
 
   try {
     assert.equal(getDiagnosticsCapabilityIcon('diagnostics.test.annotate'), 'fa-vial')
-    assert.equal(getDiagnosticsCapabilityLabel('diagnostics.test.annotate', { locale: 'zh-CN' }), '测试诊断能力')
+    assert.equal(getDiagnosticsCapabilityLabel('diagnostics.test.annotate'), 'Test diagnostics capability')
 
     const result = await createDiagnosticsAgent().run('', {
       enabledSkills: ['diagnostics.test.annotate'],

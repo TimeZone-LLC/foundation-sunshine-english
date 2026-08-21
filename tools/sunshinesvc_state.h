@@ -15,20 +15,38 @@ namespace sunshinesvc {
   constexpr std::uint32_t GUI_REATTACH_POLL_MS = 3000;
   constexpr std::uint64_t GUI_CRASH_LOG_REMINDER_MS = 300000;
 
-  class GuiRestartBackoff {
+  constexpr std::uint32_t CORE_RESTART_INITIAL_DELAY_MS = 3000;
+  constexpr std::uint32_t CORE_RESTART_MAX_DELAY_MS = 60000;
+  constexpr std::uint64_t CORE_RESTART_STABLE_RUNTIME_MS = 60000;
+
+  /**
+   * @brief Exit code reported by a Sunshine.exe that stopped on request.
+   */
+  constexpr std::uint32_t CORE_CLEAN_EXIT_CODE = 0;
+
+  /**
+   * @brief Doubling restart backoff shared by every supervised child process.
+   * @tparam InitialDelayMs Delay applied before the first restart attempt.
+   * @tparam MaxDelayMs Ceiling the doubling delay saturates at.
+   * @tparam StableRuntimeMs Previous runtime that marks a launch as healthy and clears the failure count.
+   */
+  template <std::uint32_t InitialDelayMs, std::uint32_t MaxDelayMs, std::uint64_t StableRuntimeMs>
+  class RestartBackoff {
   public:
     std::uint32_t
     next_delay(std::uint64_t previous_runtime_ms = 0) {
-      if (previous_runtime_ms >= GUI_RESTART_STABLE_RUNTIME_MS) {
+      if (previous_runtime_ms >= StableRuntimeMs) {
         failures_ = 0;
       }
 
-      const auto shift = std::min(failures_, 5U);
-      const auto delay = std::min(
-        GUI_RESTART_INITIAL_DELAY_MS << shift,
-        GUI_RESTART_MAX_DELAY_MS);
+      // The shift is computed in 64 bits so a large failure count saturates at
+      // the ceiling instead of overflowing back to a tiny delay.
+      const auto shift = std::min(failures_, 31U);
+      const auto delay = std::min<std::uint64_t>(
+        static_cast<std::uint64_t>(InitialDelayMs) << shift,
+        MaxDelayMs);
       ++failures_;
-      return delay;
+      return static_cast<std::uint32_t>(delay);
     }
 
     void
@@ -39,6 +57,27 @@ namespace sunshinesvc {
   private:
     std::uint32_t failures_ = 0;
   };
+
+  using GuiRestartBackoff = RestartBackoff<GUI_RESTART_INITIAL_DELAY_MS, GUI_RESTART_MAX_DELAY_MS, GUI_RESTART_STABLE_RUNTIME_MS>;
+  using CoreRestartBackoff = RestartBackoff<CORE_RESTART_INITIAL_DELAY_MS, CORE_RESTART_MAX_DELAY_MS, CORE_RESTART_STABLE_RUNTIME_MS>;
+
+  /**
+   * @brief How a finished Sunshine.exe lifecycle should influence the restart cadence.
+   */
+  enum class CoreExitKind {
+    clean,  ///< The process stopped on request and may be relaunched at the base cadence.
+    failed  ///< The process failed to start or crashed and the backoff must escalate.
+  };
+
+  /**
+   * @brief Classify a Sunshine.exe exit code for the supervisor.
+   * @param exit_code Exit code reported by GetExitCodeProcess.
+   * @return CoreExitKind::clean for a requested stop, CoreExitKind::failed otherwise.
+   */
+  constexpr CoreExitKind
+  classify_core_exit(std::uint32_t exit_code) {
+    return exit_code == CORE_CLEAN_EXIT_CODE ? CoreExitKind::clean : CoreExitKind::failed;
+  }
 
   class GuiAgentRestartPolicy {
   public:

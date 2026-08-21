@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cwchar>
 #include <dxgi1_2.h>
 #include <filesystem>
 #include <fstream>
@@ -418,6 +419,73 @@ namespace platf::dxgi {
     return nullptr;
   }
 
+  namespace {
+    /**
+     * @brief Health of the Windows.Graphics.Capture frame pool as seen by the consumer.
+     * @details The state is kept per capture thread because a wgc_capture_t instance is
+     *          created, driven and destroyed by the single capture thread that owns it.
+     */
+    struct wgc_frame_pool_health_t {
+      int consecutive_timeouts { 0 };
+      std::chrono::steady_clock::time_point first_timeout {};
+    };
+
+    thread_local wgc_frame_pool_health_t wgc_frame_pool_health {};
+
+    // A timeout streak is only suspicious once it is far longer than any sane frame
+    // interval. A desktop that simply has nothing to redraw must never be mistaken
+    // for a broken frame pool.
+    constexpr auto wgc_frame_pool_stall_timeout = 3s;
+
+    /**
+     * @brief Check whether the capture item can still deliver frames.
+     * @param item The item the frame pool was created for.
+     * @return false if the item was closed or has become unusable.
+     */
+    bool
+    wgc_capture_item_alive(winrt::GraphicsCaptureItem const &item) {
+      if (item == nullptr) {
+        return false;
+      }
+
+      try {
+        // Any property access on a closed item throws RO_E_CLOSED.
+        const auto size = item.Size();
+        return size.Width > 0 && size.Height > 0;
+      }
+      catch (winrt::hresult_error const &e) {
+        BOOST_LOG(warning) << "WGC capture item is no longer valid: "sv << e.code();
+        return false;
+      }
+    }
+
+    /**
+     * @brief Check whether the interactive desktop is the one we are capturing.
+     * @details The frame pool of a user-session capture silently stops producing frames
+     *          while the secure desktop (lock screen, UAC prompt) is in the foreground.
+     * @return false when another desktop has taken over the input.
+     */
+    bool
+    interactive_desktop_is_default() {
+      HDESK desktop = OpenInputDesktop(0, FALSE, GENERIC_READ);
+      if (!desktop) {
+        // Access is denied while the secure desktop belongs to another window station.
+        return false;
+      }
+
+      wchar_t name[256] {};
+      DWORD needed = 0;
+      const bool queried = GetUserObjectInformationW(desktop, UOI_NAME, name, sizeof(name), &needed) != FALSE;
+      CloseDesktop(desktop);
+
+      if (!queried) {
+        // Without a name we cannot tell, so assume the capture is still healthy.
+        return true;
+      }
+      return std::wcscmp(name, L"Default") == 0;
+    }
+  }  // namespace
+
   wgc_capture_t::wgc_capture_t() {
     InitializeConditionVariable(&frame_present_cv);
   }
@@ -455,6 +523,9 @@ namespace platf::dxgi {
       BOOST_LOG(error) << "Screen capture is not supported on this device for this release of Windows!"sv;
       return -1;
     }
+
+    // Start this capture instance with a clean frame-pool health record.
+    wgc_frame_pool_health = {};
 
     HRESULT status;
     dxgi::dxgi_t dxgi;
@@ -730,11 +801,53 @@ namespace platf::dxgi {
     // this CONSUMER runs in the capture thread
     release_frame();
 
+    // A frame pool that stopped producing looks exactly like a static desktop: both
+    // only ever time out. Once the streak is materially longer than any frame interval
+    // we check whether the capture item is still alive and whether the secure desktop
+    // took over, and ask for a reinitialization instead of freezing the stream forever.
+    auto &health = wgc_frame_pool_health;
+    auto note_timeout = [&]() -> capture_e {
+      const auto now = std::chrono::steady_clock::now();
+      if (health.consecutive_timeouts == 0) {
+        health.first_timeout = now;
+      }
+      ++health.consecutive_timeouts;
+
+      const auto stalled_for = now - health.first_timeout;
+      if (stalled_for < wgc_frame_pool_stall_timeout) {
+        // A desktop with nothing to redraw times out as well, so short streaks are normal.
+        return capture_e::timeout;
+      }
+
+      const auto stalled_seconds = std::chrono::duration_cast<std::chrono::seconds>(stalled_for).count();
+      if (!wgc_capture_item_alive(item)) {
+        BOOST_LOG(warning) << "WGC capture item is closed or invalid after "sv << stalled_seconds
+                           << "s without a frame, requesting reinit"sv;
+        health = {};
+        return capture_e::reinit;
+      }
+
+      if (!interactive_desktop_is_default()) {
+        BOOST_LOG(warning) << "WGC frame pool has produced no frames for "sv << stalled_seconds
+                           << "s while another desktop is active (lock screen or UAC prompt), requesting reinit"sv;
+        health = {};
+        return capture_e::reinit;
+      }
+
+      BOOST_LOG(debug) << "WGC frame pool has produced no frames for "sv << stalled_seconds
+                       << "s ("sv << health.consecutive_timeouts << " timeouts), but the capture item and the desktop are healthy"sv;
+
+      // Restart the window so the health probes run periodically instead of per timeout.
+      health.first_timeout = now;
+      health.consecutive_timeouts = 1;
+      return capture_e::timeout;
+    };
+
     AcquireSRWLockExclusive(&frame_lock);
     if (produced_frame == nullptr && SleepConditionVariableSRW(&frame_present_cv, &frame_lock, timeout.count(), 0) == 0) {
       ReleaseSRWLockExclusive(&frame_lock);
       if (GetLastError() == ERROR_TIMEOUT) {
-        return capture_e::timeout;
+        return note_timeout();
       }
       else {
         return capture_e::error;
@@ -746,7 +859,7 @@ namespace platf::dxgi {
     }
     ReleaseSRWLockExclusive(&frame_lock);
     if (consumed_frame == nullptr) {  // spurious wakeup
-      return capture_e::timeout;
+      return note_timeout();
     }
 
     auto capture_access = consumed_frame.Surface().as<winrt::IDirect3DDxgiInterfaceAccess>();
@@ -755,6 +868,9 @@ namespace platf::dxgi {
     }
     capture_access->GetInterface(IID_ID3D11Texture2D, (void **) out);
     out_time = consumed_frame.SystemRelativeTime().count();  // raw ticks from query performance counter
+
+    // Frames are flowing again.
+    health = {};
     return capture_e::ok;
   }
 

@@ -206,18 +206,13 @@ onUnmounted(() => {
   padding: 1rem;
   border: 1px solid var(--ui-border);
   border-left: 3px solid var(--ui-accent);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-accent-soft);
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    box-shadow 0.2s ease,
-    opacity 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .vulkan-hdr-card:hover {
   border-color: var(--ui-border-strong);
-  box-shadow: var(--ui-shadow-sm);
 }
 
 .vulkan-hdr-card.is-disabled {
@@ -238,9 +233,8 @@ onUnmounted(() => {
   width: 0.55rem;
   height: 0.55rem;
   flex: 0 0 auto;
-  border-radius: 50%;
+  border-radius: 0;
   background: currentColor;
-  box-shadow: 0 0 0 0.2rem color-mix(in srgb, currentColor 18%, transparent);
 }
 
 .feature-status.is-muted {

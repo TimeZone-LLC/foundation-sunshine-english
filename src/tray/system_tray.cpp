@@ -95,10 +95,6 @@ namespace system_tray {
   static std::string s_import_config;
   static std::string s_export_config;
   static std::string s_reset_to_default;
-  static std::string s_language;
-  static std::string s_chinese;
-  static std::string s_english;
-  static std::string s_japanese;
   static std::string s_star_project;
   static std::string s_visit_project;
   static std::string s_visit_project_sunshine;
@@ -159,10 +155,6 @@ namespace system_tray {
     s_import_config = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_IMPORT_CONFIG);
     s_export_config = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_EXPORT_CONFIG);
     s_reset_to_default = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_RESET_TO_DEFAULT);
-    s_language = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_LANGUAGE);
-    s_chinese = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_CHINESE);
-    s_english = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_ENGLISH);
-    s_japanese = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_JAPANESE);
     s_star_project = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_STAR_PROJECT);
     s_visit_project = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_VISIT_PROJECT);
     s_visit_project_sunshine = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_VISIT_PROJECT_SUNSHINE);
@@ -179,25 +171,26 @@ namespace system_tray {
   update_menu_texts() {
     init_localized_strings();
     tray_menus[0].text = s_open_sunshine.c_str();
-    tray_menus[2].text = s_vdd_base_display.c_str();
     update_vdd_submenu_text();  // 更新 VDD 子菜单文本
   #ifdef _WIN32
+    // Windows layout of tray_menus:
+    // 0 open, 1 sep, 2 vdd, 3 advanced, 4 sep, 5 star, 6 visit, 7 sep, 8 restart, 9 quit
+    tray_menus[2].text = s_vdd_base_display.c_str();
     tray_menus[3].text = s_advanced_settings.c_str();
     update_advanced_settings_menu_text();
-  #endif
-    tray_menus[5].text = s_language.c_str();
-    tray_menus[5].submenu[0].text = s_chinese.c_str();
-    tray_menus[5].submenu[1].text = s_english.c_str();
-    tray_menus[5].submenu[2].text = s_japanese.c_str();
-    tray_menus[7].text = s_star_project.c_str();
-    tray_menus[8].text = s_visit_project.c_str();
+    tray_menus[5].text = s_star_project.c_str();
+    tray_menus[6].text = s_visit_project.c_str();
     tray_visit_project_submenu_text();
-  #ifdef _WIN32
-    tray_menus[10].text = s_restart.c_str();
-    tray_menus[11].text = s_quit.c_str();
+    tray_menus[8].text = s_restart.c_str();
+    tray_menus[9].text = s_quit.c_str();
   #else
-    tray_menus[9].text = s_restart.c_str();
-    tray_menus[10].text = s_quit.c_str();
+    // Non-Windows layout of tray_menus (no vdd/advanced entries):
+    // 0 open, 1 sep, 2 sep, 3 star, 4 visit, 5 sep, 6 restart, 7 quit
+    tray_menus[3].text = s_star_project.c_str();
+    tray_menus[4].text = s_visit_project.c_str();
+    tray_visit_project_submenu_text();
+    tray_menus[6].text = s_restart.c_str();
+    tray_menus[7].text = s_quit.c_str();
   #endif
   }
 
@@ -699,7 +692,7 @@ namespace system_tray {
       if (!is_safe_config_path(file_path)) {
         BOOST_LOG(error) << "[tray_import_config] Config import rejected: unsafe file path: " << file_path;
         std::wstring title = system_tray_i18n::utf8_to_wstring(system_tray_i18n::get_localized_string(system_tray_i18n::KEY_IMPORT_ERROR_TITLE));
-        std::wstring message = L"文件路径不安全或文件类型无效。\n只允许 .conf 文件，不允许符号链接。";
+        std::wstring message = L"The file path is unsafe or the file type is invalid.\nOnly .conf files are allowed, and symbolic links are rejected.";
         MessageBoxW(NULL, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR);
         return;
       }
@@ -712,7 +705,7 @@ namespace system_tray {
         if (!is_safe_config_content(config_content)) {
           BOOST_LOG(error) << "[tray_import_config] Config import rejected: unsafe content: " << file_path;
           std::wstring title = system_tray_i18n::utf8_to_wstring(system_tray_i18n::get_localized_string(system_tray_i18n::KEY_IMPORT_ERROR_TITLE));
-          std::wstring message = L"配置文件内容无效、太大或格式错误。\n最大文件大小：1MB";
+          std::wstring message = L"The configuration file is invalid, too large, or malformed.\nMaximum file size: 1MB";
           MessageBoxW(NULL, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR);
           return;
         }
@@ -725,7 +718,7 @@ namespace system_tray {
         if (backup_result != 0) {
           BOOST_LOG(error) << "[tray_import_config] Failed to create backup, aborting import";
           std::wstring title = system_tray_i18n::utf8_to_wstring(system_tray_i18n::get_localized_string(system_tray_i18n::KEY_IMPORT_ERROR_TITLE));
-          std::wstring message = L"无法创建配置备份，导入操作已中止。";
+          std::wstring message = L"Could not create a configuration backup. The import was aborted.";
           MessageBoxW(NULL, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR);
           return;
         }
@@ -751,7 +744,7 @@ namespace system_tray {
           
           // 询问用户是否重启Sunshine以应用新配置
           std::wstring title = system_tray_i18n::utf8_to_wstring(system_tray_i18n::get_localized_string(system_tray_i18n::KEY_IMPORT_SUCCESS_TITLE));
-          std::wstring message = L"配置导入成功！\n\n是否立即重启 Sunshine 以应用新配置？";
+          std::wstring message = L"Configuration imported successfully!\n\nRestart Sunshine now to apply the new configuration?";
           int result = MessageBoxW(NULL, message.c_str(), title.c_str(), MB_YESNO | MB_ICONQUESTION);
           
           if (result == IDYES) {
@@ -936,7 +929,7 @@ namespace system_tray {
         if (p.extension() != ".conf") {
           BOOST_LOG(warning) << "[tray_export_config] Config export rejected: invalid extension: " << p.extension().string();
           std::wstring title = system_tray_i18n::utf8_to_wstring(system_tray_i18n::get_localized_string(system_tray_i18n::KEY_EXPORT_ERROR_TITLE));
-          std::wstring message = L"只允许导出为 .conf 文件。";
+          std::wstring message = L"Configuration can only be exported as a .conf file.";
           MessageBoxW(NULL, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR);
           return;
         }
@@ -945,7 +938,7 @@ namespace system_tray {
         if (std::filesystem::exists(p) && std::filesystem::is_symlink(p)) {
           BOOST_LOG(warning) << "[tray_export_config] Config export rejected: target is symlink: " << file_path;
           std::wstring title = system_tray_i18n::utf8_to_wstring(system_tray_i18n::get_localized_string(system_tray_i18n::KEY_EXPORT_ERROR_TITLE));
-          std::wstring message = L"不允许导出到符号链接。";
+          std::wstring message = L"Exporting to a symbolic link is not allowed.";
           MessageBoxW(NULL, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR);
           return;
         }
@@ -953,7 +946,7 @@ namespace system_tray {
       catch (const std::exception &e) {
         BOOST_LOG(error) << "[tray_export_config] Path validation error during export: " << e.what();
         std::wstring title = system_tray_i18n::utf8_to_wstring(system_tray_i18n::get_localized_string(system_tray_i18n::KEY_EXPORT_ERROR_TITLE));
-        std::wstring message = L"文件路径无效。";
+        std::wstring message = L"The file path is invalid.";
         MessageBoxW(NULL, message.c_str(), title.c_str(), MB_OK | MB_ICONERROR);
         return;
       }
@@ -1008,30 +1001,6 @@ namespace system_tray {
   #else
     BOOST_LOG(info) << "[tray_export_config] Config export not implemented for this platform yet";
   #endif
-  };
-
-  // 通用语言切换函数
-  static auto change_tray_language = [](const std::string &locale, const std::string &language_name) {
-    BOOST_LOG(info) << "Changing tray language to " << language_name << " from system tray"sv;
-    system_tray_i18n::set_tray_locale(locale);
-
-    // 保存到配置文件
-    config::update_config({{"tray_locale", locale}});
-
-    update_menu_texts();
-    tray_update(&tray);
-  };
-
-  auto tray_language_chinese_cb = [](struct tray_menu *item) {
-    change_tray_language("zh", "Chinese");
-  };
-
-  auto tray_language_english_cb = [](struct tray_menu *item) {
-    change_tray_language("en", "English");
-  };
-
-  auto tray_language_japanese_cb = [](struct tray_menu *item) {
-    change_tray_language("ja", "Japanese");
   };
 
   auto tray_reset_config_cb = [](struct tray_menu *item) {
@@ -1093,14 +1062,6 @@ namespace system_tray {
     { .text = "Foundation Display", .submenu = vdd_submenu },
     { .text = "Advanced Settings", .submenu = advanced_settings_submenu },
   #endif
-    { .text = "-" },
-    { .text = "Language",
-      .submenu =
-        (struct tray_menu[]) {
-          { .text = "中文", .cb = tray_language_chinese_cb },
-          { .text = "English", .cb = tray_language_english_cb },
-          { .text = "日本語", .cb = tray_language_japanese_cb },
-          { .text = nullptr } } },
     { .text = "-" },
     { .text = "Star Project", .cb = tray_star_project_cb },
     { .text = "Visit Project", .submenu = visit_project_submenu },

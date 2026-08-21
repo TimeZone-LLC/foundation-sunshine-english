@@ -1,6 +1,6 @@
 /**
  * @file tests/unit/test_sunshinesvc_state.cpp
- * @brief Tests for the GUI agent lifecycle policy used by sunshinesvc.
+ * @brief Tests for the GUI agent and Sunshine.exe lifecycle policies used by sunshinesvc.
  */
 #include <tools/sunshinesvc_state.h>
 
@@ -34,6 +34,62 @@ TEST(GuiRestartBackoff, ExplicitResetStartsAtInitialDelay) {
   EXPECT_EQ(backoff.next_delay(), 2000U);
   backoff.reset();
   EXPECT_EQ(backoff.next_delay(), 1000U);
+}
+
+TEST(CoreRestartBackoff, BacksOffRepeatedFailures) {
+  sunshinesvc::CoreRestartBackoff backoff;
+  constexpr std::array expected { 3000U, 6000U, 12000U, 24000U, 48000U, 60000U, 60000U };
+
+  for (std::size_t index = 0; index < expected.size(); ++index) {
+    SCOPED_TRACE(index);
+    EXPECT_EQ(backoff.next_delay(), expected[index]);
+  }
+}
+
+TEST(CoreRestartBackoff, StartsAtTheInitialDelay) {
+  sunshinesvc::CoreRestartBackoff backoff;
+
+  EXPECT_EQ(backoff.next_delay(), sunshinesvc::CORE_RESTART_INITIAL_DELAY_MS);
+}
+
+TEST(CoreRestartBackoff, SaturatesAtTheCeiling) {
+  sunshinesvc::CoreRestartBackoff backoff;
+
+  // A long-running failure streak must keep hitting the ceiling instead of
+  // wrapping back around to a tiny delay.
+  for (std::size_t index = 0; index < 64; ++index) {
+    SCOPED_TRACE(index);
+    EXPECT_LE(backoff.next_delay(), sunshinesvc::CORE_RESTART_MAX_DELAY_MS);
+  }
+  EXPECT_EQ(backoff.next_delay(), sunshinesvc::CORE_RESTART_MAX_DELAY_MS);
+}
+
+TEST(CoreRestartBackoff, ResetsOnlyAfterStableRuntime) {
+  sunshinesvc::CoreRestartBackoff backoff;
+
+  EXPECT_EQ(backoff.next_delay(), 3000U);
+  EXPECT_EQ(backoff.next_delay(), 6000U);
+  EXPECT_EQ(backoff.next_delay(sunshinesvc::CORE_RESTART_STABLE_RUNTIME_MS - 1), 12000U);
+  EXPECT_EQ(backoff.next_delay(sunshinesvc::CORE_RESTART_STABLE_RUNTIME_MS), 3000U);
+  EXPECT_EQ(backoff.next_delay(), 6000U);
+}
+
+TEST(CoreRestartBackoff, ExplicitResetStartsAtInitialDelay) {
+  sunshinesvc::CoreRestartBackoff backoff;
+
+  EXPECT_EQ(backoff.next_delay(), 3000U);
+  EXPECT_EQ(backoff.next_delay(), 6000U);
+  backoff.reset();
+  EXPECT_EQ(backoff.next_delay(), 3000U);
+}
+
+TEST(ClassifyCoreExit, TreatsOnlyZeroAsACleanStop) {
+  EXPECT_EQ(sunshinesvc::classify_core_exit(0), sunshinesvc::CoreExitKind::clean);
+  EXPECT_EQ(sunshinesvc::classify_core_exit(1), sunshinesvc::CoreExitKind::failed);
+  EXPECT_EQ(sunshinesvc::classify_core_exit(0xFFFFFFFFU), sunshinesvc::CoreExitKind::failed);
+
+  static_assert(sunshinesvc::classify_core_exit(sunshinesvc::CORE_CLEAN_EXIT_CODE) ==
+                sunshinesvc::CoreExitKind::clean);
 }
 
 TEST(GuiAgentRestartPolicy, CleanExitSuppressesLaunchUntilSupervisionResumes) {

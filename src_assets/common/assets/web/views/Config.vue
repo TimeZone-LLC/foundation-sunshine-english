@@ -4,7 +4,7 @@
     <div class="config-floating-buttons">
       <button
         type="button"
-        class="cute-btn cute-btn-primary"
+        class="tool-btn tool-btn-primary"
         :class="{ 'has-unsaved': hasUnsaved }"
         @click="requestConfigAction('save')"
         :disabled="riskActionRunning"
@@ -16,7 +16,7 @@
       <button
         v-if="saved && !restarted"
         type="button"
-        class="cute-btn cute-btn-primary"
+        class="tool-btn tool-btn-primary"
         @click="requestConfigAction('apply')"
         :disabled="riskActionRunning"
         :aria-label="$t('_common.apply')"
@@ -437,20 +437,10 @@ onUnmounted(() => {
 <style lang="less">
 @import '../styles/global.less';
 
-// Variables
-@transition-fast: 0.3s;
-@border-radius-sm: 2px;
-@border-radius-md: 10px;
-@border-radius-lg: 12px;
+// Layout constants. Radii, easings and shadows are no longer declared here:
+// corners are square everywhere and only color transitions are permitted.
 @btn-size: 52px;
 @btn-size-mobile: 48px;
-@cubic-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
-@cubic-smooth: cubic-bezier(0.4, 0, 0.2, 1);
-
-// Encoder brand colors
-@color-nvidia: #76b900;
-@color-amd: #ed1c24;
-@color-intel: #0071c5;
 
 // Mixins
 .flex-center() {
@@ -459,34 +449,26 @@ onUnmounted(() => {
   align-items: center;
 }
 
-.transition(@properties: all) {
-  transition: @properties @transition-fast @cubic-smooth;
-}
-
-.skeleton-gradient() {
-  background: linear-gradient(
-    90deg,
-    var(--ui-skeleton-base) 25%,
-    var(--ui-skeleton-highlight) 50%,
-    var(--ui-skeleton-base) 75%
-  );
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s infinite;
-}
-
 .config-page {
   padding: 1em;
   border: 1px solid var(--ui-border);
   border-top: none;
-  border-radius: 0 0 var(--ui-radius-md) var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface-strong);
   color: var(--ui-text-primary);
 }
 
+// Loading placeholders are static blocks. The shimmer gradient that used to
+// sweep across them is gone; the skeleton is a plain outline of the layout.
 .config-skeleton {
+  .skeleton-block() {
+    background: var(--ui-skeleton-base);
+    border: 1px solid var(--ui-border);
+    border-radius: 0;
+  }
+
   .skeleton-header {
     background: var(--ui-surface-strong);
-    border-radius: @border-radius-lg @border-radius-lg 0 0;
     padding: 0.5rem 1rem;
   }
 
@@ -499,8 +481,7 @@ onUnmounted(() => {
   .skeleton-tab {
     width: 80px;
     height: 38px;
-    .skeleton-gradient();
-    border-radius: @border-radius-md;
+    .skeleton-block();
   }
 
   .skeleton-body {
@@ -517,8 +498,7 @@ onUnmounted(() => {
   .skeleton-title {
     width: 150px;
     height: 24px;
-    .skeleton-gradient();
-    border-radius: 4px;
+    .skeleton-block();
     margin-bottom: 1rem;
   }
 
@@ -535,71 +515,60 @@ onUnmounted(() => {
   .skeleton-label {
     width: 120px;
     height: 16px;
-    .skeleton-gradient();
-    border-radius: 4px;
+    .skeleton-block();
     flex-shrink: 0;
   }
 
   .skeleton-input {
     flex: 1;
     height: 38px;
-    .skeleton-gradient();
-    border-radius: 6px;
+    .skeleton-block();
     max-width: 300px;
-  }
-}
-
-@keyframes skeleton-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
   }
 }
 
 .page-config {
   min-height: 100vh;
   padding-bottom: var(--spacing-xl);
-  background: linear-gradient(180deg, rgba(var(--ui-accent-rgb), 0.06), transparent 28rem);
+  background: var(--ui-page-bg);
 
   .page-title {
     color: var(--ui-text-primary) !important;
-    font-weight: 600;
+    font-weight: var(--ui-label-weight);
   }
 
   .form.card {
     overflow: visible;
     border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius-md);
+    border-radius: 0;
     background: var(--ui-surface);
-    box-shadow: var(--ui-shadow-sm);
   }
 
   .config-page {
     .accordion-item {
       overflow: hidden;
       border: 1px solid var(--ui-border);
-      border-radius: var(--ui-radius-md);
+      border-radius: 0;
       background: var(--ui-surface);
-      box-shadow: var(--ui-shadow-sm);
     }
 
     .accordion-button {
       border: 0;
+      border-radius: 0;
       background: var(--ui-surface-strong);
       color: var(--ui-text-primary);
       font-weight: 600;
-      transition: color 0.2s ease, background-color 0.2s ease;
+      transition: var(--transition-default);
 
       &:hover,
       &:not(.collapsed) {
-        background: var(--ui-accent-soft);
-        color: var(--ui-accent);
+        background: var(--ui-surface-hover);
+        color: var(--ui-text-primary);
       }
 
-      &:focus {
-        box-shadow: inset 0 0 0 2px var(--ui-accent-soft);
+      &:focus-visible {
+        outline: 2px solid var(--ui-text-primary);
+        outline-offset: 0;
       }
     }
 
@@ -613,9 +582,10 @@ onUnmounted(() => {
       padding: 0.75rem 1rem;
       overflow: auto;
       border: 1px solid var(--ui-border);
-      border-radius: var(--ui-radius-sm);
+      border-radius: 0;
       background: var(--ui-surface);
       color: var(--ui-text-secondary);
+      font-family: var(--font-family-mono);
       font-size: 0.82rem;
     }
 
@@ -634,21 +604,20 @@ onUnmounted(() => {
       min-width: 0;
       padding: 0.9rem;
       border: 1px solid var(--ui-border);
-      border-radius: var(--ui-radius-md);
+      border-radius: 0;
       background: var(--ui-surface);
-      box-shadow: var(--ui-shadow-sm);
     }
 
     .settings-panel--accent {
-      border-left: 3px solid var(--ui-accent);
-      background: color-mix(in srgb, var(--ui-accent) 5%, var(--ui-surface));
+      border-left: 3px solid var(--ui-border-strong);
+      background: var(--ui-surface-strong);
     }
 
     .settings-subpanel {
       padding: 0.8rem;
       border: 1px solid var(--ui-border);
       border-left: 3px solid var(--ui-border-strong);
-      border-radius: var(--ui-radius-sm);
+      border-radius: 0;
       background: var(--ui-surface-strong);
     }
 
@@ -682,21 +651,19 @@ onUnmounted(() => {
 
   .ms-item {
     border: 1px solid;
-    border-radius: @border-radius-sm;
+    border-radius: 0;
     font-size: 12px;
-    font-weight: bold;
+    font-weight: 600;
   }
 
   .config-tabs-shell {
     position: relative;
-    border-radius: @border-radius-lg @border-radius-lg 0 0;
     z-index: 10;
     background: var(--ui-surface-strong);
   }
 
   .config-tabs {
     background: var(--ui-surface-strong);
-    border-radius: @border-radius-lg @border-radius-lg 0 0;
     padding: 0.5rem 1rem 0;
     gap: 0.5rem;
     border-bottom: 1px solid var(--ui-border);
@@ -716,52 +683,39 @@ onUnmounted(() => {
     }
 
     .nav-link {
-      border: none;
-      border-radius: @border-radius-md @border-radius-md 0 0;
+      border: 1px solid transparent;
+      border-radius: 0;
       padding: 0.75rem 1.5rem;
-      font-weight: 500;
+      font-weight: var(--ui-label-weight);
+      text-transform: var(--ui-label-transform);
+      letter-spacing: var(--ui-label-tracking);
       color: var(--ui-text-secondary);
       background: transparent;
       position: relative;
-      overflow: hidden;
-      .transition();
-
-      &::before {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 50%;
-        transform: translateX(-50%) scaleX(0);
-        width: 80%;
-        height: 3px;
-        background: var(--ui-accent);
-        border-radius: 3px 3px 0 0;
-        .transition(transform);
-      }
+      transition: var(--transition-default);
 
       &:hover {
         color: var(--ui-text-primary);
-        background: var(--ui-accent-soft);
+        background: var(--ui-surface-hover);
       }
 
+      // The active tab is marked by a solid bar, not by a growing underline.
       &.active {
-        color: var(--ui-accent);
+        color: var(--ui-text-primary);
         background: var(--ui-surface);
-        box-shadow: var(--ui-shadow-sm);
-        font-weight: 600;
+        border-color: var(--ui-border);
+        border-bottom-color: transparent;
+        font-weight: var(--ui-label-weight);
 
         &::before {
-          transform: translateX(-50%) scaleX(1);
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: var(--ui-accent);
         }
-      }
-
-      &.dropdown-toggle::after {
-        margin-left: 0.5em;
-        .transition(transform);
-      }
-
-      &.dropdown-toggle[aria-expanded='true']::after {
-        transform: rotate(180deg);
       }
     }
 
@@ -772,13 +726,11 @@ onUnmounted(() => {
       left: 0;
       z-index: 1050;
       min-width: 200px;
-      margin-top: 0.25rem;
+      margin-top: 0;
       padding: 0.5rem 0;
-      border-radius: @border-radius-md;
-      border: 1px solid var(--ui-border);
-      box-shadow: var(--ui-shadow-md);
+      border-radius: 0;
+      border: 1px solid var(--ui-border-strong);
       background: var(--ui-surface-strong);
-      backdrop-filter: blur(10px);
 
       &.show {
         display: block;
@@ -789,43 +741,22 @@ onUnmounted(() => {
         align-items: center;
         padding: 0.5rem 1.5rem;
         font-weight: 500;
+        color: var(--ui-text-primary);
         text-decoration: none;
-        .transition();
-
-        &.encoder-item-nv {
-          color: @color-nvidia;
-        }
-        &.encoder-item-amd {
-          color: @color-amd;
-        }
-        &.encoder-item-qsv {
-          color: @color-intel;
-        }
-        &.encoder-item-sw {
-          color: var(--ui-text-secondary);
-        }
+        transition: var(--transition-default);
 
         &:hover {
-          background: var(--ui-accent-soft);
+          background: var(--ui-surface-hover);
         }
+
         &.active {
-          background: rgba(var(--ui-accent-rgb), 0.2);
+          background: var(--ui-accent);
+          color: var(--ui-accent-contrast);
           font-weight: 600;
         }
       }
     }
   }
-}
-
-// Toast transitions
-.toast-enter-active,
-.toast-leave-active {
-  transition: opacity @transition-fast ease-in-out;
-}
-
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
 }
 
 .toast.show {
@@ -845,7 +776,7 @@ onUnmounted(() => {
 .risk-item {
   padding: 1rem;
   border: 1px solid var(--ui-border);
-  border-radius: @border-radius-md;
+  border-radius: 0;
   background: var(--ui-surface);
 
   &.critical {
@@ -854,13 +785,13 @@ onUnmounted(() => {
   }
 
   &.high {
-    border-color: color-mix(in srgb, var(--ui-warning) 36%, transparent);
-    background: color-mix(in srgb, var(--ui-warning) 8%, transparent);
+    border-color: var(--ui-warning-border);
+    background: var(--ui-warning-soft);
   }
 
   &.medium {
-    border-color: color-mix(in srgb, var(--ui-accent) 30%, transparent);
-    background: var(--ui-accent-soft);
+    border-color: var(--ui-border-strong);
+    background: var(--ui-surface-strong);
   }
 
   p {
@@ -868,7 +799,6 @@ onUnmounted(() => {
     color: var(--ui-text-primary);
     line-height: 1.5;
   }
-
 }
 
 .risk-item-header {
@@ -887,11 +817,11 @@ onUnmounted(() => {
   align-items: center;
   min-height: 24px;
   padding: 0.15rem 0.55rem;
-  border-radius: 999px;
+  border-radius: 0;
   font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
+  font-weight: var(--ui-label-weight);
+  text-transform: var(--ui-label-transform);
+  letter-spacing: var(--ui-label-tracking);
 
   &.critical {
     color: var(--ui-danger-contrast);
@@ -928,11 +858,12 @@ onUnmounted(() => {
     max-width: 100%;
     overflow-wrap: anywhere;
     padding: 0.2rem 0.4rem;
-    border-radius: @border-radius-sm;
+    border: 1px solid var(--ui-border);
+    border-radius: 0;
     color: var(--ui-text-primary);
-    background: var(--ui-accent-soft);
+    background: var(--ui-surface-strong);
+    font-family: var(--font-family-mono);
   }
-
 }
 
 .risk-recovery p {
@@ -940,6 +871,8 @@ onUnmounted(() => {
   color: var(--ui-text-secondary);
 }
 
+// Sticky save / apply controls. Formerly circular buttons that lifted on
+// hover, scaled on press and pulsed while changes were pending.
 .config-floating-buttons {
   position: sticky;
   top: 80%;
@@ -964,98 +897,51 @@ onUnmounted(() => {
     }
   }
 
-  .cute-btn {
+  .tool-btn {
     width: @btn-size;
     height: @btn-size;
-    border-radius: var(--ui-radius-md);
+    border-radius: 0;
     border: 1px solid var(--ui-border-strong);
-    color: var(--ui-accent-contrast);
     font-size: 1.25rem;
     cursor: pointer;
     position: relative;
-    .transition();
+    transition: var(--transition-default);
     .flex-center();
 
-    &:hover {
-      transform: translateY(-1px);
-      box-shadow: var(--ui-shadow-md);
-    }
-
-    &:active {
-      transform: scale(0.97) translateY(0);
-      transition: transform 0.1s @cubic-bounce;
-    }
-
     &:focus-visible {
-      outline: none;
-      box-shadow: var(--ui-shadow-sm), 0 0 0 3px var(--ui-accent-soft);
+      outline: 2px solid var(--ui-text-primary);
+      outline-offset: 0;
     }
 
     &-primary {
       background: var(--ui-accent);
       color: var(--ui-accent-contrast);
-      box-shadow: var(--ui-shadow-sm);
 
       &:hover {
         background: var(--ui-accent);
-        box-shadow: var(--ui-shadow-md);
       }
 
+      // Pending changes are flagged by the frame color alone.
       &.has-unsaved {
-        animation: pulse-warning 2s ease-in-out 3;
-        box-shadow: var(--ui-shadow-sm), 0 0 0 3px color-mix(in srgb, var(--ui-warning) 50%, transparent);
-
-        &:hover {
-          animation: pulse-warning 2s ease-in-out 3;
-          box-shadow: var(--ui-shadow-md), 0 0 0 4px color-mix(in srgb, var(--ui-warning) 70%, transparent);
-        }
+        border-color: var(--ui-warning);
       }
     }
 
     &-success {
       background: var(--ui-success);
       color: var(--ui-success-contrast);
-      box-shadow: var(--ui-shadow-sm);
 
       &:hover {
         background: var(--ui-success);
-        box-shadow: var(--ui-shadow-md);
       }
-    }
-
-    i {
-      position: relative;
-      z-index: 1;
-      .transition(transform);
-    }
-
-    &:hover i {
-      transform: scale(1.06);
     }
 
     &:disabled {
       cursor: not-allowed;
       opacity: 0.65;
-      transform: none;
-      box-shadow: none;
-      animation: none;
       border-color: var(--ui-border);
       background: var(--ui-surface-strong);
       color: var(--ui-text-muted);
-
-      i {
-        transform: none;
-      }
-    }
-  }
-
-  @keyframes pulse-warning {
-    0%,
-    100% {
-      box-shadow: var(--ui-shadow-sm), 0 0 0 3px color-mix(in srgb, var(--ui-warning) 50%, transparent);
-    }
-    50% {
-      box-shadow: var(--ui-shadow-sm), 0 0 0 5px color-mix(in srgb, var(--ui-warning) 80%, transparent);
     }
   }
 }
@@ -1079,7 +965,7 @@ onUnmounted(() => {
       max-width: calc(100vw - 2rem);
     }
 
-    .cute-btn {
+    .tool-btn {
       width: @btn-size-mobile;
       height: @btn-size-mobile;
       font-size: 1.1rem;
@@ -1104,48 +990,6 @@ onUnmounted(() => {
       white-space: nowrap;
       scroll-snap-align: center;
     }
-  }
-
-  .page-config .config-tabs-shell {
-    &::before,
-    &::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      bottom: 0;
-      width: 2rem;
-      pointer-events: none;
-      z-index: 11;
-    }
-
-    &::before {
-      left: 0;
-      background: linear-gradient(90deg, var(--ui-surface-strong), transparent);
-    }
-
-    &::after {
-      right: 0;
-      background: linear-gradient(270deg, var(--ui-surface-strong), transparent);
-    }
-  }
-}
-
-// 无障碍：减少动态效果
-@media (prefers-reduced-motion: reduce) {
-  .config-floating-buttons .cute-btn {
-    animation: none !important;
-    transition: none !important;
-
-    &:hover {
-      animation: none !important;
-    }
-  }
-
-  .config-skeleton .skeleton-tab,
-  .config-skeleton .skeleton-title,
-  .config-skeleton .skeleton-label,
-  .config-skeleton .skeleton-input {
-    animation: none !important;
   }
 }
 </style>

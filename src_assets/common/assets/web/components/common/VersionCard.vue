@@ -13,50 +13,6 @@
         {{ $t('index.loading_latest') }}
       </div>
 
-      <!-- 开发版本标识 -->
-      <div class="version-alert version-alert-success" v-if="buildVersionIsDirty">
-        <i class="fas fa-code me-2"></i>
-        {{ $t('index.version_dirty') }} 🌇
-      </div>
-
-      <!-- 已安装版本不是稳定版 -->
-      <div class="version-alert version-alert-info" v-if="installedVersionNotStable">
-        <i class="fas fa-info-circle me-2"></i>
-        {{ $t('index.installed_version_not_stable') }}
-      </div>
-
-      <!-- 已是最新版本 -->
-      <div
-        v-else-if="(!preReleaseBuildAvailable || !notifyPreReleases) && !stableBuildAvailable && !buildVersionIsDirty"
-        class="version-alert version-alert-success"
-      >
-        <i class="fas fa-check-circle me-2"></i>
-        {{ $t('index.version_latest') }}
-      </div>
-
-      <!-- 预发布版本可用 -->
-      <div v-if="notifyPreReleases && preReleaseBuildAvailable" class="version-update">
-        <div class="version-update-header">
-          <div class="version-update-title">
-            <i class="fas fa-rocket text-warning me-2"></i>
-            <span>{{ $t('index.new_pre_release') }}</span>
-          </div>
-          <button
-            type="button"
-            class="btn btn-primary btn-download"
-            :disabled="pendingNativeChannel !== ''"
-            :aria-busy="pendingNativeChannel === 'prerelease'"
-            @click="handleDownloadClick(preReleaseVersion.release.html_url, 'prerelease')"
-          >
-            <i :class="pendingNativeChannel === 'prerelease' ? 'fas fa-spinner fa-spin me-2' : 'fas fa-download me-2'"></i>
-            {{ $t('index.download') }}
-            <span v-if="nativeUpdaterAvailable" class="native-updater-badge">Control Panel</span>
-          </button>
-        </div>
-        <h3 class="version-release-name">{{ preReleaseVersion.release.name }}</h3>
-        <div class="markdown-content" v-html="parsedPreReleaseBody"></div>
-      </div>
-
       <!-- 稳定版本可用 -->
       <div v-if="stableBuildAvailable" class="version-update">
         <div class="version-update-header">
@@ -112,10 +68,8 @@ defineProps({
   preReleaseVersion: Object,
   notifyPreReleases: Boolean,
   loading: Boolean,
-  installedVersionNotStable: Boolean,
   stableBuildAvailable: Boolean,
   preReleaseBuildAvailable: Boolean,
-  buildVersionIsDirty: Boolean,
   parsedStableBody: String,
   parsedPreReleaseBody: String,
 })
@@ -250,112 +204,94 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* Loading State */
+/*
+ * The card is now purely an update notice: the header states the installed
+ * version, the body states what is available. There is no "you are up to date"
+ * banner to style, because the card does not render when that is the case.
+ */
 .version-loading {
   display: flex;
   align-items: center;
-  padding: 1rem;
-  color: var(--ui-text-secondary);
-  font-size: 0.95rem;
-}
-
-/* Version Alerts */
-.version-alert {
-  border-radius: var(--ui-radius-sm);
-  font-size: 0.9rem;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
-  display: flex;
-  align-items: center;
-  border: 1px solid transparent;
-}
-
-.version-alert-success {
-  background: color-mix(in srgb, var(--ui-success) 12%, transparent);
-  color: var(--ui-success-text);
-  border-color: color-mix(in srgb, var(--ui-success) 30%, transparent);
-  border-left: 4px solid var(--ui-success);
-}
-
-.version-alert-info {
-  background: var(--ui-accent-soft);
-  color: var(--ui-accent);
-  border-color: var(--ui-border);
-  border-left: 4px solid var(--ui-accent);
+  padding: var(--ui-space-4);
+  color: var(--ui-text-muted);
+  font-size: var(--font-size-sm);
 }
 
 .version-card-header .card-title i {
-  color: var(--ui-accent);
+  color: var(--ui-text-muted);
 }
 
-/* Version Update Section */
+/*
+ * The update notice is a framed block one tonal step off the card. The signal
+ * is carried by the hairline border, not by a coloured fill.
+ */
 .version-update {
-  background: color-mix(in srgb, var(--ui-warning) 10%, var(--ui-surface));
-  border: 1px solid color-mix(in srgb, var(--ui-warning) 30%, transparent);
-  border-radius: var(--ui-radius-md);
-  padding: 1.25rem;
-  margin-top: 1rem;
+  margin-top: var(--ui-space-4);
+  padding: var(--ui-space-4);
+  border: 1px solid var(--ui-warning-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
 }
 
 .version-update-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
   flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1rem;
+  gap: var(--ui-space-3);
+  margin-bottom: var(--ui-space-3);
 }
 
 .version-update-title {
   display: flex;
   align-items: center;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--ui-text-primary);
   flex: 1;
   min-width: 200px;
+  color: var(--ui-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--ui-label-weight);
 }
 
 .btn-download {
-  border-radius: 8px;
-  padding: 0.5rem 1.25rem;
-  font-weight: 600;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  height: var(--ui-control-height);
+  padding: 0 var(--ui-space-3);
+  border-radius: var(--ui-radius);
+  font-size: var(--font-size-sm);
+  font-weight: var(--ui-label-weight);
   white-space: nowrap;
+  transition: var(--transition-default);
 }
 
 .native-updater-badge {
   display: inline-flex;
   align-items: center;
-  margin-left: 0.55rem;
-  padding: 0.12rem 0.4rem;
-  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 600;
+  margin-left: var(--ui-space-2);
+  padding: 1px var(--ui-space-1);
+  border: 1px solid currentColor;
+  border-radius: var(--ui-radius);
+  font-size: var(--font-size-xs);
+  font-weight: var(--ui-label-weight);
   line-height: 1.2;
 }
 
-.btn-download:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--ui-shadow-sm);
-}
-
 .version-release-name {
-  font-size: 1.3rem;
-  font-weight: 600;
-  margin: 1rem 0 0.75rem 0;
+  margin: var(--ui-space-3) 0 var(--ui-space-2);
   color: var(--ui-text-primary);
+  font-size: var(--font-size-md);
+  font-weight: var(--ui-label-weight);
 }
 
-/* Markdown Content */
+/* Release notes, rendered from the GitHub release body. */
 .markdown-content {
-  background: var(--ui-surface);
-  border-radius: var(--ui-radius-sm);
-  padding: 1.25rem;
-  margin-top: 1rem;
-  line-height: 1.6;
+  margin-top: var(--ui-space-3);
+  padding: var(--ui-space-4);
   border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-panel);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
 }
 
 .markdown-content h1,
@@ -364,11 +300,11 @@ onBeforeUnmount(() => {
 .markdown-content h4,
 .markdown-content h5,
 .markdown-content h6 {
-  margin-top: 1.25rem;
-  margin-bottom: 0.75rem;
-  font-weight: 600;
-  line-height: 1.25;
+  margin-top: var(--ui-space-4);
+  margin-bottom: var(--ui-space-2);
   color: var(--ui-text-primary);
+  font-weight: var(--ui-label-weight);
+  line-height: 1.25;
 }
 
 .markdown-content h1:first-child,
@@ -378,96 +314,94 @@ onBeforeUnmount(() => {
 }
 
 .markdown-content h1 {
-  font-size: 1.5em;
+  font-size: 1.25em;
 }
 
 .markdown-content h2 {
-  font-size: 1.3em;
+  font-size: 1.15em;
 }
 
 .markdown-content h3 {
-  font-size: 1.1em;
+  font-size: 1.05em;
 }
 
 .markdown-content p {
-  margin-bottom: 0.75rem;
-  white-space: pre-line;
+  margin-bottom: var(--ui-space-2);
   color: var(--ui-text-secondary);
+  white-space: pre-line;
 }
 
 .markdown-content ul,
 .markdown-content ol {
-  margin-bottom: 0.75rem;
-  padding-left: 1.5rem;
+  margin-bottom: var(--ui-space-2);
+  padding-left: var(--ui-space-5);
 }
 
 .markdown-content li {
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--ui-space-1);
   color: var(--ui-text-secondary);
 }
 
 .markdown-content code {
-  background: var(--ui-accent-soft);
-  padding: 0.2em 0.4em;
-  border-radius: 4px;
-  font-family: 'Courier New', 'Consolas', 'Monaco', monospace;
-  font-size: 0.9em;
-  color: var(--ui-accent);
+  padding: 0.1em 0.35em;
+  border: 1px solid var(--ui-border-soft);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 0.92em;
 }
 
 .markdown-content pre {
-  background: var(--ui-surface-strong);
-  padding: 1rem;
-  border-radius: 8px;
   overflow-x: auto;
-  margin: 1rem 0;
+  margin: var(--ui-space-3) 0;
+  padding: var(--ui-space-3);
   border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
 }
 
 .markdown-content pre code {
-  background: none;
   padding: 0;
+  border: 0;
+  background: none;
   color: inherit;
 }
 
 .markdown-content blockquote {
-  border-left: 4px solid var(--ui-accent);
-  margin: 1rem 0;
-  padding-left: 1rem;
-  color: var(--ui-text-secondary);
-  font-style: italic;
+  margin: var(--ui-space-3) 0;
+  padding-left: var(--ui-space-3);
+  border-left: 1px solid var(--ui-border-strong);
+  color: var(--ui-text-muted);
 }
 
 .markdown-content a {
-  color: var(--ui-accent);
-  text-decoration: none;
+  color: var(--ui-text-primary);
   font-weight: 500;
-  transition: color 0.2s ease;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: var(--transition-default);
 }
 
 .markdown-content a:hover {
-  color: var(--ui-accent);
-  text-decoration: underline;
+  color: var(--ui-text-muted);
 }
 
 .markdown-content table {
-  border-collapse: collapse;
   width: 100%;
-  margin: 1rem 0;
-  border-radius: 8px;
-  overflow: hidden;
+  margin: var(--ui-space-3) 0;
+  border-collapse: collapse;
 }
 
 .markdown-content th,
 .markdown-content td {
+  padding: var(--ui-space-2) var(--ui-space-3);
   border: 1px solid var(--ui-border);
-  padding: 0.75rem 1rem;
   text-align: left;
 }
 
 .markdown-content th {
-  background: var(--ui-surface-strong);
-  font-weight: 600;
+  background: var(--ui-surface);
+  font-weight: var(--ui-label-weight);
 }
-
 </style>

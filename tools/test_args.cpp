@@ -43,22 +43,22 @@ std::string get_current_time() {
 #ifdef _WIN32
 void print_user_info(std::ofstream& log) {
     log << "----------------------------------------\n";
-    log << "User Information (用户信息):\n";
+    log << "User Information:\n";
     
     // 获取用户名
     char username[UNLEN + 1];
     DWORD username_len = UNLEN + 1;
     if (GetUserNameA(username, &username_len)) {
-        log << "  Username (用户名): " << username << "\n";
+        log << "  Username: " << username << "\n";
     } else {
-        log << "  Username (用户名): <Failed to get (获取失败)>\n";
+        log << "  Username: <Failed to get>\n";
     }
     
     // 获取计算机名
     char computer_name[MAX_COMPUTERNAME_LENGTH + 1];
     DWORD computer_name_len = MAX_COMPUTERNAME_LENGTH + 1;
     if (GetComputerNameA(computer_name, &computer_name_len)) {
-        log << "  Computer (计算机名): " << computer_name << "\n";
+        log << "  Computer: " << computer_name << "\n";
     }
     
     // 检查是否是管理员
@@ -70,7 +70,7 @@ void print_user_info(std::ofstream& log) {
         CheckTokenMembership(NULL, admin_group, &is_admin);
         FreeSid(admin_group);
     }
-    log << "  Is Admin (是否管理员): " << (is_admin ? "Yes (是)" : "No (否)") << "\n";
+    log << "  Is Admin: " << (is_admin ? "Yes" : "No") << "\n";
     
     // 获取当前进程的令牌信息
     HANDLE token = NULL;
@@ -84,7 +84,7 @@ void print_user_info(std::ofstream& log) {
             if (GetTokenInformation(token, TokenUser, token_user, token_user_size, &token_user_size)) {
                 LPSTR sid_string = NULL;
                 if (ConvertSidToStringSidA(token_user->User.Sid, &sid_string)) {
-                    log << "  User SID (用户 SID): " << sid_string << "\n";
+                    log << "  User SID: " << sid_string << "\n";
                     LocalFree(sid_string);
                 }
             }
@@ -95,19 +95,19 @@ void print_user_info(std::ofstream& log) {
         TOKEN_ELEVATION_TYPE elevation_type;
         if (GetTokenInformation(token, TokenElevationType, &elevation_type,
                                 elevation_type_size, &elevation_type_size)) {
-            const char* elevation_str = "Unknown (未知)";
+            const char* elevation_str = "Unknown";
             switch (elevation_type) {
                 case TokenElevationTypeDefault:
-                    elevation_str = "Default (默认)";
+                    elevation_str = "Default";
                     break;
                 case TokenElevationTypeFull:
-                    elevation_str = "Full (Elevated) (完全/已提升)";
+                    elevation_str = "Full (Elevated)";
                     break;
                 case TokenElevationTypeLimited:
-                    elevation_str = "Limited (受限)";
+                    elevation_str = "Limited";
                     break;
             }
-            log << "  Elevation Type (权限提升类型): " << elevation_str << "\n";
+            log << "  Elevation Type: " << elevation_str << "\n";
         }
         
         // 检查是否以管理员身份运行
@@ -115,45 +115,45 @@ void print_user_info(std::ofstream& log) {
         DWORD is_elevated_size = sizeof(BOOL);
         if (GetTokenInformation(token, TokenElevation, &is_elevated,
                                is_elevated_size, &is_elevated_size)) {
-            log << "  Is Elevated (是否已提升权限): " << (is_elevated ? "Yes (是)" : "No (否)") << "\n";
+            log << "  Is Elevated: " << (is_elevated ? "Yes" : "No") << "\n";
         }
         
         CloseHandle(token);
     }
     
     // 获取进程 ID
-    log << "  Process ID (进程 ID): " << GetCurrentProcessId() << "\n";
-    log << "  Thread ID (线程 ID): " << GetCurrentThreadId() << "\n";
+    log << "  Process ID: " << GetCurrentProcessId() << "\n";
+    log << "  Thread ID: " << GetCurrentThreadId() << "\n";
     
     // 获取会话 ID
     DWORD session_id = 0;
     if (ProcessIdToSessionId(GetCurrentProcessId(), &session_id)) {
-        log << "  Session ID (会话 ID): " << session_id << "\n";
+        log << "  Session ID: " << session_id << "\n";
     }
 }
 #else
 void print_user_info(std::ofstream& log) {
     log << "----------------------------------------\n";
-    log << "User Information (用户信息):\n";
+    log << "User Information:\n";
     
     // 获取用户 ID 和组 ID
     uid_t uid = getuid();
     gid_t gid = getgid();
-    log << "  UID (用户 ID): " << uid << "\n";
-    log << "  GID (组 ID): " << gid << "\n";
+    log << "  UID: " << uid << "\n";
+    log << "  GID: " << gid << "\n";
     
     // 获取用户名
     struct passwd* pw = getpwuid(uid);
     if (pw) {
-        log << "  Username (用户名): " << pw->pw_name << "\n";
-        log << "  Home (主目录): " << pw->pw_dir << "\n";
+        log << "  Username: " << pw->pw_name << "\n";
+        log << "  Home: " << pw->pw_dir << "\n";
     }
     
     // 检查是否是 root
-    log << "  Is Root (是否 Root): " << (uid == 0 ? "Yes (是)" : "No (否)") << "\n";
+    log << "  Is Root: " << (uid == 0 ? "Yes" : "No") << "\n";
     
     // 获取进程 ID
-    log << "  Process ID (进程 ID): " << getpid() << "\n";
+    log << "  Process ID: " << getpid() << "\n";
 }
 #endif
 
@@ -201,10 +201,10 @@ int main(int argc, char* argv[]) {
     // 写入分隔符和时间戳
     log << "\n";
     log << "========================================\n";
-    log << "Test Time (测试时间): " << get_current_time() << "\n";
+    log << "Test Time: " << get_current_time() << "\n";
     log << "========================================\n";
-    log << "Total Arguments (参数总数): " << argc << "\n";
-    log << "Executable (可执行文件): " << (argc > 0 ? argv[0] : "unknown") << "\n";
+    log << "Total Arguments: " << argc << "\n";
+    log << "Executable: " << (argc > 0 ? argv[0] : "unknown") << "\n";
     
     // 打印用户权限信息
     print_user_info(log);
@@ -213,24 +213,24 @@ int main(int argc, char* argv[]) {
 
     // 输出所有参数
     for (int i = 0; i < argc; i++) {
-        log << "Arg[" << i << "] (参数[" << i << "]): \"" << argv[i] << "\"\n";
+        log << "Arg[" << i << "]: \"" << argv[i] << "\"\n";
     }
 
     log << "----------------------------------------\n";
-    log << "Argument Analysis (参数分析):\n";
+    log << "Argument Analysis:\n";
 
     // 检查是否有环境变量相关的参数
     bool found_env_vars = false;
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
         if (arg.find("%SUNSHINE_") != std::string::npos) {
-            log << "  WARNING (警告): Found unexpanded environment variable in arg[" << i << "] (在参数[" << i << "] 中发现未展开的环境变量): " << arg << "\n";
+            log << "  WARNING: Found unexpanded environment variable in arg[" << i << "]: " << arg << "\n";
             found_env_vars = true;
         }
     }
 
     if (!found_env_vars) {
-        log << "  ✓ All environment variables appear to be expanded (所有环境变量已正确展开)\n";
+        log << "  ✓ All environment variables appear to be expanded\n";
     }
 
     log << "========================================\n";
@@ -239,8 +239,8 @@ int main(int argc, char* argv[]) {
     log.close();
 
     // 同时输出到控制台（如果可用）
-    std::cout << "Arguments logged to (参数已记录到): " << log_file << std::endl;
-    std::cout << "Total arguments (参数总数): " << argc << std::endl;
+    std::cout << "Arguments logged to: " << log_file << std::endl;
+    std::cout << "Total arguments: " << argc << std::endl;
     for (int i = 0; i < argc; i++) {
         std::cout << "  [" << i << "] " << argv[i] << std::endl;
     }

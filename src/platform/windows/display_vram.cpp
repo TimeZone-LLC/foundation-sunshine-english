@@ -127,6 +127,25 @@ namespace platf::dxgi {
     is_quality_vbr_rate_control(const std::optional<int> &rc_mode) {
       return rc_mode && *rc_mode == quality_vbr_rate_control;
     }
+
+    /**
+     * @brief Decide how a failed D3D11 call during a snapshot should be reported.
+     * @details Every call against the device fails once it has been removed or reset,
+     *          which is exactly what a resume from sleep or a GPU driver restart looks
+     *          like. Those cases must recreate the display instead of ending the stream.
+     * @param device The device the failing call was made on.
+     * @return capture_e::reinit if the device was lost, capture_e::error otherwise.
+     */
+    capture_e
+    classify_snapshot_failure(ID3D11Device *device) {
+      const HRESULT removed_reason = device ? device->GetDeviceRemovedReason() : S_OK;
+      if (FAILED(removed_reason)) {
+        BOOST_LOG(error) << "D3D11 device lost during capture [0x"sv
+                         << util::hex(removed_reason).to_string_view() << "], requesting reinit"sv;
+        return capture_e::reinit;
+      }
+      return capture_e::error;
+    }
   }  // namespace
 
   template <class T>
@@ -3012,8 +3031,10 @@ namespace platf::dxgi {
     }
 
     bool shape_updated;
-    if (dup.update_cursor(frame_info, shape_updated) != capture_e::ok) {
-      return capture_e::error;
+    if (auto cursor_status = dup.update_cursor(frame_info, shape_updated); cursor_status != capture_e::ok) {
+      // Propagate the duplication's own verdict: a pointer shape that cannot be read
+      // during a desktop switch asks for a reinit rather than a fatal error.
+      return cursor_status;
     }
     auto &cursor = dup.cursor;
     if (use_local_cursor) {
@@ -3028,12 +3049,15 @@ namespace platf::dxgi {
             true,
             normalized
           )) {
+        // A shape we cannot normalize is a data problem, not a device state problem,
+        // so it stays a hard error and is bounded by the capture retry window.
+        BOOST_LOG(error) << "Failed to normalize the cursor shape"sv;
         return capture_e::error;
       }
 
       if (!set_cursor_texture(device.get(), cursor_alpha, std::move(normalized.alpha), normalized.info) ||
           !set_cursor_texture(device.get(), cursor_xor, std::move(normalized.xor_mask), normalized.info)) {
-        return capture_e::error;
+        return classify_snapshot_failure(device.get());
       }
     }
 
@@ -3056,7 +3080,7 @@ namespace platf::dxgi {
       status = res->QueryInterface(IID_ID3D11Texture2D, (void **) &src);
       if (FAILED(status)) {
         BOOST_LOG(error) << "Couldn't query interface [0x"sv << util::hex(status).to_string_view() << ']';
-        return capture_e::error;
+        return classify_snapshot_failure(device.get());
       }
 
       D3D11_TEXTURE2D_DESC desc;

@@ -56,7 +56,7 @@ const showMessage = (message, type = 'info') => {
       )
       return
     } catch (e) {
-      console.warn('无法通过 postMessage 发送消息:', e)
+      console.warn('Failed to send message via postMessage:', e)
     }
   }
 
@@ -79,7 +79,7 @@ const checkSunshineMode = async () => {
     const result = await window.__TAURI__.core.invoke('is_sunshine_running_in_user_mode')
     isUserMode.value = result === true
   } catch (error) {
-    console.error('检查 Sunshine 模式失败:', error)
+    console.error('Failed to check the Sunshine run mode:', error)
     // 如果检查失败，默认假设为服务模式
     isUserMode.value = false
   } finally {
@@ -102,7 +102,7 @@ const toggleSunshineMode = async () => {
     setTimeout(() => checkSunshineMode(), 6000)
     setTimeout(() => checkSunshineMode(), 11000)
   } catch (error) {
-    console.error('切换模式失败:', error)
+    console.error('Failed to switch the run mode:', error)
     showMessage(t('config.wgc_mode_switch_failed') + ': ' + (error.message || error), 'error')
   }
 }
@@ -347,9 +347,9 @@ const hdrToggleDisabled = computed(() => codecStrategy.value !== 'modern')
 <style scoped>
 .strategy-warning,
 .status-note {
-  border: 1px solid color-mix(in srgb, var(--ui-warning) 34%, transparent);
-  border-radius: var(--ui-radius-sm);
-  background: color-mix(in srgb, var(--ui-warning) 11%, transparent);
+  border: 1px solid var(--ui-warning-border);
+  border-radius: 0;
+  background: var(--ui-warning-soft);
   color: var(--ui-warning-text);
 }
 
@@ -363,19 +363,23 @@ const hdrToggleDisabled = computed(() => codecStrategy.value !== 'modern')
   min-height: 2.1rem;
   padding: 0.35rem 0.75rem;
   border: 1px solid var(--ui-border-strong);
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   background: var(--ui-surface);
   color: var(--ui-accent);
   font-size: 0.84rem;
   font-weight: 600;
-  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .settings-disclosure:hover,
 .settings-disclosure:focus-visible {
   border-color: var(--ui-accent);
   background: var(--ui-accent-soft);
-  box-shadow: 0 0 0 3px var(--ui-accent-soft);
+}
+
+.settings-disclosure:focus-visible {
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 .capture-control-row {
@@ -390,26 +394,26 @@ const hdrToggleDisabled = computed(() => codecStrategy.value !== 'modern')
   padding: 0.45rem 0.8rem;
   white-space: nowrap;
   border: 1px solid;
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   font-weight: 600;
-  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .mode-switch-button.is-success {
-  border-color: color-mix(in srgb, var(--ui-success) 42%, transparent);
-  background: color-mix(in srgb, var(--ui-success) 14%, transparent);
+  border-color: var(--ui-success-border);
+  background: var(--ui-success-soft);
   color: var(--ui-success-text);
 }
 
 .mode-switch-button.is-warning {
-  border-color: color-mix(in srgb, var(--ui-warning) 42%, transparent);
-  background: color-mix(in srgb, var(--ui-warning) 14%, transparent);
+  border-color: var(--ui-warning-border);
+  background: var(--ui-warning-soft);
   color: var(--ui-warning-text);
 }
 
-.mode-switch-button:hover:not(:disabled),
 .mode-switch-button:focus-visible {
-  box-shadow: 0 0 0 3px var(--ui-accent-soft);
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 .status-note {
@@ -420,20 +424,20 @@ const hdrToggleDisabled = computed(() => codecStrategy.value !== 'modern')
 }
 
 .status-note.is-success {
-  border-color: color-mix(in srgb, var(--ui-success) 34%, transparent);
-  background: color-mix(in srgb, var(--ui-success) 11%, transparent);
+  border-color: var(--ui-success-border);
+  background: var(--ui-success-soft);
   color: var(--ui-success-text);
 }
 
 .status-note.is-info {
-  border-color: color-mix(in srgb, var(--ui-accent) 30%, transparent);
+  border-color: var(--ui-border-strong);
   background: var(--ui-accent-soft);
   color: var(--ui-accent);
 }
 
 .status-note.is-warning {
-  border-color: color-mix(in srgb, var(--ui-warning) 34%, transparent);
-  background: color-mix(in srgb, var(--ui-warning) 11%, transparent);
+  border-color: var(--ui-warning-border);
+  background: var(--ui-warning-soft);
   color: var(--ui-warning-text);
 }
 

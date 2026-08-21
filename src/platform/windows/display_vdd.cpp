@@ -784,7 +784,10 @@ namespace platf::dxgi {
     out_cursor_only = false;
 
     if (!m_hEvent || m_keyedMutex.empty() || m_sharedTex.empty() || !m_pMeta) {
-      return capture_e::error;
+      // The producer went away (driver reload, suspend/resume) and took the shared
+      // handles with it. Reopening the channel is the recovery path, not a fatal error.
+      BOOST_LOG(warning) << "[vdd_capture] shared frame channel is not attached; requesting reinit"sv;
+      return capture_e::reinit;
     }
 
     auto *meta = static_cast<const SharedFrameMetadata *>(m_pMeta);
@@ -873,9 +876,12 @@ namespace platf::dxgi {
       return acquire_cursor_frame();
     }
     if (wr != WAIT_OBJECT_0) {
-      BOOST_LOG(error) << "[vdd_capture] WaitForMultipleObjects: result="sv << wr
-                       << " gle="sv << GetLastError();
-      return capture_e::error;
+      // WAIT_ABANDONED / WAIT_FAILED means the producer-owned events are gone, which is
+      // what a driver reload across suspend/resume looks like. Reattach instead of
+      // reporting a fatal capture failure.
+      BOOST_LOG(warning) << "[vdd_capture] WaitForMultipleObjects: result="sv << wr
+                         << " gle="sv << GetLastError() << "; requesting reinit"sv;
+      return capture_e::reinit;
     }
 
     // Coalesce a cursor signal that arrived with the new desktop frame. The

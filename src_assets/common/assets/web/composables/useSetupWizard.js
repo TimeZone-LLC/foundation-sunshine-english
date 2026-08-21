@@ -69,7 +69,7 @@ export function useSetupWizard() {
 
   // 设置完成回调
   const onSetupComplete = (config) => {
-    console.log('设置完成:', config)
+    console.log('Setup complete:', config)
     // 用户点击"配置应用程序"按钮后会自动跳转到 /apps
   }
 

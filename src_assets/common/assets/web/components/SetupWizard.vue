@@ -34,7 +34,7 @@
 
     <div class="setup-card">
       <div class="setup-header">
-        <img src="/images/logo-sunshine-256.png" height="60" alt="Sunshine">
+        <BrandMark :size="34" stacked />
         <h1>{{ $t('setup.welcome') }}</h1>
         <p>{{ $t('setup.description') }}</p>
       </div>
@@ -44,59 +44,29 @@
         <div class="step-indicator">
           <div class="step" :class="{ active: currentStep === 1, completed: currentStep > 1 }">
             <div class="step-number">1</div>
-            <span>{{ $t('setup.step0_title') }}</span>
+            <span>{{ $t('setup.step2_title') }}</span>
           </div>
           <div class="step-connector"></div>
           <div class="step" :class="{ active: currentStep === 2, completed: currentStep > 2 }">
             <div class="step-number">2</div>
-            <span>{{ $t('setup.step2_title') }}</span>
+            <span>{{ $t('setup.step1_title') }}</span>
           </div>
           <div class="step-connector"></div>
           <div class="step" :class="{ active: currentStep === 3, completed: currentStep > 3 }">
             <div class="step-number">3</div>
-            <span>{{ $t('setup.step1_title') }}</span>
-          </div>
-          <div class="step-connector"></div>
-          <div class="step" :class="{ active: currentStep === 4, completed: currentStep > 4 }">
-            <div class="step-number">4</div>
             <span>{{ $t('setup.step3_title') }}</span>
           </div>
           <div class="step-connector"></div>
-          <div class="step" :class="{ active: currentStep === 5 }">
-            <div class="step-number">5</div>
+          <div class="step" :class="{ active: currentStep === 4 }">
+            <div class="step-number">4</div>
             <span>{{ $t('setup.step4_title') }}</span>
           </div>
         </div>
 
         <!-- 步骤内容 -->
         <div class="step-content">
-          <!-- 步骤 1: 选择语言 -->
+          <!-- 步骤 1: 选择显卡 -->
           <div v-if="currentStep === 1">
-            <h3 class="mb-4">{{ $t('setup.step0_description') }}</h3>
-            
-            <div class="option-card" 
-                 :class="{ selected: selectedLocale === 'zh' }"
-                 @click="selectedLocale = 'zh'">
-              <div class="option-icon">
-                <i class="fas fa-language"></i>
-              </div>
-              <h4>简体中文</h4>
-              <p>使用简体中文界面</p>
-            </div>
-
-            <div class="option-card" 
-                 :class="{ selected: selectedLocale === 'en' }"
-                 @click="selectedLocale = 'en'">
-              <div class="option-icon">
-                <i class="fas fa-language"></i>
-              </div>
-              <h4>English</h4>
-              <p>Use English interface</p>
-            </div>
-          </div>
-
-          <!-- 步骤 2: 选择显卡 -->
-          <div v-else-if="currentStep === 2">
             <h3 class="mb-4">{{ $t('setup.step2_description') }}</h3>
             
             <div class="mb-3">
@@ -123,8 +93,8 @@
               <div class="form-text mt-3 adapter-hint-box" v-html="$t('config.adapter_name_desc_windows')"></div>
           </div>
 
-          <!-- 步骤 3: 选择串流显示器 -->
-          <div v-else-if="currentStep === 3">
+          <!-- 步骤 2: 选择串流显示器 -->
+          <div v-else-if="currentStep === 2">
             <h3 class="mb-4">{{ $t('setup.step1_description') }}</h3>
             <p class="vdd-intro-text mb-4">{{ $t('setup.step1_vdd_intro') }}</p>
             
@@ -184,8 +154,8 @@
             </div>
           </div>
 
-          <!-- 步骤 4: 选择显示器组合策略 -->
-          <div v-else-if="currentStep === 4">
+          <!-- 步骤 3: 选择显示器组合策略 -->
+          <div v-else-if="currentStep === 3">
             <h3 class="mb-4">{{ $t('setup.step3_description') }}</h3>
             
             <!-- 显示器组合策略（VDD/物理模式统一） -->
@@ -240,8 +210,8 @@
               </div>
           </div>
 
-          <!-- 步骤 5: 完成 -->
-          <div v-else-if="currentStep === 5">
+          <!-- 步骤 4: 完成 -->
+          <div v-else-if="currentStep === 4">
             <div>
               <div class="alert alert-danger" v-if="saveError">
                 <i class="fas fa-exclamation-triangle"></i>
@@ -294,7 +264,7 @@
                   <div class="client-qrcodes">
                     <div class="qr-code-item">
                       <div class="qr-code-box">
-                        <img :src="androidQrCode" alt="Android QR Code" class="qr-code-image">
+                        <img v-if="androidQrCode" :src="androidQrCode" alt="Android QR Code" class="qr-code-image">
                       </div>
                       <div class="qr-code-label">
                         <i class="fas fa-mobile-alt"></i>
@@ -303,7 +273,7 @@
                     </div>
                     <div class="qr-code-item">
                       <div class="qr-code-box">
-                        <img :src="iosQrCode" alt="iOS QR Code" class="qr-code-image">
+                        <img v-if="iosQrCode" :src="iosQrCode" alt="iOS QR Code" class="qr-code-image">
                       </div>
                       <div class="qr-code-label">
                         <i class="fas fa-tablet-alt"></i>
@@ -323,14 +293,14 @@
       <div class="action-buttons">
           <button class="btn btn-setup btn-setup-secondary" 
                   @click="previousStep" 
-                  v-if="currentStep > 1 && currentStep < 5"
+                  v-if="currentStep > 1 && currentStep < 4"
                   :disabled="saving">
             <i class="fas fa-arrow-left"></i>
             {{ $t('setup.previous') }}
           </button>
           <button class="btn btn-setup btn-setup-skip" 
                   @click="skipWizard" 
-                  v-if="currentStep < 5"
+                  v-if="currentStep < 4"
                   :disabled="saving"
                   type="button">
             <i class="fas fa-forward"></i>
@@ -340,7 +310,7 @@
 
           <button class="btn btn-setup btn-setup-primary" 
                   @click="nextStep" 
-                  v-if="currentStep < 5"
+                  v-if="currentStep < 4"
                   :disabled="!canProceed || saving || vddInstalling || vddStatusLoading">
             {{ nextButtonLabel }}
             <i class="fas fa-arrow-right"></i>
@@ -348,7 +318,7 @@
 
           <button class="btn btn-setup btn-setup-primary" 
                   @click="goToApps" 
-                  v-if="currentStep === 5">
+                  v-if="currentStep === 4">
             {{ $t('setup.go_to_apps') }}
             <i class="fas fa-arrow-right"></i>
           </button>
@@ -420,11 +390,11 @@
 import { trackEvents } from '../config/firebase.js'
 import { apiFetch, apiJson } from '../utils/apiFetch.js'
 import { openExternalUrl } from '../utils/helpers.js'
-import { detectSystemLocale } from '../config/i18n.js'
-import { SETUP_WIZARD_LANGUAGE_SAVED_KEY } from '../composables/useSetupWizard.js'
 import { useVddStatus } from '../composables/useVddStatus.js'
+import QRCode from 'qrcode'
 import ResourceLink from './common/ResourceLink.vue'
 import ConfirmDialog from './common/ConfirmDialog.vue'
+import BrandMark from './common/BrandMark.vue'
 import {
   CLIENT_RESOURCES,
   FEATURED_RESOURCES,
@@ -471,29 +441,13 @@ const COMPLETION_NOTICES = Object.freeze([
 
 const COMPLETION_NOTICE_DURATION_MS = 5000
 
-// 向导第一步只暴露 简体中文(zh) / English(en) 两个选项，
-// 因此把系统语言探测结果折叠到这两者之一即可
-function detectInitialWizardLocale() {
-  const sys = detectSystemLocale() // 已经过支持白名单过滤，未知语言落到 'en'
-  return (sys === 'zh' || sys === 'zh_TW') ? 'zh' : 'en'
-}
-
 function isPhysicalDisplay(device) {
   return !/^FRIENDLY NAME:\s*Zako HDR\s*$/im.test(device?.data || '')
 }
 
-function markLanguageSavedForReload() {
-  try {
-    window.sessionStorage.setItem(SETUP_WIZARD_LANGUAGE_SAVED_KEY, 'true')
-  } catch (e) {
-    // If sessionStorage is unavailable, the saved locale still takes effect;
-    // the user may simply see the language step again in Chinese environments.
-  }
-}
-
 export default {
   name: 'SetupWizard',
-  components: { ConfirmDialog, ResourceLink },
+  components: { BrandMark, ConfirmDialog, ResourceLink },
   props: {
     adapters: {
       type: Array,
@@ -511,9 +465,6 @@ export default {
   data() {
     return {
       currentStep: 1,
-      // 已有 locale 时向导会跳过第一步，不预置，避免 saveConfiguration() 覆盖已有设置（如 de / ja）
-      // 首次进入向导时依然按系统 / 浏览器语言预选 zh / en
-      selectedLocale: this.hasLocale ? null : detectInitialWizardLocale(),
       selectedDisplay: 'ZakoHDR', // 默认选择基地显示器
       selectedAdapter: '',
       displayDevicePrep: 'ensure_only_display', // 默认选择：确保唯一显示器（VDD 和普通模式通用）
@@ -526,9 +477,9 @@ export default {
       restartTimer: null, // 倒计时定时器
       visibleCompletionNoticeIds: [],
       completionNoticeTimer: null,
-      // 客户端下载链接
-      androidQrCode: 'https://assets.alkaidlab.com/androidQrCode.png',
-      iosQrCode: 'https://assets.alkaidlab.com/iosQrCode.png',
+      // Client download QR codes, rendered locally in mounted().
+      androidQrCode: '',
+      iosQrCode: '',
     }
   },
   setup() {
@@ -542,19 +493,18 @@ export default {
       adapter_count: this.adapters.length
     })
     
-    // 如果已经有语言配置，跳过第一步
-    if (this.hasLocale) {
-      this.currentStep = 2
-      trackEvents.userAction('setup_wizard_skip_language', { 
-        reason: 'already_configured' 
-      })
-    }
-    
     // 如果只有一个显卡，自动选择
     if (this.uniqueAdapters.length === 1) {
       this.selectedAdapter = this.uniqueAdapters[0].name
     }
     this.refreshVddStatus()
+    this.renderClientQrCodes()
+  },
+  watch: {
+    '$i18n.locale'() {
+      // Two of the client links are locale specific, so re-render the codes.
+      this.renderClientQrCodes()
+    },
   },
   beforeUnmount() {
     if (this.restartTimer) {
@@ -571,12 +521,10 @@ export default {
     },
     canProceed() {
       if (this.currentStep === 1) {
-        return this.selectedLocale !== null
-      } else if (this.currentStep === 2) {
         return this.selectedAdapter !== null
-      } else if (this.currentStep === 3) {
+      } else if (this.currentStep === 2) {
         return this.selectedDisplay !== null
-      } else if (this.currentStep === 4) {
+      } else if (this.currentStep === 3) {
         return this.displayDevicePrep !== null
       }
       return false
@@ -585,12 +533,12 @@ export default {
       return this.selectedDisplay === 'ZakoHDR'
     },
     nextButtonLabel() {
-      if (this.currentStep === 3 && this.isVirtualDisplay && !this.vddReady) {
+      if (this.currentStep === 2 && this.isVirtualDisplay && !this.vddReady) {
         return this.canManageVdd
           ? this.$t('setup.vdd_install_continue')
           : this.$t('setup.vdd_recheck_continue')
       }
-      return this.currentStep === 4 ? this.$t('setup.finish') : this.$t('setup.next')
+      return this.currentStep === 3 ? this.$t('setup.finish') : this.$t('setup.next')
     },
     physicalDisplayDevices() {
       return (this.displayDevices || []).filter(isPhysicalDisplay)
@@ -608,7 +556,7 @@ export default {
     },
     setupClientResources() {
       const resourcesById = new Map(CLIENT_RESOURCES.map((resource) => [resource.id, resource]))
-      const locale = this.selectedLocale || this.$i18n.locale
+      const locale = this.$i18n.locale
       return SETUP_CLIENT_RESOURCE_ORDER
         .map((id) => resourcesById.get(id))
         .filter(Boolean)
@@ -620,6 +568,32 @@ export default {
     }
   },
   methods: {
+    /**
+     * Render the two client-download QR codes locally with the bundled qrcode
+     * dependency. They used to be pre-rendered PNGs fetched from a third-party
+     * CDN; encoding the very same links the adjacent list already offers keeps
+     * the feature offline-capable and removes the remote request.
+     */
+    async renderClientQrCodes() {
+      const targets = [
+        ['androidQrCode', 'android-vplus'],
+        ['iosQrCode', 'voidlink'],
+      ]
+      for (const [field, resourceId] of targets) {
+        const resource = CLIENT_RESOURCES.find((item) => item.id === resourceId)
+        if (!resource) continue
+        try {
+          this[field] = await QRCode.toDataURL(this.resourceHref(resource), {
+            width: 320,
+            margin: 2,
+            // A QR code must stay dark-on-light in both themes to stay scannable.
+            color: { dark: '#000000', light: '#ffffff' },
+          })
+        } catch (error) {
+          console.error('Failed to render client QR code:', error)
+        }
+      }
+    },
     selectVirtualDisplay() {
       if (this.vddReady) {
         this.selectedDisplay = 'ZakoHDR'
@@ -632,7 +606,7 @@ export default {
       return resolveResourceText(this.$t, resource, 'description')
     },
     resourceHref(resource) {
-      return resolveResourceHref(resource, this.selectedLocale || this.$i18n.locale)
+      return resolveResourceHref(resource, this.$i18n.locale)
     },
     handleResourceActivate(resource, event) {
       if (resource.action !== 'harmony') return
@@ -646,11 +620,8 @@ export default {
     },
     async nextStep() {
       if (this.currentStep === 1 && this.canProceed) {
-        // 保存语言设置并刷新
-        await this.saveLanguage()
-      } else if (this.currentStep === 2 && this.canProceed) {
         this.currentStep++
-      } else if (this.currentStep === 3 && this.canProceed) {
+      } else if (this.currentStep === 2 && this.canProceed) {
         if (this.isVirtualDisplay && !this.vddReady) {
           try {
             if (this.canManageVdd) {
@@ -664,26 +635,8 @@ export default {
           if (!this.vddReady) return
         }
         this.currentStep++
-      } else if (this.currentStep === 4 && this.canProceed) {
+      } else if (this.currentStep === 3 && this.canProceed) {
         await this.saveConfiguration()
-      }
-    },
-    async saveLanguage() {
-      try {
-        const response = await apiFetch('/api/config', {
-          method: 'POST',
-          body: {
-            locale: this.selectedLocale
-          },
-        })
-        if (!response.ok) {
-          throw new Error(`Failed to save language: HTTP ${response.status}`)
-        }
-        markLanguageSavedForReload()
-        // 重新加载页面以应用新语言
-        window.location.reload()
-      } catch (error) {
-        console.error('Failed to save language:', error)
       }
     },
     async saveConfiguration() {
@@ -700,13 +653,6 @@ export default {
         // 标记新手引导已完成
         config.setup_wizard_completed = true
         
-        // 确保 locale 被保存（如果用户在步骤1选择了语言，或者已有配置中有 locale）
-        if (this.selectedLocale) {
-          config.locale = this.selectedLocale
-        } else if (currentConfig.locale) {
-          config.locale = currentConfig.locale
-        }
-        
         // 设置 adapter_name
         config.adapter_name = this.selectedAdapter || ''
 
@@ -716,7 +662,7 @@ export default {
         // 统一保存 display_device_prep（VDD 和物理模式通用）
         config.display_device_prep = this.displayDevicePrep
 
-        console.log('保存配置:', config)
+        console.log('Saving configuration:', config)
 
         const response = await apiFetch('/api/config', {
           method: 'POST',
@@ -724,7 +670,7 @@ export default {
         })
 
         if (response.ok) {
-          this.currentStep = 5
+          this.currentStep = 4
           this.showCompletionNotices()
           
           // 记录设置完成
@@ -819,7 +765,7 @@ export default {
         const config = { ...currentConfig }
         // 标记新手引导已完成
         config.setup_wizard_completed = true
-        console.log('跳过新手引导，保存配置:', config)
+        console.log('Skipping the setup wizard, saving configuration:', config)
         const response = await apiFetch('/api/config', {
           method: 'POST',
           body: config,
@@ -950,18 +896,14 @@ export default {
   flex-direction: column;
   align-items: center;
   z-index: 1000;
-  background:
-    radial-gradient(circle at 12% 0%, rgba(var(--ui-accent-rgb), 0.18), transparent 34rem),
-    var(--ui-page-bg);
+  background: var(--ui-page-bg);
   color: var(--ui-text-primary);
 }
 
 .setup-card {
   background: var(--ui-surface-strong);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-lg);
-  box-shadow: var(--ui-shadow-md);
-  backdrop-filter: blur(22px);
+  border-radius: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -980,15 +922,13 @@ export default {
   border-bottom: 1px solid var(--ui-border);
 }
 
-.setup-header img {
-  filter: drop-shadow(0 6px 14px rgba(var(--ui-accent-rgb), 0.18));
-}
-
 .setup-header h1 {
-  margin: 0.3em 0 0 0;
+  margin: 0.6em 0 0 0;
   font-size: 1.5em;
-  font-weight: 600;
-  color: var(--ui-accent);
+  font-weight: var(--ui-label-weight);
+  text-transform: var(--ui-label-transform);
+  letter-spacing: var(--ui-label-tracking);
+  color: var(--ui-text-primary);
 }
 
 .setup-header p {
@@ -1004,7 +944,7 @@ export default {
   flex: 1;
   overflow: hidden;
   min-height: 0;
-  background: color-mix(in srgb, var(--ui-surface) 74%, transparent);
+  background: var(--ui-surface);
 }
 
 .step-indicator {
@@ -1027,16 +967,17 @@ export default {
 .step-number {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
+  border-radius: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
+  font-family: var(--font-family-mono);
+  font-weight: var(--ui-label-weight);
   font-size: 0.9em;
   background: var(--ui-surface);
   color: var(--ui-text-secondary);
   border: 1px solid var(--ui-border);
-  transition: all 0.3s ease;
+  transition: var(--transition-default);
   flex-shrink: 0;
 }
 
@@ -1044,7 +985,6 @@ export default {
   background: var(--ui-accent);
   color: var(--ui-accent-contrast);
   border-color: var(--ui-accent);
-  transform: scale(1.05);
 }
 
 .step.active {
@@ -1053,7 +993,7 @@ export default {
 
 .step.completed .step-number {
   background: var(--ui-success);
-  color: white;
+  color: var(--ui-success-contrast);
   border-color: var(--ui-success);
 }
 
@@ -1082,18 +1022,16 @@ export default {
 
 .option-card {
   border: 1px solid var(--ui-border);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 0.8em 1em;
   margin-bottom: 0.6em;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-default);
   background: var(--ui-surface);
 }
 
 .option-card:hover {
   border-color: var(--ui-border-strong);
-  transform: translateY(-1px);
-  box-shadow: var(--ui-shadow-sm);
   background: var(--ui-surface-hover);
 }
 
@@ -1109,15 +1047,13 @@ export default {
 
 .option-card.disabled:hover {
   border-color: var(--ui-border);
-  transform: none;
-  box-shadow: none;
   background: var(--ui-surface);
 }
 
 .option-card .option-icon {
   font-size: 1.8em;
   margin-bottom: 0.3em;
-  color: var(--ui-accent);
+  color: var(--ui-text-primary);
 }
 
 .option-card h4 {
@@ -1139,19 +1075,17 @@ export default {
   display: flex;
   align-items: center;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: 0;
   padding: 0.5em 0.8em;
   margin-bottom: 0.4em;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-default);
   background: var(--ui-surface);
   gap: 0.7em;
 }
 
 .option-card-compact:hover {
   border-color: var(--ui-border-strong);
-  transform: translateY(-1px);
-  box-shadow: var(--ui-shadow-sm);
   background: var(--ui-surface-hover);
 }
 
@@ -1162,7 +1096,7 @@ export default {
 
 .option-icon-compact {
   font-size: 1.2em;
-  color: var(--ui-accent);
+  color: var(--ui-text-primary);
   flex-shrink: 0;
   width: 2em;
   text-align: center;
@@ -1185,11 +1119,11 @@ export default {
 .form-select-large {
   padding: 0.7em;
   font-size: 1em;
-  border-radius: 8px;
+  border-radius: 0;
   border: 1px solid var(--ui-border);
   background-color: var(--ui-surface);
   color: var(--ui-text-primary);
-  transition: all 0.3s ease;
+  transition: var(--transition-default);
 }
 
 /* 显卡适配器标签 */
@@ -1206,8 +1140,9 @@ export default {
 }
 
 .form-select-large:focus {
-  border-color: var(--ui-accent);
-  box-shadow: 0 0 0 0.2rem var(--ui-accent-soft);
+  border-color: var(--ui-border-strong);
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 .action-buttons {
@@ -1223,9 +1158,11 @@ export default {
 .btn-setup {
   padding: 0.6em 1.5em;
   font-size: 1em;
-  border-radius: 8px;
-  font-weight: 500;
-  transition: all 0.3s ease;
+  border-radius: 0;
+  font-weight: var(--ui-label-weight);
+  text-transform: var(--ui-label-transform);
+  letter-spacing: var(--ui-label-tracking);
+  transition: var(--transition-default);
 }
 
 .btn-setup-primary {
@@ -1235,43 +1172,37 @@ export default {
 }
 
 .btn-setup-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--ui-shadow-md);
   color: var(--ui-accent-contrast);
 }
 
 .btn-setup-secondary {
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
+  background: transparent;
+  border: 1px solid var(--ui-border-strong);
   color: var(--ui-text-primary);
 }
 
 .btn-setup-secondary:hover:not(:disabled) {
   background: var(--ui-surface-hover);
   border-color: var(--ui-border-strong);
-  transform: translateY(-1px);
 }
 
 .btn-setup-skip {
-  background: var(--ui-accent-soft);
+  background: transparent;
   border: 1px solid var(--ui-border-strong);
-  color: var(--ui-accent);
-  font-weight: 500;
+  color: var(--ui-text-secondary);
 }
 
 .btn-setup-skip:hover:not(:disabled) {
   background: var(--ui-surface-hover);
-  border-color: var(--ui-accent);
-  color: var(--ui-accent);
-  transform: translateY(-1px);
-  box-shadow: var(--ui-shadow-sm);
+  border-color: var(--ui-border-strong);
+  color: var(--ui-text-primary);
 }
 
 .adapter-info {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   padding: 0.8em;
-  border-radius: 8px;
+  border-radius: 0;
   margin-top: 0.8em;
   font-size: 0.9em;
 }
@@ -1288,14 +1219,14 @@ export default {
 
 /* GPU选择提示框样式 */
 .adapter-hint-box {
-  background: var(--ui-accent-soft);
+  background: var(--ui-surface-strong);
   padding: 0.8em 1em;
-  border-radius: 8px;
-  border-left: 3px solid var(--ui-accent);
+  border-radius: 0;
+  border-left: 3px solid var(--ui-border-strong);
   font-size: 0.9em;
   line-height: 1.5;
   color: var(--ui-text-secondary);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 /* VDD 介绍文字样式 */
@@ -1307,9 +1238,10 @@ export default {
 .adapter-vdd-hint {
   margin: 0.5em 0 0 0;
   padding: 0.5em 0.8em;
-  background: color-mix(in srgb, var(--ui-success) 12%, transparent);
+  background: var(--ui-surface-strong);
   color: var(--ui-success-text);
-  border-radius: 4px;
+  border-radius: 0;
+  border-left: 3px solid var(--ui-success-border);
   font-size: 0.95em;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -1326,11 +1258,11 @@ export default {
 
 .step-content::-webkit-scrollbar-thumb {
   background: var(--ui-border-strong);
-  border-radius: 3px;
+  border-radius: 0;
 }
 
 .step-content::-webkit-scrollbar-thumb:hover {
-  background: var(--ui-accent);
+  background: var(--ui-text-muted);
 }
 
 /* 完成页资源区样式 */
@@ -1339,7 +1271,7 @@ export default {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   padding: 1em;
-  border-radius: 10px;
+  border-radius: 0;
 }
 
 .client-download-section h5,
@@ -1385,11 +1317,13 @@ export default {
 }
 
 .qr-code-box {
-  background: white;
+  background: #ffffff;
   padding: 0.4em;
-  border-radius: 8px;
-  box-shadow: var(--ui-shadow-sm);
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
   width: 100%;
+  /* Hold the square while the code is still being rendered. */
+  aspect-ratio: 1;
 }
 
 .qr-code-image {
@@ -1427,34 +1361,31 @@ export default {
   min-height: 48px;
   gap: 0.75rem;
   padding: 0.75rem 0.9rem;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 0;
   color: var(--ui-text-primary);
   background: var(--ui-surface-strong);
-  box-shadow: var(--ui-shadow-lg);
   pointer-events: auto;
 }
 
 .setup-completion-toast-success {
-  border-color: color-mix(in srgb, var(--ui-success) 40%, var(--ui-border));
-  background: color-mix(in srgb, var(--ui-success) 10%, var(--ui-surface-strong));
+  border-color: var(--ui-success-border);
 }
 
 .setup-completion-toast-success > i {
-  color: var(--ui-success);
+  color: var(--ui-success-text);
 }
 
 .setup-completion-toast-info {
-  border-color: color-mix(in srgb, var(--ui-accent) 40%, var(--ui-border));
-  background: color-mix(in srgb, var(--ui-accent) 10%, var(--ui-surface-strong));
+  border-color: var(--ui-border-strong);
 }
 
 .setup-completion-toast-info > i {
-  color: var(--ui-accent);
+  color: var(--ui-text-primary);
 }
 
 .setup-completion-toast-title {
-  font-weight: 700;
+  font-weight: var(--ui-label-weight);
 }
 
 .setup-completion-toast-close {
@@ -1465,7 +1396,7 @@ export default {
   height: 30px;
   padding: 0;
   border: 0;
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   color: var(--ui-text-secondary);
   background: transparent;
   cursor: pointer;
@@ -1478,26 +1409,15 @@ export default {
 }
 
 .setup-toast-enter-active,
-.setup-toast-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.2s ease;
-}
-
-.setup-toast-enter-from,
-.setup-toast-leave-to {
-  opacity: 0;
-  transform: translateY(-0.75rem);
-}
-
+.setup-toast-leave-active,
 .setup-toast-move {
-  transition: transform 0.2s ease;
+  transition: none;
 }
 
 /* 小图标样式 */
 .option-icon-small {
   font-size: 1.5em;
-  color: var(--ui-accent);
+  color: var(--ui-text-primary);
   margin-right: 0.8em;
   flex-shrink: 0;
 }
@@ -1520,7 +1440,7 @@ export default {
 }
 
 .restart-countdown .text-primary {
-  color: var(--ui-accent) !important;
+  color: var(--ui-text-primary) !important;
 }
 
 .restart-countdown + .progress .progress-bar {
@@ -1541,10 +1461,6 @@ export default {
 
   .setup-header {
     padding: 0.85rem 1rem;
-  }
-
-  .setup-header img {
-    height: 44px;
   }
 
   .setup-header h1 {

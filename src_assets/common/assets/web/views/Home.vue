@@ -17,23 +17,7 @@
         <div class="page-header home-intro">
           <div class="home-intro-copy">
             <h1 id="home-title" class="page-title">{{ $t('index.welcome') }}</h1>
-            <p class="page-subtitle">{{ $t('index.description') }}</p>
           </div>
-          <component
-            :is="showVersionDetails ? 'button' : 'div'"
-            class="home-status"
-            :class="[`home-status-${statusState}`, { 'home-status-action': showVersionDetails }]"
-            :type="showVersionDetails ? 'button' : undefined"
-            :role="showVersionDetails ? 'button' : 'status'"
-            :aria-live="statusState === 'loading' ? 'polite' : 'off'"
-            :aria-label="statusAriaLabel"
-            :aria-controls="showVersionDetails ? 'version-details' : undefined"
-            :title="statusTitle"
-            @click="handleStatusClick"
-          >
-            <span class="home-status-dot" aria-hidden="true"></span>
-            <span>{{ statusLabel }}</span>
-          </component>
         </div>
 
         <div class="host-overview">
@@ -64,22 +48,6 @@
             </div>
           </div>
 
-          <nav class="quick-actions" :aria-label="$t('resource_card.quick_start')">
-            <a
-              v-for="action in quickActions"
-              :key="action.id"
-              class="quick-action"
-              :class="{ 'quick-action-primary': action.primary }"
-              :href="action.href"
-            >
-              <span class="quick-action-icon" aria-hidden="true"><i :class="action.icon"></i></span>
-              <span class="quick-action-copy">
-                <span>{{ $t(action.labelKey) }}</span>
-                <small>{{ $t(action.descriptionKey) }}</small>
-              </span>
-              <i class="fas fa-chevron-right quick-action-arrow" aria-hidden="true"></i>
-            </a>
-          </nav>
         </div>
       </section>
 
@@ -103,16 +71,11 @@
         :pre-release-version="preReleaseVersion"
         :notify-pre-releases="notifyPreReleases"
         :loading="loading"
-        :installed-version-not-stable="installedVersionNotStable"
         :stable-build-available="stableBuildAvailable"
         :pre-release-build-available="preReleaseBuildAvailable"
-        :build-version-is-dirty="buildVersionIsDirty"
         :parsed-stable-body="parsedStableBody"
         :parsed-pre-release-body="parsedPreReleaseBody"
       />
-
-      <!-- 资源卡片 -->
-      <ResourceCard class="home-resources" />
     </main>
   </div>
 </template>
@@ -122,7 +85,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Navbar from '../components/layout/Navbar.vue'
 import SetupWizard from '../components/SetupWizard.vue'
-import ResourceCard from '../components/common/ResourceCard.vue'
 import ErrorLogs from '../components/common/ErrorLogs.vue'
 import VersionCard from '../components/common/VersionCard.vue'
 import { VERSION_CHECK_STATUS, useVersion } from '../composables/useVersion.js'
@@ -138,78 +100,16 @@ const hostStatus = ref('loading')
 const appsCount = ref(null)
 const clientsCount = ref(null)
 
-const quickActions = [
-  {
-    id: 'pin',
-    href: '/pin',
-    icon: 'fas fa-link',
-    labelKey: 'navbar.clients',
-    descriptionKey: 'pin.pin_pairing',
-    primary: true,
-  },
-  {
-    id: 'apps',
-    href: '/apps',
-    icon: 'fas fa-gamepad',
-    labelKey: 'navbar.applications',
-    descriptionKey: 'apps.applications_title',
-  },
-  {
-    id: 'config',
-    href: '/config',
-    icon: 'fas fa-sliders-h',
-    labelKey: 'navbar.configuration',
-    descriptionKey: 'config.configuration',
-  },
-]
-
 const hasStableUpdate = computed(() => stableBuildAvailable.value)
-const hasPreReleaseUpdate = computed(() => notifyPreReleases.value && preReleaseBuildAvailable.value)
-
-const statusState = computed(() => {
-  if (hostStatus.value === 'error' || versionCheckStatus.value === VERSION_CHECK_STATUS.ERROR) return 'error'
-  if (
-    hostStatus.value === 'loading' ||
-    versionCheckStatus.value === VERSION_CHECK_STATUS.IDLE ||
-    versionCheckStatus.value === VERSION_CHECK_STATUS.CHECKING
-  ) {
-    return 'loading'
-  }
-  if (hasStableUpdate.value || hasPreReleaseUpdate.value) return 'update'
-  return 'ready'
-})
-
-const statusLabel = computed(() => {
-  if (statusState.value === 'loading') return t('index.loading_latest')
-  if (statusState.value === 'error') return t('_common.error')
-  if (hasStableUpdate.value) return t('index.new_stable')
-  if (hasPreReleaseUpdate.value) return t('index.new_pre_release')
-  return t('index.version_latest')
-})
-
-const statusTitle = computed(() =>
-  versionCheckStatus.value === VERSION_CHECK_STATUS.ERROR ? t('welcome.network_error') : undefined,
-)
-
-const statusAriaLabel = computed(() => statusTitle.value || statusLabel.value)
 
 const versionLabel = computed(() => {
   const currentVersion = version.value?.version || hostConfig.value?.version
   return currentVersion ? `Ver ${currentVersion}` : t('index.loading_latest')
 })
 
-const showVersionDetails = computed(
-  () =>
-    buildVersionIsDirty.value ||
-    installedVersionNotStable.value ||
-    hasStableUpdate.value ||
-    hasPreReleaseUpdate.value,
-)
-
-const handleStatusClick = () => {
-  if (!showVersionDetails.value) return
-  document.getElementById('version-details')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
+// The card carries update notices only, so it appears only when there is one.
+// Pre-release notifications were removed, so only a stable update opens it.
+const showVersionDetails = computed(() => hasStableUpdate.value)
 
 const countCollection = (payload, key) => {
   if (Array.isArray(payload)) return payload.length
@@ -226,10 +126,8 @@ const {
   notifyPreReleases,
   versionCheckStatus,
   loading,
-  installedVersionNotStable,
   stableBuildAvailable,
   preReleaseBuildAvailable,
-  buildVersionIsDirty,
   parsedStableBody,
   parsedPreReleaseBody,
   fetchVersions,
@@ -255,7 +153,7 @@ const reportGPUInfo = (config) => {
 
     trackEvents.gpuReported(gpuInfo)
   } catch (error) {
-    console.error('上报显卡信息失败:', error)
+    console.error('Failed to report GPU information:', error)
   }
 }
 
@@ -310,52 +208,29 @@ onMounted(async () => {
 
 .home-content {
   display: flex;
-  min-height: calc(100vh - 77px);
-  max-width: 1180px;
+  /*
+   * Was calc(100vh - 77px) with the old mascot-height bar hardcoded, plus a
+   * 1180px max-width that stranded a gutter either side on a wide window.
+   */
+  min-height: calc(100vh - var(--ui-navbar-height));
   box-sizing: border-box;
   flex-direction: column;
   padding-top: 0.45rem;
   padding-bottom: 0.35rem;
 }
 
+/*
+ * The hero is a framed panel, not a decorated one: the gradient fill, the
+ * blur and the two floating blobs that used to be drawn with ::before and
+ * ::after are gone.
+ */
 .home-hero {
   position: relative;
   margin: 0.45rem 0 0.7rem;
   overflow: hidden;
-  border: 1px solid var(--ui-border, rgba(74, 158, 255, 0.22));
-  border-radius: calc(var(--ui-radius-lg, 16px) + 2px);
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--ui-surface-strong) 94%, var(--ui-accent-soft)),
-    color-mix(in srgb, var(--ui-surface) 92%, transparent)
-  );
-  box-shadow: var(--ui-shadow-md, 0 12px 32px rgba(58, 126, 213, 0.14));
-  backdrop-filter: blur(18px);
-}
-
-.home-hero::before,
-.home-hero::after {
-  position: absolute;
-  border-radius: 50%;
-  background: var(--ui-accent-soft, rgba(74, 158, 255, 0.12));
-  content: '';
-  pointer-events: none;
-}
-
-.home-hero::before {
-  top: -3.2rem;
-  right: 11rem;
-  width: 8rem;
-  height: 8rem;
-  opacity: 0.65;
-}
-
-.home-hero::after {
-  top: 1.25rem;
-  right: 8.5rem;
-  width: 0.65rem;
-  height: 0.65rem;
-  box-shadow: 1.1rem -0.75rem 0 -0.12rem var(--ui-accent-soft, rgba(74, 158, 255, 0.12));
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: var(--ui-surface);
 }
 
 .home-intro {
@@ -370,15 +245,9 @@ onMounted(async () => {
 }
 
 .home-intro .page-title {
-  margin-bottom: 0.18rem;
-  font-size: 1.9rem;
-  line-height: 1.15;
-  font-weight: 650;
-  letter-spacing: -0.03em;
-}
-
-.home-intro .page-subtitle {
-  max-width: 48rem;
+  margin-bottom: 0;
+  font-size: 1.05rem;
+  line-height: 1.3;
 }
 
 .home-status {
@@ -387,16 +256,15 @@ onMounted(async () => {
   gap: 0.5rem;
   flex-shrink: 0;
   padding: 0.45rem 0.7rem;
-  border: 1px solid var(--ui-border, rgba(74, 158, 255, 0.22));
-  border-radius: var(--ui-radius-md, 12px);
-  background: color-mix(in srgb, var(--ui-surface) 88%, transparent);
-  color: var(--ui-text-primary, #1e293b);
-  backdrop-filter: blur(10px);
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: var(--ui-surface-strong);
+  color: var(--ui-text-primary);
   font-size: var(--font-size-sm);
   font-weight: 600;
   font-family: inherit;
   text-align: left;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .home-status-action {
@@ -404,48 +272,50 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.home-status-action:hover,
-.home-status-action:focus-visible {
-  border-color: var(--ui-border-strong, rgba(74, 158, 255, 0.42));
-  box-shadow: var(--ui-shadow-sm, 0 4px 16px rgba(74, 158, 255, 0.1));
-  transform: translateY(-1px);
+.home-status-action:hover {
+  border-color: var(--ui-border-strong);
 }
 
 .home-status-action:focus-visible {
-  outline: 2px solid var(--ui-accent, #4a9eff);
-  outline-offset: 2px;
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
+/* Status marker: a square swatch in the state color, no halo. */
 .home-status-dot {
   width: 0.48rem;
   height: 0.48rem;
-  border-radius: 50%;
+  border-radius: 0;
   background: currentColor;
-  box-shadow: 0 0 0 0.2rem color-mix(in srgb, currentColor 16%, transparent);
 }
 
+/*
+ * "Nothing is wrong" does not need a colour. Colour is reserved for states the
+ * user has to act on - loading, error, update available - so a healthy host
+ * reads as quiet chrome rather than a green badge.
+ */
 .home-status-ready {
-  border-color: var(--ui-success-border, rgba(78, 205, 196, 0.34));
-  background: var(--ui-success-soft, rgba(78, 205, 196, 0.12));
-  color: var(--ui-success-text, #287d4c);
+  border-color: var(--ui-border);
+  background: var(--ui-surface-raised);
+  color: var(--ui-text-secondary);
 }
 
 .home-status-loading {
-  border-color: var(--ui-warning-border, rgba(255, 193, 7, 0.38));
-  background: var(--ui-warning-soft, rgba(255, 193, 7, 0.13));
-  color: var(--ui-warning-text, #9a6700);
+  border-color: var(--ui-warning-border);
+  background: var(--ui-warning-soft);
+  color: var(--ui-warning-text);
 }
 
 .home-status-error {
-  border-color: var(--ui-danger-border, rgba(255, 107, 107, 0.34));
-  background: var(--ui-danger-soft, rgba(255, 107, 107, 0.12));
-  color: var(--ui-danger-text, #b4233a);
+  border-color: var(--ui-danger-border);
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger-text);
 }
 
 .home-status-update {
-  border-color: var(--ui-info-border, rgba(122, 184, 255, 0.34));
-  background: var(--ui-info-soft, rgba(122, 184, 255, 0.12));
-  color: var(--ui-info-text, #306fae);
+  border-color: var(--ui-info-border);
+  background: var(--ui-info-soft);
+  color: var(--ui-info-text);
 }
 
 .host-overview {
@@ -456,8 +326,8 @@ onMounted(async () => {
   align-items: center;
   gap: 0.75rem 1rem;
   padding: 0.68rem 0.78rem;
-  border-top: 1px solid var(--ui-border, rgba(74, 158, 255, 0.22));
-  background: color-mix(in srgb, var(--ui-surface) 76%, transparent);
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-surface);
 }
 
 .host-overview-main {
@@ -474,11 +344,10 @@ onMounted(async () => {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--ui-border-strong, rgba(74, 158, 255, 0.42));
-  border-radius: 0.9rem;
-  background: var(--ui-accent-soft, rgba(74, 158, 255, 0.12));
-  color: var(--ui-accent, #4a9eff);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, white 40%, transparent);
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 0;
+  background: var(--ui-surface-strong);
+  color: var(--ui-text-primary);
   font-size: 1rem;
 }
 
@@ -489,16 +358,16 @@ onMounted(async () => {
 .host-name {
   margin: 0;
   overflow: hidden;
-  color: var(--ui-text-primary, #1e293b);
+  color: var(--ui-text-primary);
   font-size: clamp(1.2rem, 2.3vw, 1.55rem);
-  font-weight: 650;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .host-meta {
   margin: 0.22rem 0 0;
-  color: var(--ui-text-secondary, #64748b);
+  color: var(--ui-text-secondary);
   font-size: var(--font-size-sm);
 }
 
@@ -516,9 +385,9 @@ onMounted(async () => {
   column-gap: 0.45rem;
   align-items: center;
   padding: 0.45rem 0.55rem;
-  border: 1px solid var(--ui-border, rgba(74, 158, 255, 0.22));
-  border-radius: var(--ui-radius-md, 12px);
-  background: color-mix(in srgb, var(--ui-surface-strong) 76%, transparent);
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: var(--ui-surface-strong);
 }
 
 .metric-icon {
@@ -528,21 +397,22 @@ onMounted(async () => {
   grid-row: 1 / 3;
   align-items: center;
   justify-content: center;
-  border-radius: 0.55rem;
-  background: var(--ui-accent-soft, rgba(74, 158, 255, 0.12));
-  color: var(--ui-accent, #4a9eff);
+  border-radius: 0;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
   font-size: 0.7rem;
 }
 
 .metric-value {
-  color: var(--ui-text-primary, #1e293b);
+  color: var(--ui-text-primary);
+  font-family: var(--font-family-mono);
   font-size: 1.05rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1;
 }
 
 .metric-label {
-  color: var(--ui-text-secondary, #64748b);
+  color: var(--ui-text-secondary);
   font-size: var(--font-size-xs);
   line-height: 1.1;
 }
@@ -560,26 +430,29 @@ onMounted(async () => {
   column-gap: 0.45rem;
   align-items: center;
   padding: 0.42rem 0.5rem;
-  border: 1px solid var(--ui-border, rgba(74, 158, 255, 0.22));
-  border-radius: var(--ui-radius-md, 12px);
-  background-color: color-mix(in srgb, var(--ui-surface-strong) 78%, transparent);
-  color: var(--ui-text-primary, #1e293b);
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  background-color: var(--ui-surface-strong);
+  color: var(--ui-text-primary);
   text-decoration: none;
-  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .quick-action:hover,
 .quick-action:focus-visible {
-  border-color: var(--ui-border-strong, rgba(74, 158, 255, 0.42));
-  background-color: var(--ui-surface-hover, rgba(255, 255, 255, 0.8));
-  color: var(--ui-text-primary, #1e293b);
-  box-shadow: var(--ui-shadow-sm, 0 4px 16px rgba(74, 158, 255, 0.1));
-  transform: translateY(-1px);
+  border-color: var(--ui-border-strong);
+  background-color: var(--ui-surface-hover);
+  color: var(--ui-text-primary);
+}
+
+.quick-action:focus-visible {
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 .quick-action-primary {
-  border-color: var(--ui-border-strong, rgba(74, 158, 255, 0.42));
-  background-color: color-mix(in srgb, var(--ui-accent-soft) 68%, var(--ui-surface-strong));
+  border-color: var(--ui-border-strong);
+  background-color: var(--ui-surface-hover);
 }
 
 .quick-action-icon {
@@ -588,9 +461,9 @@ onMounted(async () => {
   height: 1.8rem;
   align-items: center;
   justify-content: center;
-  border-radius: 0.62rem;
-  background: var(--ui-accent-soft, rgba(74, 158, 255, 0.12));
-  color: var(--ui-accent, #4a9eff);
+  border-radius: 0;
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
   font-size: 0.75rem;
 }
 
@@ -609,30 +482,17 @@ onMounted(async () => {
 
 .quick-action-copy > span {
   font-size: var(--font-size-sm);
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .quick-action-copy > small {
-  color: var(--ui-text-secondary, #64748b);
+  color: var(--ui-text-secondary);
   font-size: var(--font-size-xs);
 }
 
 .quick-action-arrow {
-  color: var(--ui-text-muted, #94a3b8);
+  color: var(--ui-text-muted);
   font-size: 0.58rem;
-  transition: transform 0.2s ease;
-}
-
-.quick-action:hover .quick-action-arrow,
-.quick-action:focus-visible .quick-action-arrow {
-  transform: translateX(2px);
-}
-
-.home-resources {
-  display: flex;
-  flex: 1 0 auto;
-  flex-direction: column;
-  margin-bottom: 0;
 }
 
 #version-details {
@@ -713,7 +573,6 @@ onMounted(async () => {
     height: 2.1rem;
     font-size: 0.82rem;
   }
-
 }
 
 @media (max-width: 1199.98px) {
@@ -732,15 +591,15 @@ onMounted(async () => {
   gap: 0.75rem;
   margin: 1rem 0;
   padding: 0.9rem 1rem;
-  border: 1px solid var(--ui-danger-border, rgba(180, 35, 58, 0.28));
-  border-radius: var(--ui-radius-md, 12px);
-  background: var(--ui-danger-soft, rgba(180, 35, 58, 0.1));
-  color: var(--ui-danger-text, #b4233a);
+  border: 1px solid var(--ui-danger-border);
+  border-radius: 0;
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger-text);
 }
 
 .home-alert > i {
   margin-top: 0.15rem;
-  color: var(--ui-danger-text, #b4233a);
+  color: var(--ui-danger-text);
 }
 
 .home-alert p {
@@ -749,14 +608,6 @@ onMounted(async () => {
 }
 
 @media (max-width: 767.98px) {
-  .home-hero::before {
-    right: -2.5rem;
-  }
-
-  .home-hero::after {
-    display: none;
-  }
-
   .home-intro {
     align-items: flex-start;
     flex-direction: column;

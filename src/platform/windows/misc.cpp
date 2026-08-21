@@ -201,14 +201,97 @@ namespace platf {
     return "00:00:00:00:00:00"s;
   }
 
+  namespace {
+    /**
+     * @brief Query the name of a desktop object, for example "Default" or "Winlogon".
+     * @param desktop The desktop to query.
+     * @return The desktop name, or an empty string if it could not be determined.
+     */
+    std::wstring
+    get_desktop_name(HDESK desktop) {
+      if (!desktop) {
+        return {};
+      }
+
+      DWORD needed = 0;
+      GetUserObjectInformationW(desktop, UOI_NAME, nullptr, 0, &needed);
+      if (needed < sizeof(wchar_t)) {
+        return {};
+      }
+
+      std::wstring name(needed / sizeof(wchar_t), L'\0');
+      if (!GetUserObjectInformationW(desktop, UOI_NAME, name.data(), needed, &needed)) {
+        return {};
+      }
+
+      const auto terminator = name.find(L'\0');
+      if (terminator != std::wstring::npos) {
+        name.resize(terminator);
+      }
+
+      return name;
+    }
+
+    /**
+     * @brief Owns the input desktop handle that the calling thread is currently attached to.
+     * @note One instance per thread, see syncThreadDesktop() for the full ownership contract.
+     */
+    struct thread_input_desktop_t {
+      HDESK initial { nullptr }; /**< Desktop the thread started on. NOT owned - GetThreadDesktop() handles must not be closed. */
+      HDESK handle { nullptr }; /**< Owned handle for the input desktop this thread is attached to. */
+      std::wstring name {}; /**< Name of `handle`, used to tell an actual desktop switch from a fresh handle for the same desktop. */
+
+      ~thread_input_desktop_t() {
+        if (!handle) {
+          return;
+        }
+
+        // CloseDesktop() fails while the desktop is still assigned to this thread, so move
+        // the thread back to the desktop it started on before releasing the handle.
+        if (initial) {
+          SetThreadDesktop(initial);
+        }
+        CloseDesktop(handle);
+      }
+    };
+  }  // namespace
+
+  /**
+   * @brief Attach the calling thread to the current input desktop.
+   * @return A handle to the input desktop the thread is attached to, or nullptr if it could not be opened.
+   *
+   * @warning OWNERSHIP: the returned handle is owned by this function and is kept alive in
+   *          thread-local storage for as long as the calling thread stays attached to that
+   *          desktop. Callers MUST NOT call CloseDesktop() on it. Closing it here (as this
+   *          function used to do) both detaches the thread and hands out a dangling handle,
+   *          which silently breaks the desktop-switch detection in platf::send_input() and
+   *          platf::inject_synthetic_pointer_input().
+   * @note The returned value is stable while the input desktop does not change, so callers
+   *       can use `!=` against the previously returned handle as a reliable
+   *       "the input desktop switched" test (e.g. a switch to the secure desktop).
+   */
   HDESK
   syncThreadDesktop() {
+    static thread_local thread_input_desktop_t current_desktop;
+
+    if (!current_desktop.initial) {
+      current_desktop.initial = GetThreadDesktop(GetCurrentThreadId());
+    }
+
     auto hDesk = OpenInputDesktop(DF_ALLOWOTHERACCOUNTHOOK, FALSE, GENERIC_ALL);
     if (!hDesk) {
       auto err = GetLastError();
       BOOST_LOG(error) << "Failed to Open Input Desktop [0x"sv << util::hex(err).to_string_view() << ']';
 
       return nullptr;
+    }
+
+    // OpenInputDesktop() hands out a brand new handle on every call, so compare the desktop
+    // names instead of the handle values to decide whether anything actually changed.
+    auto desk_name = get_desktop_name(hDesk);
+    if (current_desktop.handle && !desk_name.empty() && desk_name == current_desktop.name) {
+      CloseDesktop(hDesk);
+      return current_desktop.handle;
     }
 
     if (!SetThreadDesktop(hDesk)) {
@@ -221,11 +304,21 @@ namespace platf {
       else {
         BOOST_LOG(error) << "Failed to sync desktop to thread [0x"sv << util::hex(err).to_string_view() << ']';
       }
+
+      // The thread is still attached to whatever it was attached to before, so keep
+      // reporting that desktop and release the handle we could not use.
+      CloseDesktop(hDesk);
+      return current_desktop.handle;
     }
 
-    CloseDesktop(hDesk);
+    // The thread is attached to `hDesk` now, so the previous handle is no longer in use.
+    if (current_desktop.handle) {
+      CloseDesktop(current_desktop.handle);
+    }
+    current_desktop.handle = hDesk;
+    current_desktop.name = std::move(desk_name);
 
-    return hDesk;
+    return current_desktop.handle;
   }
 
   void

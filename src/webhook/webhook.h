@@ -193,10 +193,10 @@ namespace webhook {
   bool is_event_enabled(event_type_t type) noexcept;
   int event_type_id(event_type_t type) noexcept;
   const char *event_type_name(event_type_t type) noexcept;
-  std::string get_alert_message(event_type_t type, bool is_chinese);
+  std::string get_alert_message(event_type_t type);
   std::string sanitize_json_string(const std::string &str);
   std::string get_current_timestamp();
-  std::string generate_webhook_json(const event_t &event, bool is_chinese);
+  std::string generate_webhook_json(const event_t &event);
 
   /** Stable, non-sensitive name for API responses and UI messages. */
   const char *delivery_error_name(delivery_error_t error) noexcept;

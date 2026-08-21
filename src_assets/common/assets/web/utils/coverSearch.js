@@ -219,7 +219,7 @@ export async function searchIGDBCover(searchName, bucket) {
 
     return buildIGDBImageUrl(game.cover.url)
   } catch (error) {
-    console.warn(`搜索IGDB封面失败: ${searchName}`, error)
+    console.warn(`Failed to search IGDB covers for: ${searchName}`, error)
     return ''
   }
 }
@@ -236,7 +236,7 @@ export async function searchIGDBCovers(name, signal = null, maxResults = 20) {
 
   // 检查搜索词是否适合IGDB搜索（IGDB只支持英文搜索）
   if (!isValidForIGDB(name)) {
-    console.debug(`IGDB搜索跳过：搜索词 "${name}" 不包含英文字符`)
+    console.debug(`Skipping IGDB search: the term "${name}" contains no Latin letters or digits`)
     return []
   }
 
@@ -305,7 +305,7 @@ export async function searchIGDBCovers(name, signal = null, maxResults = 20) {
     if (error.name === 'AbortError') {
       throw error
     }
-    console.error('搜索IGDB封面失败:', error)
+    console.error('Failed to search IGDB covers:', error)
     return []
   }
 }
@@ -333,7 +333,7 @@ export async function searchCoverImage(appName) {
       ''
     )
   } catch (error) {
-    console.warn(`搜索封面失败: ${appName}`, error)
+    console.warn(`Failed to search covers for: ${appName}`, error)
     return ''
   }
 }
@@ -378,7 +378,7 @@ export async function searchAllCovers(name, signal = null) {
     if (error.name === 'AbortError') {
       throw error
     }
-    console.error('搜索封面失败:', error)
+    console.error('Failed to search covers:', error)
     return { igdb: [], steam: [] }
   }
 }

@@ -50,7 +50,7 @@ test('createSkillRegistry registers extension capabilities and supports unregist
     },
     capability: {
       icon: 'fa-vial',
-      labels: { zh: '可选能力' },
+      label: 'Optional capability',
       defaultEnabled: false,
       userSelectable: true,
     },
@@ -66,7 +66,7 @@ test('createSkillRegistry registers extension capabilities and supports unregist
     'demo.optional',
   ])
   assert.equal(getAgentCapabilityIcon('demo.optional', capabilities), 'fa-vial')
-  assert.equal(getAgentCapabilityLabel('demo.optional', { locale: 'zh-CN', capabilities }), '可选能力')
+  assert.equal(getAgentCapabilityLabel('demo.optional', { capabilities }), 'Optional capability')
 
   unregister()
   assert.ok(!registry.getCapabilities().some((capability) => capability.skillId === 'demo.optional'))

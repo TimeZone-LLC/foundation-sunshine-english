@@ -35,7 +35,7 @@ export const GAME_LIBRARY_AGENT_CAPABILITIES = [
     icon: 'fa-clock-rotate-left',
     label: 'Confirmed overrides',
     labels: {
-      zh: '\u5df2\u786e\u8ba4\u8986\u76d6',
+      zh: 'Confirmed overrides',
     },
     required: true,
     defaultEnabled: true,
@@ -47,7 +47,7 @@ export const GAME_LIBRARY_AGENT_CAPABILITIES = [
     icon: 'fa-wand-magic-sparkles',
     label: 'AI name cleanup',
     labels: {
-      zh: 'AI \u540d\u79f0\u6e05\u6d17',
+      zh: 'AI name cleanup',
     },
     defaultEnabled: true,
     userSelectable: true,
@@ -58,7 +58,7 @@ export const GAME_LIBRARY_AGENT_CAPABILITIES = [
     icon: 'fa-image',
     label: 'AI cover matching',
     labels: {
-      zh: 'AI \u5c01\u9762\u5339\u914d',
+      zh: 'AI cover matching',
     },
     defaultEnabled: true,
     userSelectable: true,

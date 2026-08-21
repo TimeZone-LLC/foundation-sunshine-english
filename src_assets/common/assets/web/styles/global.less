@@ -2,65 +2,17 @@
 
 // Cross-document navigation motion. The browser opt-in lives in the shared
 // head template so it is available before navigation starts; the Tauri proxy
-// opts out because the GUI already owns its loading transition.
+// opts out because the GUI already owns its loading transition. Nothing
+// animates in the brutalist system, so the page transition is suppressed
+// rather than styled.
 
-::view-transition-group(root) {
-  animation-duration: 180ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
+::view-transition-group(root),
 ::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 180ms;
-  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-::view-transition-old(root) {
-  animation-name: sunshine-page-out;
-}
-
-::view-transition-new(root) {
-  animation-name: sunshine-page-in;
-}
-
-::view-transition-group(sunshine-navbar) {
-  animation-duration: 1ms;
-}
-
+::view-transition-new(root),
+::view-transition-group(sunshine-navbar),
 ::view-transition-old(sunshine-navbar),
 ::view-transition-new(sunshine-navbar) {
   animation: none;
-}
-
-@keyframes sunshine-page-out {
-  from {
-    opacity: 1;
-  }
-
-  to {
-    opacity: 0.98;
-  }
-}
-
-@keyframes sunshine-page-in {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(root),
-  ::view-transition-old(root),
-  ::view-transition-new(root),
-  ::view-transition-group(sunshine-navbar),
-  ::view-transition-old(sunshine-navbar),
-  ::view-transition-new(sunshine-navbar) {
-    animation-duration: 1ms !important;
-  }
 }
 
 // Scrollbar stability
@@ -75,40 +27,42 @@
 body {
   min-height: 100vh;
   font-family: var(--font-family-base);
+  // Body copy is 13px - IDE-tight. The rem scale in var.css stays anchored to
+  // the 16px root, so paddings and gaps do not shrink along with it.
+  font-size: var(--ui-font-size-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background-color: var(--ui-page-bg);
   background-position: center;
   background-size: cover;
   background-repeat: no-repeat;
   background-attachment: fixed;
-  transition: background 0.3s ease;
+  color: var(--ui-text-primary);
   position: relative;
   z-index: 0;
 
-  &.bg-light {
+  // The retired wallpaper sampler used to toggle these classes; pin them to
+  // the token background so any leftover class cannot repaint the page.
+  &.bg-light,
+  &.bg-dark {
     background-color: var(--ui-page-bg) !important;
   }
-
-  &::after {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background: var(--ui-page-overlay);
-    pointer-events: none;
-    z-index: -1;
-  }
 }
 
-// Theme variables
-[data-bs-theme='light'] {
-  --bs-body-bg: var(--ui-surface);
-  --bs-dropdown-bg: var(--ui-surface-strong);
-  --bs-dropdown-border-color: var(--ui-border);
-}
-
+// Bootstrap variables, in both themes, so its own components read the tokens.
+[data-bs-theme='light'],
 [data-bs-theme='dark'] {
   --bs-body-bg: var(--ui-surface);
+  --bs-body-color: var(--ui-text-primary);
+  --bs-emphasis-color: var(--ui-text-primary);
+  --bs-secondary-color: var(--ui-text-muted);
+  --bs-tertiary-bg: var(--ui-surface-strong);
+  --bs-border-color: var(--ui-border);
   --bs-dropdown-bg: var(--ui-surface-strong);
   --bs-dropdown-border-color: var(--ui-border);
+  --bs-dropdown-link-color: var(--ui-text-primary);
+  --bs-dropdown-link-hover-bg: var(--ui-surface-hover);
 }
 
 // Drag and drop indicator
@@ -118,18 +72,47 @@ body {
 }
 
 // Layout
+//
+// Bootstrap's .container steps through fixed max-widths (540/720/960/1140/1320px).
+// This is a local tool, not a marketing page: on a wide window that cap stranded
+// a few hundred pixels of empty gutter either side of the content. Let it fill.
 .container {
   padding: 1rem;
+  max-width: 100%;
+}
+
+// Section headers are sentence case. Weight is the only emphasis available:
+// no uppercase, no tracking. (gloss)
+.section-title,
+.card-header > h1,
+.card-header > h2,
+.card-header > h3,
+.card-header > h4,
+.card-header > h5,
+.card-header > h6 {
+  font-weight: var(--ui-label-weight);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+// Values, identifiers, commands and log output are monospaced.
+code,
+kbd,
+pre,
+samp {
+  font-family: var(--font-family-mono);
 }
 
 // Page typography
 .page-title {
-  font-size: 1.9rem;
-  font-weight: 100;
+  // gloss type scale: body is 13px, so a 30px page title reads as a marketing
+  // hero rather than a tool heading. Weight carries the emphasis instead.
+  font-size: 1.05rem;
+  font-weight: var(--ui-label-weight);
   margin-bottom: 0.5rem;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
+  text-transform: none;
   color: var(--text-title-color, var(--ui-text-primary));
-  transition: color 0.5s ease;
 
   [data-bs-theme='dark'] &,
   [data-bs-theme='light'] &,
@@ -141,35 +124,33 @@ body {
 
 .page-subtitle {
   font-size: 1rem;
-  font-weight: 100;
+  font-weight: 400;
   margin-bottom: 0;
   color: var(--ui-text-secondary);
-  transition: color 0.5s ease;
-}
-
-// Color transition utility
-:root.text-color-transitioning * {
-  transition: color 0.5s ease !important;
 }
 
 // Card component
 .card {
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
   color: var(--ui-text-primary);
-  box-shadow: var(--ui-shadow-sm);
+  // xs is the most a RESTING surface may carry. Anything larger belongs to an
+  // overlay and is granted in the elevation allow-list at the end of the file.
+  box-shadow: var(--ui-shadow-xs);
 
   &-header {
-    border-radius: var(--ui-radius-md) var(--ui-radius-md) 0 0 !important;
-    padding: 1rem 1.25rem;
-    background: var(--ui-surface-strong);
+    border-radius: 0 !important;
+    padding: var(--ui-space-3) var(--ui-space-4);
+    background: var(--ui-panel-soft);
     border-bottom: 1px solid var(--ui-border);
   }
 
   &-title {
-    font-size: 1.1rem;
-    font-weight: 600;
+    font-size: 1rem;
+    font-weight: var(--ui-label-weight);
+    letter-spacing: 0;
+    text-transform: none;
   }
 
   &-body {
@@ -190,11 +171,14 @@ body {
 // Shared Bootstrap component contract
 .form-control,
 .form-select {
+  min-height: var(--ui-control-height);
+  padding: var(--ui-space-1) var(--ui-space-2);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
-  background-color: var(--ui-surface-strong);
+  border-radius: 0;
+  background-color: var(--ui-surface);
   color: var(--ui-text-primary);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  font-size: var(--ui-font-size-base);
+  transition: var(--transition-default);
 
   &:hover {
     border-color: var(--ui-border-strong);
@@ -204,7 +188,8 @@ body {
     border-color: var(--ui-border-strong);
     background-color: var(--ui-surface-hover);
     color: var(--ui-text-primary);
-    box-shadow: 0 0 0 3px var(--ui-accent-soft);
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 
   &::placeholder {
@@ -233,7 +218,8 @@ body {
 
   &:focus {
     border-color: var(--ui-border-strong);
-    box-shadow: 0 0 0 3px var(--ui-accent-soft);
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 }
 
@@ -246,7 +232,8 @@ body {
 
   &:focus {
     border-color: var(--ui-success);
-    box-shadow: 0 0 0 3px var(--ui-success-soft);
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 }
 
@@ -259,7 +246,8 @@ body {
 
   &:focus {
     border-color: var(--ui-danger);
-    box-shadow: 0 0 0 3px var(--ui-danger-soft);
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 }
 
@@ -275,6 +263,29 @@ body {
   color: var(--ui-text-muted) !important;
 }
 
+// Buttons: square, hairline framed, SENTENCE CASE. Hover only ever changes the
+// background colour; the focus indicator is a solid outline, never a glow.
+.btn {
+  min-height: var(--ui-control-height);
+  padding: var(--ui-space-1) var(--ui-space-3);
+  border-radius: 0;
+  box-shadow: none;
+  font-size: var(--ui-font-size-base);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: var(--transition-default);
+
+  &:not(.btn-link) {
+    border: 1px solid var(--ui-border-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
+  }
+}
+
 .btn-primary {
   border-color: var(--ui-accent);
   background: var(--ui-accent);
@@ -286,40 +297,40 @@ body {
     border-color: var(--ui-accent);
     background: var(--ui-accent);
     color: var(--ui-accent-contrast);
-    box-shadow: 0 0 0 3px var(--ui-accent-soft);
   }
 }
 
 .btn-outline-primary {
   border-color: var(--ui-border-strong);
-  color: var(--ui-accent);
+  background: transparent;
+  color: var(--ui-text-primary);
 
   &:hover,
-  &:focus-visible {
+  &:focus-visible,
+  &:active {
     border-color: var(--ui-border-strong);
-    background: var(--ui-accent-soft);
-    color: var(--ui-accent);
-    box-shadow: 0 0 0 3px var(--ui-accent-soft);
+    background: var(--ui-surface-raised);
+    color: var(--ui-text-primary);
   }
 }
 
 .btn-secondary,
 .btn-outline-secondary {
   border-color: var(--ui-border);
-  background: var(--ui-surface-strong);
+  background: transparent;
   color: var(--ui-text-secondary);
 
   &:hover,
-  &:focus-visible {
+  &:focus-visible,
+  &:active {
     border-color: var(--ui-border-strong);
     background: var(--ui-surface-hover);
     color: var(--ui-text-primary);
-    box-shadow: 0 0 0 3px var(--ui-accent-soft);
   }
 }
 
 // Shared semantic color contract
-.semantic-solid-button(@tone, @contrast, @soft) {
+.semantic-solid-button(@tone, @contrast) {
   border-color: @tone;
   background: @tone;
   color: @contrast;
@@ -331,11 +342,10 @@ body {
     border-color: @tone;
     background: @tone;
     color: @contrast;
-    box-shadow: 0 0 0 3px @soft;
   }
 }
 
-.semantic-outline-button(@text, @border, @soft) {
+.semantic-outline-button(@text, @border, @hover-bg) {
   border-color: @border;
   background: transparent;
   color: @text;
@@ -345,55 +355,43 @@ body {
   &:active,
   &.active {
     border-color: @border;
-    background: @soft;
+    background: @hover-bg;
     color: @text;
-    box-shadow: 0 0 0 3px @soft;
   }
 }
 
 .btn-success {
-  .semantic-solid-button(var(--ui-success), var(--ui-success-contrast), var(--ui-success-soft));
+  .semantic-solid-button(var(--ui-success), var(--ui-success-contrast));
 }
 
 .btn-warning {
-  .semantic-solid-button(var(--ui-warning), var(--ui-warning-contrast), var(--ui-warning-soft));
+  .semantic-solid-button(var(--ui-warning), var(--ui-warning-contrast));
 }
 
 .btn-danger {
-  .semantic-solid-button(var(--ui-danger), var(--ui-danger-contrast), var(--ui-danger-soft));
+  .semantic-solid-button(var(--ui-danger), var(--ui-danger-contrast));
 }
 
 .btn-info,
 .btn-info.text-white {
-  border-color: var(--ui-info-border);
-  background: var(--ui-info-soft);
+  .semantic-outline-button(var(--ui-info-text), var(--ui-info-border), var(--ui-surface-hover));
   color: var(--ui-info-text) !important;
-
-  &:hover,
-  &:focus-visible,
-  &:active,
-  &.active {
-    border-color: var(--ui-info-border);
-    background: rgba(var(--ui-info-rgb), 0.2);
-    color: var(--ui-info-text) !important;
-    box-shadow: 0 0 0 3px var(--ui-info-soft);
-  }
 }
 
 .btn-outline-success {
-  .semantic-outline-button(var(--ui-success-text), var(--ui-success-border), var(--ui-success-soft));
+  .semantic-outline-button(var(--ui-success-text), var(--ui-success-border), var(--ui-surface-hover));
 }
 
 .btn-outline-warning {
-  .semantic-outline-button(var(--ui-warning-text), var(--ui-warning-border), var(--ui-warning-soft));
+  .semantic-outline-button(var(--ui-warning-text), var(--ui-warning-border), var(--ui-surface-hover));
 }
 
 .btn-outline-danger {
-  .semantic-outline-button(var(--ui-danger-text), var(--ui-danger-border), var(--ui-danger-soft));
+  .semantic-outline-button(var(--ui-danger-text), var(--ui-danger-border), var(--ui-surface-hover));
 }
 
 .btn-outline-info {
-  .semantic-outline-button(var(--ui-info-text), var(--ui-info-border), var(--ui-info-soft));
+  .semantic-outline-button(var(--ui-info-text), var(--ui-info-border), var(--ui-surface-hover));
 }
 
 .text-primary {
@@ -552,4 +550,93 @@ body {
 .progress-bar {
   background-color: var(--ui-accent);
   color: var(--ui-accent-contrast);
+}
+
+// ---------------------------------------------------------------------------
+// gloss invariants
+//
+// A safety net for styling that cannot be reached from the token layer: the
+// prebuilt Bootstrap stylesheet and ~35 component <style scoped> blocks still
+// ship rounded corners, coloured glow shadows and blurred glass. The rules
+// below are deliberately blunt and deliberately last.
+//
+// Elevation policy: gloss DOES allow a subtle neutral shadow, but only the
+// three tokens in var.css and only on the surfaces named in the allow-list
+// below. So the blanket kill stays - it is what stops a leftover coloured glow
+// in a component stylesheet from coming back - and the permitted elevation is
+// then handed back explicitly. A component that needs elevation should use
+// .ui-elevated / .ui-elevated-overlay rather than declaring its own shadow.
+//
+// Scoping notes:
+//   - FontAwesome renders glyphs from a font, so nothing here can touch it.
+//   - Loading spinners and determinate progress bars keep their transforms:
+//     the transform reset only fires on interaction states of interactive
+//     elements, never on descendants and never on layout/positioning
+//     transforms (Popper dropdown placement, modal slide-in, centering).
+//   - Removing every box-shadow also removes shadow-based focus rings, so a
+//     global :focus-visible outline is restored immediately afterwards.
+// ---------------------------------------------------------------------------
+*,
+*::before,
+*::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+// Resting surfaces: the smallest step, and never more than one per stack.
+.card,
+.list-group,
+.ui-elevated {
+  box-shadow: var(--ui-shadow-xs) !important;
+}
+
+// Overlays: anything that floats over the page earns real separation, because
+// a hairline alone cannot say "this is in front of that".
+.dropdown-menu,
+.popover,
+.toast,
+.offcanvas,
+.modal-content,
+.ui-elevated-overlay {
+  box-shadow: var(--ui-shadow-md) !important;
+}
+
+// Range thumbs are shadow-DOM pseudo-elements that `*` cannot match.
+input[type='range']::-webkit-slider-thumb {
+  border-radius: 0;
+}
+
+input[type='range']::-moz-range-thumb {
+  border-radius: 0;
+}
+
+// Accessibility floor: every focusable element keeps a visible indicator even
+// if its own stylesheet suppressed the outline or relied on a glow shadow.
+:focus-visible {
+  outline: 2px solid var(--ui-text-primary) !important;
+  outline-offset: 0 !important;
+}
+
+// No lift, scale, tilt or nudge on interaction.
+a:hover,
+a:active,
+a:focus,
+button:hover,
+button:active,
+button:focus,
+.btn:hover,
+.btn:active,
+.btn:focus,
+[role='button']:hover,
+[role='button']:active,
+[role='button']:focus,
+.card:hover,
+.nav-link:hover,
+.list-group-item:hover,
+.dropdown-item:hover,
+.dropdown-item:active {
+  transform: none !important;
 }

@@ -10,15 +10,21 @@ export const getPreferredTheme = () => {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
+/**
+ * Apply a theme to the document.
+ *
+ * data-bs-theme on <html> is the single theme hook: Bootstrap keys off it and
+ * so does the [data-bs-theme="dark"] token block in styles/var.css, so writing
+ * the attribute is all that is needed to swap the whole palette. color-scheme
+ * is set alongside it so native chrome (scrollbars, form controls, the canvas
+ * behind the page) follows the OLED theme instead of staying light.
+ */
 export const setTheme = (theme) => {
-  if (theme === 'auto') {
-    document.documentElement.setAttribute(
-      'data-bs-theme',
-      window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-    )
-  } else {
-    document.documentElement.setAttribute('data-bs-theme', theme)
-  }
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  const resolved = theme === 'auto' ? systemTheme : theme
+
+  document.documentElement.setAttribute('data-bs-theme', resolved)
+  document.documentElement.style.colorScheme = resolved === 'dark' ? 'dark' : 'light'
 }
 
 export const showActiveTheme = (theme, focus = false) => {

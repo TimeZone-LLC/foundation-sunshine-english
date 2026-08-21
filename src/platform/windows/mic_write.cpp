@@ -825,18 +825,18 @@ namespace platf::audio {
       wstring_t device_id;
       if (SUCCEEDED(default_input->GetId(&device_id))) {
         restoration_state.original_input_device_id = device_id.get();
-        BOOST_LOG(debug) << "已存储原始输入设备: " << platf::to_utf8(restoration_state.original_input_device_id);
+        BOOST_LOG(debug) << "Stored original input device: " << platf::to_utf8(restoration_state.original_input_device_id);
       }
       else {
-        BOOST_LOG(warning) << "获取输入设备ID失败";
+        BOOST_LOG(warning) << "Failed to get the input device ID";
       }
     }
     else {
-      BOOST_LOG(warning) << "获取默认输入设备失败";
+      BOOST_LOG(warning) << "Failed to get the default input device";
     }
 
     restoration_state.settings_stored = true;
-    BOOST_LOG(info) << "原始音频设备设置存储完成";
+    BOOST_LOG(info) << "Original audio device settings stored";
   }
 
   int

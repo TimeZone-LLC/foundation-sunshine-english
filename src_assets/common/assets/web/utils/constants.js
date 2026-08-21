@@ -78,13 +78,13 @@ export const DEFAULT_BUILT_IN_APPS = {
       'menu-cmd': [
         {
           id: 'kcENAT5r9P',
-          name: '触摸键盘',
+          name: 'Touch Keyboard',
           cmd: '.\\tools\\qiin-tabtip.exe',
           elevated: 'false'
         },
         {
           id: 'rjeOKHmcdL',
-          name: '桌宠',
+          name: 'Desktop Pet',
           cmd: '.\\assets\\gui\\sunshine-gui.exe --toolbar',
           elevated: 'false'
         }

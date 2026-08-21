@@ -13,7 +13,6 @@
   padding: 1.25rem;
   overflow: hidden;
   background: var(--ui-overlay);
-  backdrop-filter: blur(6px);
 }
 
 .delete-app-modal {
@@ -24,9 +23,7 @@
   color: var(--ui-text-primary);
   background: var(--ui-surface-strong);
   border: 1px solid var(--ui-danger-border);
-  border-radius: var(--ui-radius-lg);
-  box-shadow: var(--ui-shadow-lg);
-  animation: modalSlideUp 0.22s ease;
+  border-radius: 0;
 }
 
 .delete-app-header {
@@ -61,8 +58,8 @@
   }
 
   &:focus-visible {
-    outline: 3px solid var(--ui-danger-soft);
-    outline-offset: 3px;
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 }
 
@@ -92,15 +89,8 @@
   }
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+// Vue transition hooks are intentionally styleless: modals appear and
+// disappear instantly, so no fade is declared for the `fade` transition.
 
 @media (max-width: 576px) {
   .delete-app-overlay {
@@ -125,14 +115,5 @@
     button {
       width: 100%;
     }
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .delete-app-modal,
-  .fade-enter-active,
-  .fade-leave-active {
-    animation: none;
-    transition: none;
   }
 }

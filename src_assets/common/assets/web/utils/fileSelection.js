@@ -4,8 +4,8 @@
  */
 
 const FILE_FILTERS = [
-  { name: '可执行文件', extensions: ['exe', 'app', 'sh', 'bat', 'cmd'] },
-  { name: '所有文件', extensions: ['*'] },
+  { name: 'Executables', extensions: ['exe', 'app', 'sh', 'bat', 'cmd'] },
+  { name: 'All Files', extensions: ['*'] },
 ]
 
 const PLACEHOLDERS = {
@@ -65,7 +65,7 @@ export class FileSelector {
    */
   selectBrowser(input, callback, isDirectory) {
     if (!input) {
-      this.onError(isDirectory ? '目录输入元素不存在' : '文件输入元素不存在')
+      this.onError(isDirectory ? 'Directory input element not found' : 'File input element not found')
       return
     }
 
@@ -81,14 +81,14 @@ export class FileSelector {
           const path = isDirectory ? this.processDirectoryPath(files[0]) : this.processFilePath(files[0])
 
           callback?.(this.currentField, path)
-          this.onSuccess(`${isDirectory ? '目录' : '文件'}选择成功: ${path}`)
+          this.onSuccess(`${isDirectory ? 'Directory' : 'File'} selected: ${path}`)
 
           if (!this.isElectronEnvironment()) {
-            this.onInfo('浏览器环境下无法获取完整路径，请检查并手动调整路径')
+            this.onInfo('The browser cannot provide the full path. Please check it and adjust it manually.')
           }
         } catch (error) {
-          console.error(`${isDirectory ? '目录' : '文件'}选择处理失败:`, error)
-          this.onError(`${isDirectory ? '目录' : '文件'}选择处理失败，请重试`)
+          console.error(`Failed to process the selected ${isDirectory ? 'directory' : 'file'}:`, error)
+          this.onError(`Failed to process the selected ${isDirectory ? 'directory' : 'file'}. Please try again.`)
         }
       }
 
@@ -128,27 +128,27 @@ export class FileSelector {
   async selectTauri(fieldName, callback, isDirectory) {
     const tauri = window.__TAURI__
     if (!tauri?.dialog?.open) {
-      this.onError('Tauri 对话框 API 不可用')
+      this.onError('The Tauri dialog API is unavailable')
       this.resetState()
       return null
     }
 
     try {
       const options = isDirectory
-        ? { title: '选择目录', multiple: false, directory: true }
-        : { title: '选择文件', filters: FILE_FILTERS, multiple: false, directory: false }
+        ? { title: 'Select Directory', multiple: false, directory: true }
+        : { title: 'Select File', filters: FILE_FILTERS, multiple: false, directory: false }
 
       const selected = await tauri.dialog.open(options)
 
       if (selected) {
         callback?.(fieldName, selected)
-        this.onSuccess(`${isDirectory ? '目录' : '文件'}选择成功: ${selected}`)
+        this.onSuccess(`${isDirectory ? 'Directory' : 'File'} selected: ${selected}`)
         this.resetState()
         return selected
       }
     } catch (error) {
-      console.error(`Tauri ${isDirectory ? '目录' : '文件'}选择失败:`, error)
-      this.onError(`${isDirectory ? '目录' : '文件'}选择失败，请手动输入路径`)
+      console.error(`Tauri ${isDirectory ? 'directory' : 'file'} selection failed:`, error)
+      this.onError(`${isDirectory ? 'Directory' : 'File'} selection failed. Please enter the path manually.`)
     }
 
     this.resetState()
@@ -178,12 +178,12 @@ export class FileSelector {
       if (!result.canceled && result.filePaths.length > 0) {
         const path = result.filePaths[0]
         callback?.(fieldName, path)
-        this.onSuccess(`${isDirectory ? '目录' : '文件'}选择成功: ${path}`)
+        this.onSuccess(`${isDirectory ? 'Directory' : 'File'} selected: ${path}`)
         return path
       }
     } catch (error) {
-      console.error(`${isDirectory ? '目录' : '文件'}选择失败:`, error)
-      this.onError(`${isDirectory ? '目录' : '文件'}选择失败，请手动输入路径`)
+      console.error(`${isDirectory ? 'Directory' : 'File'} selection failed:`, error)
+      this.onError(`${isDirectory ? 'Directory' : 'File'} selection failed. Please enter the path manually.`)
     }
 
     this.resetState()
@@ -263,7 +263,7 @@ export class FileSelector {
    * 获取按钮标题文本
    */
   getButtonTitle(type) {
-    return type === 'file' ? '选择文件' : type === 'directory' ? '选择目录' : '选择'
+    return type === 'file' ? 'Select File' : type === 'directory' ? 'Select Directory' : 'Select'
   }
 
   /**

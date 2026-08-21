@@ -5,7 +5,6 @@
   position: fixed;
   inset: 0;
   background: var(--modal-backdrop-bg);
-  backdrop-filter: blur(8px);
   z-index: 9999;
   display: flex;
   align-items: flex-start;
@@ -20,11 +19,8 @@
   max-width: 640px;
   background: var(--modal-content-bg);
   border: 1px solid var(--modal-border-color);
-  border-radius: var(--ui-radius-lg);
-  backdrop-filter: blur(20px);
-  box-shadow: var(--ui-shadow-md);
+  border-radius: 0;
   overflow: hidden;
-  animation: modalSlideUp 0.3s ease;
 
 }
 
@@ -54,7 +50,7 @@
 .scan-options-section {
   padding: var(--spacing-md, 16px);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
 }
 
@@ -74,13 +70,13 @@
   width: 100%;
   margin: 0;
   padding: var(--spacing-sm, 10px);
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   color: var(--ui-text-primary);
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: var(--transition-default);
 
   &:hover {
-    background: var(--ui-accent-soft);
+    background: var(--ui-surface-hover);
   }
 
   input {
@@ -132,7 +128,7 @@
   min-height: 40px;
   padding: 0 var(--spacing-sm, 12px);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   color: var(--ui-text-primary);
   cursor: pointer;
   background: var(--ui-surface-strong);

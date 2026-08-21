@@ -153,7 +153,7 @@ function addRemapping() {
 .display-mode-remapping {
   margin-bottom: 1rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   background: var(--ui-surface);
 }
 
@@ -182,7 +182,7 @@ function addRemapping() {
   font-family: 'Font Awesome 6 Free';
   font-weight: 900;
   content: '\f078';
-  transition: transform 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .display-mode-remapping[open] summary::after {
@@ -201,7 +201,7 @@ function addRemapping() {
   margin-top: 0.75rem;
   overflow-x: auto;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
 }
 
@@ -236,7 +236,7 @@ function addRemapping() {
 }
 
 .monospace {
-  font-family: 'SF Mono', 'Cascadia Code', Consolas, monospace;
+  font-family: var(--font-family-mono);
 }
 
 .remapping-delete {
@@ -247,7 +247,7 @@ function addRemapping() {
   height: 2.1rem;
   padding: 0;
   border: 1px solid var(--ui-danger-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   background: transparent;
   color: var(--ui-danger-text);
 }
@@ -255,7 +255,11 @@ function addRemapping() {
 .remapping-delete:hover,
 .remapping-delete:focus-visible {
   background: var(--ui-danger-soft);
-  box-shadow: 0 0 0 3px var(--ui-danger-soft);
+}
+
+.remapping-delete:focus-visible {
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 0;
 }
 
 @media (max-width: 575.98px) {

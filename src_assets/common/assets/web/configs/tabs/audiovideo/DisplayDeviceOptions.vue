@@ -313,7 +313,7 @@ onUnmounted(() => {
 .display-options-note {
   margin: 0 0 1rem;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   background: var(--ui-accent-soft);
   color: var(--ui-text-secondary);
 }
@@ -343,7 +343,7 @@ onUnmounted(() => {
   font-family: 'Font Awesome 6 Free';
   font-weight: 900;
   content: '\f078';
-  transition: transform 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .display-options-note[open] summary::after {
@@ -367,7 +367,7 @@ onUnmounted(() => {
 .nested-setting {
   padding: 0.75rem;
   border-left: 3px solid var(--ui-border-strong);
-  border-radius: 0 var(--ui-radius-sm) var(--ui-radius-sm) 0;
+  border-radius: 0;
   background: var(--ui-surface-strong);
 }
 
@@ -375,18 +375,13 @@ onUnmounted(() => {
   padding: 1rem;
   border: 1px solid var(--ui-border);
   border-left: 3px solid var(--ui-accent);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-accent-soft);
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    box-shadow 0.2s ease,
-    opacity 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .hdr-feature-card:hover {
   border-color: var(--ui-border-strong);
-  box-shadow: var(--ui-shadow-sm);
 }
 
 .hdr-feature-card.is-disabled {
@@ -411,9 +406,8 @@ onUnmounted(() => {
   width: 0.55rem;
   height: 0.55rem;
   flex: 0 0 auto;
-  border-radius: 50%;
+  border-radius: 0;
   background: currentColor;
-  box-shadow: 0 0 0 0.2rem color-mix(in srgb, currentColor 18%, transparent);
 }
 
 .feature-status.is-muted {

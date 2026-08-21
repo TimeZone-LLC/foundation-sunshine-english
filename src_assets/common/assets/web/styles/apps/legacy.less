@@ -5,7 +5,7 @@
   width: 200px;
 }
 .monospace {
-  font-family: 'Courier New', monospace;
+  font-family: var(--font-family-mono);
 }
 
 .cover-finder .cover-results {
@@ -48,7 +48,7 @@
 
 .config-page {
   padding: 1em;
-  border: 1px solid #dee2e6;
+  border: 1px solid var(--ui-border);
   border-top: none;
 }
 
@@ -61,14 +61,14 @@ td {
 
 .env-table td {
   padding: 0.25em;
-  border-bottom: rgba(0, 0, 0, 0.25) 1px solid;
+  border-bottom: 1px solid var(--ui-border);
   vertical-align: top;
 }
 
 .table .item-app {
   cursor: move;
   &:hover {
-    background-color: #d38d9d91;
+    background-color: var(--ui-surface-hover);
   }
 }
 

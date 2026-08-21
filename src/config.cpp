@@ -574,7 +574,6 @@ namespace config {
 
   sunshine_t sunshine {
     "en",  // locale
-    "en",  // tray_locale (托盘菜单语言)
     2,  // min_log_level
     0,  // flags
     {},  // User file
@@ -1621,32 +1620,6 @@ namespace config {
       sunshine.max_log_size_mb = 0;
     }
 
-    string_restricted_f(vars, "locale", config::sunshine.locale, {
-                                                                   "bg"sv,  // Bulgarian
-                                                                   "cs"sv,  // Czech
-                                                                   "de"sv,  // German
-                                                                   "en"sv,  // English
-                                                                   "en_GB"sv,  // English (UK)
-                                                                   "en_US"sv,  // English (US)
-                                                                   "es"sv,  // Spanish
-                                                                   "fr"sv,  // French
-                                                                   "it"sv,  // Italian
-                                                                   "ja"sv,  // Japanese
-                                                                   "pt"sv,  // Portuguese
-                                                                   "ru"sv,  // Russian
-                                                                   "sv"sv,  // Swedish
-                                                                   "tr"sv,  // Turkish
-                                                                   "zh"sv,  // Chinese
-                                                                   "zh_TW"sv,  // Chinese (Traditional)
-                                                                 });
-
-    // 托盘菜单语言设置
-    string_restricted_f(vars, "tray_locale", config::sunshine.tray_locale, {
-                                                                   "en"sv,  // English
-                                                                   "zh"sv,  // Chinese (Simplified)
-                                                                   "ja"sv,  // Japanese
-                                                                 });
-
     std::string log_level_string;
     string_f(vars, "min_log_level", log_level_string);
 
@@ -1795,7 +1768,6 @@ namespace config {
 
     if (!config_loaded && !shortcut_launch) {
       BOOST_LOG(fatal) << "To relaunch Sunshine successfully, use the shortcut in the Start Menu. Do not run Sunshine.exe manually."sv;
-      BOOST_LOG(fatal) << "要成功重新启动 Sunshine, 请使用开始菜单中的快捷方式。不要手动运行 Sunshine.exe"sv;
       std::this_thread::sleep_for(10s);
 #else
     if (!config_loaded) {
@@ -1934,7 +1906,6 @@ namespace config {
       const std::set<std::string> protectedFields = {
         "vdd_keep_enabled",       // 由系统托盘控制，不通过Web UI修改
         "vdd_headless_create",    // 由系统托盘控制，不通过Web UI修改
-        "tray_locale",            // 由系统托盘控制，不通过Web UI修改
       };
 
       // 读取现有配置文件（用于获取受保护字段的值和后续对比）

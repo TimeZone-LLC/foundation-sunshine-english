@@ -234,13 +234,13 @@ bool ShowKeyboardViaCOM() {
 bool ShowKeyboard() {
   // 方法 1: 使用 COM 接口（最可靠的方法）
   if (ShowKeyboardViaCOM()) {
-    Print(L"✓ 触摸键盘已显示");
+    Print(L"✓ Touch keyboard shown");
     return true;
   }
   
   // 方法 2: 传统方法作为备选
   if (!CheckTabTipExists()) {
-    PrintError(L"✗ 找不到 TabTip.exe");
+    PrintError(L"✗ TabTip.exe not found");
     return false;
   }
 
@@ -257,7 +257,7 @@ bool ShowKeyboard() {
 
   if (existingWnd != NULL) {
     if (ForceShowKeyboardWindow()) {
-      Print(L"✓ 触摸键盘已显示");
+      Print(L"✓ Touch keyboard shown");
       return true;
     }
   }
@@ -278,7 +278,7 @@ bool ShowKeyboard() {
     Sleep(500);
     
     if (ForceShowKeyboardWindow()) {
-      Print(L"✓ 触摸键盘已显示");
+      Print(L"✓ Touch keyboard shown");
       return true;
     }
   }
@@ -286,11 +286,11 @@ bool ShowKeyboard() {
   // 最后备选：OSK
   HINSTANCE result = ShellExecute(NULL, L"open", L"osk.exe", NULL, NULL, SW_SHOW);
   if ((INT_PTR)result > 32) {
-    Print(L"✓ 屏幕键盘已显示");
+    Print(L"✓ On-screen keyboard shown");
     return true;
   }
   
-  PrintError(L"✗ 无法显示键盘");
+  PrintError(L"✗ Failed to show the keyboard");
   return false;
 }
 
@@ -307,11 +307,11 @@ bool HideKeyboard() {
 
   if (hwnd != NULL && IsWindowVisible(hwnd)) {
     PostMessage(hwnd, WM_SYSCOMMAND, SC_CLOSE, 0);
-    Print(L"✓ 触摸键盘已隐藏");
+    Print(L"✓ Touch keyboard hidden");
     return true;
   }
   
-  Print(L"触摸键盘未运行或已隐藏");
+  Print(L"Touch keyboard is not running or already hidden");
   return false;
 }
 
@@ -332,7 +332,7 @@ bool ToggleKeyboard() {
 void Diagnose() {
   wchar_t buffer[256];
   
-  Print(L"=== 系统诊断信息 ===");
+  Print(L"=== System diagnostics ===");
   Print(L"");
   
   // 检查 Windows 版本
@@ -346,43 +346,43 @@ void Diagnose() {
   #if defined(_MSC_VER)
   #pragma warning(pop)
   #endif
-  wsprintfW(buffer, L"Windows 版本: %d.%d", osvi.dwMajorVersion, osvi.dwMinorVersion);
+  wsprintfW(buffer, L"Windows version: %d.%d", osvi.dwMajorVersion, osvi.dwMinorVersion);
   Print(buffer);
   
   // 检查 TabTip.exe
   Print(L"");
-  wsprintfW(buffer, L"TabTip 路径: %s", TABTIP_PATH);
+  wsprintfW(buffer, L"TabTip path: %s", TABTIP_PATH);
   Print(buffer);
-  Print(CheckTabTipExists() ? L"TabTip.exe: ✓ 存在" : L"TabTip.exe: ✗ 不存在");
+  Print(CheckTabTipExists() ? L"TabTip.exe: ✓ present" : L"TabTip.exe: ✗ missing");
   
   // 检查注册表设置
   Print(L"");
-  Print(L"注册表设置:");
+  Print(L"Registry settings:");
   Print(IsDesktopModeAutoInvokeEnabled() ? 
-        L"  EnableDesktopModeAutoInvoke: ✓ 已启用" : 
-        L"  EnableDesktopModeAutoInvoke: ✗ 未启用");
+        L"  EnableDesktopModeAutoInvoke: ✓ enabled" : 
+        L"  EnableDesktopModeAutoInvoke: ✗ disabled");
   
   // 检查键盘窗口
   Print(L"");
-  Print(L"检查键盘窗口:");
+  Print(L"Keyboard windows:");
   HWND hwnd = FindWindow(L"IPTip_Main_Window", NULL);
   if (hwnd) {
-    Print(L"  IPTip_Main_Window: ✓ 找到 (Windows 10)");
-    Print(IsWindowVisible(hwnd) ? L"  可见性: 可见" : L"  可见性: 隐藏");
+    Print(L"  IPTip_Main_Window: ✓ found (Windows 10)");
+    Print(IsWindowVisible(hwnd) ? L"  Visibility: visible" : L"  Visibility: hidden");
   } else {
-    Print(L"  IPTip_Main_Window: ✗ 未找到");
+    Print(L"  IPTip_Main_Window: ✗ not found");
   }
   
   hwnd = FindWindow(L"ApplicationFrameWindow", L"Microsoft Text Input Application");
   if (hwnd) {
-    Print(L"  ApplicationFrameWindow: ✓ 找到 (Windows 11)");
-    Print(IsWindowVisible(hwnd) ? L"  可见性: 可见" : L"  可见性: 隐藏");
+    Print(L"  ApplicationFrameWindow: ✓ found (Windows 11)");
+    Print(IsWindowVisible(hwnd) ? L"  Visibility: visible" : L"  Visibility: hidden");
   } else {
-    Print(L"  ApplicationFrameWindow: ✗ 未找到");
+    Print(L"  ApplicationFrameWindow: ✗ not found");
   }
   
   Print(L"");
-  Print(IsKeyboardVisible() ? L"当前键盘状态: 可见" : L"当前键盘状态: 隐藏");
+  Print(IsKeyboardVisible() ? L"Current keyboard state: visible" : L"Current keyboard state: hidden");
 }
 
 /**
@@ -391,10 +391,10 @@ void Diagnose() {
 bool ShowOSK() {
   HINSTANCE result = ShellExecute(NULL, L"open", L"osk.exe", NULL, NULL, SW_SHOW);
   if ((INT_PTR)result > 32) {
-    Print(L"✓ 屏幕键盘已显示");
+    Print(L"✓ On-screen keyboard shown");
     return true;
   }
-  PrintError(L"✗ 无法显示屏幕键盘");
+  PrintError(L"✗ Failed to show the on-screen keyboard");
   return false;
 }
 
@@ -402,25 +402,25 @@ bool ShowOSK() {
  * 显示使用帮助
  */
 void ShowHelp() {
-  Print(L"Windows 虚拟触摸键盘工具");
+  Print(L"Windows virtual touch keyboard tool");
   Print(L"");
-  Print(L"用法:");
-  Print(L"  qiin-tabtip [选项]");
+  Print(L"Usage:");
+  Print(L"  qiin-tabtip [option]");
   Print(L"");
-  Print(L"选项:");
-  Print(L"  show      - 显示触摸键盘 (TabTip)");
-  Print(L"  hide      - 隐藏触摸键盘");
-  Print(L"  toggle    - 切换键盘显示状态 (默认)");
-  Print(L"  osk       - 显示屏幕键盘 (OSK)");
-  Print(L"  status    - 检查键盘是否可见");
-  Print(L"  diagnose  - 诊断系统环境");
-  Print(L"  help      - 显示此帮助信息");
+  Print(L"Options:");
+  Print(L"  show      - Show the touch keyboard (TabTip)");
+  Print(L"  hide      - Hide the touch keyboard");
+  Print(L"  toggle    - Toggle keyboard visibility (default)");
+  Print(L"  osk       - Show the on-screen keyboard (OSK)");
+  Print(L"  status    - Check whether the keyboard is visible");
+  Print(L"  diagnose  - Diagnose the system environment");
+  Print(L"  help      - Show this help text");
   Print(L"");
-  Print(L"示例:");
-  Print(L"  qiin-tabtip              # 切换键盘状态");
-  Print(L"  qiin-tabtip show         # 显示触摸键盘");
-  Print(L"  qiin-tabtip osk          # 显示屏幕键盘");
-  Print(L"  qiin-tabtip diagnose     # 诊断问题");
+  Print(L"Examples:");
+  Print(L"  qiin-tabtip              # Toggle the keyboard");
+  Print(L"  qiin-tabtip show         # Show the touch keyboard");
+  Print(L"  qiin-tabtip osk          # Show the on-screen keyboard");
+  Print(L"  qiin-tabtip diagnose     # Diagnose problems");
 }
 
 int wmain(int argc, wchar_t* argv[]) {
@@ -452,10 +452,10 @@ int wmain(int argc, wchar_t* argv[]) {
   }
   else if (StrEqualI(command, L"status")) {
     if (IsKeyboardVisible()) {
-      Print(L"触摸键盘当前: 可见");
+      Print(L"Touch keyboard is currently: visible");
       return 0;
     } else {
-      Print(L"触摸键盘当前: 隐藏");
+      Print(L"Touch keyboard is currently: hidden");
       return 1;
     }
   }
@@ -470,9 +470,9 @@ int wmain(int argc, wchar_t* argv[]) {
   }
   else {
     wchar_t errMsg[512];
-    wsprintfW(errMsg, L"未知命令: %s", command);
+    wsprintfW(errMsg, L"Unknown command: %s", command);
     PrintError(errMsg);
-    PrintError(L"使用 'qiin-tabtip help' 查看帮助");
+    PrintError(L"Run 'qiin-tabtip help' for usage");
     return 1;
   }
 

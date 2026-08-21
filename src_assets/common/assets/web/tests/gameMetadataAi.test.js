@@ -141,8 +141,8 @@ test('enhanceScannedGameNames renames only high-confidence results', async () =>
     assert.equal(result[1].name, 'weird.exe')
     assert.equal(result[1]['canonical-name'], 'Unknown Game')
     assert.equal(result[1]['ai-confidence'], 0.4)
-    assert.equal(JSON.parse(requestBody.messages[1].content).locale, 'zh')
-    assert.match(requestBody.messages[0].content, /Simplified Chinese/)
+    assert.equal(JSON.parse(requestBody.messages[1].content).locale, 'en')
+    assert.match(requestBody.messages[0].content, /English/)
 
     const cachedResult = await enhanceScannedGameNames([
       { name: 'CP2077.exe', cmd: 'C:/Games/Cyberpunk2077/bin/x64/Cyberpunk2077.exe' },

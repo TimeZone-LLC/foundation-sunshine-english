@@ -28,10 +28,6 @@ namespace system_tray_i18n {
   extern const std::string KEY_IMPORT_CONFIG;
   extern const std::string KEY_EXPORT_CONFIG;
   extern const std::string KEY_RESET_TO_DEFAULT;
-  extern const std::string KEY_LANGUAGE;
-  extern const std::string KEY_CHINESE;
-  extern const std::string KEY_ENGLISH;
-  extern const std::string KEY_JAPANESE;
   extern const std::string KEY_STAR_PROJECT;
   extern const std::string KEY_VISIT_PROJECT;
   extern const std::string KEY_VISIT_PROJECT_SUNSHINE;
@@ -78,12 +74,9 @@ namespace system_tray_i18n {
   extern const std::string KEY_FILE_DIALOG_SAVE_EXPORT;
   extern const std::string KEY_FILE_DIALOG_CONFIG_FILES;
   
-  // Get localized string
+  // Get localized string (English-only)
   std::string get_localized_string(const std::string& key);
-  
-  // Set tray locale
-  void set_tray_locale(const std::string& locale);
-  
+
   // Convert UTF-8 string to wide string
   std::wstring utf8_to_wstring(const std::string& utf8_str);
 }

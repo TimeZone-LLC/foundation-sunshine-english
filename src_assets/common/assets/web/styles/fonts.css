@@ -1,0 +1,66 @@
+/*
+ * Self-hosted Geist / Geist Mono - the "gloss" type foundation.
+ *
+ * The woff2 files live in public/assets/fonts/, and everything under public/
+ * is copied verbatim to the web root by Vite. That is why the src URLs below
+ * are ROOT-ABSOLUTE (/assets/fonts/...) rather than relative: this file is
+ * @imported into var.css, which is in turn @imported into several component
+ * <style lang="less"> blocks, so a relative URL would resolve differently
+ * depending on which page pulled it in. A root-absolute URL always resolves,
+ * in the dev server and in the built bundle alike.
+ *
+ * font-display: swap - the UI must be readable before the face arrives; the
+ * fallback stack in var.css (--font-family-sans / --font-family-mono) is
+ * metric-neighbourly enough that the swap is not a jolt.
+ *
+ * No CDN. Sunshine's config server is frequently reached over a LAN with no
+ * route to the internet, so a remote font would simply never load.
+ */
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/assets/fonts/Geist-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/assets/fonts/Geist-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/assets/fonts/Geist-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist';
+  src: url('/assets/fonts/Geist-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/assets/fonts/GeistMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/assets/fonts/GeistMono-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}

@@ -140,7 +140,7 @@ function removeFps(index) {
           required
           pattern="\d+(\.\d+)?"
           class="form-control add-input add-input-fps"
-          placeholder="例如: 120 或 119.88"
+          placeholder="e.g. 120 or 119.88"
         />
         <button v-if="fps.length < MAX_FPS" class="btn btn-primary add-btn" type="submit">
           <i class="fas fa-plus"></i>
@@ -194,10 +194,9 @@ function removeFps(index) {
 .settings-section {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   padding: 1rem;
   margin-bottom: 1rem;
-  box-shadow: var(--ui-shadow-sm);
 }
 
 .section-header {
@@ -237,27 +236,25 @@ function removeFps(index) {
   color: var(--ui-accent);
   border: 1px solid var(--ui-border-strong);
   padding: 0.35rem 0.5rem 0.35rem 0.75rem;
-  border-radius: 999px;
+  border-radius: 0;
   font-size: 0.85rem;
   font-weight: 500;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+  transition: var(--transition-default);
 }
 
 .tag-item:hover {
-  transform: translateY(-1px);
   background: var(--ui-surface-hover);
-  box-shadow: var(--ui-shadow-sm);
 }
 
 .tag-fps {
-  border-color: color-mix(in srgb, var(--ui-success) 34%, transparent);
-  background: color-mix(in srgb, var(--ui-success) 12%, transparent);
+  border-color: var(--ui-success-border);
+  background: var(--ui-success-soft);
   color: var(--ui-success-text);
 }
 
 .tag-text {
   margin-right: 0.5rem;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-family-mono);
 }
 
 .tag-remove {
@@ -269,16 +266,15 @@ function removeFps(index) {
   border: 1px solid currentColor;
   background: var(--ui-surface-strong);
   color: inherit;
-  border-radius: 50%;
+  border-radius: 0;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: var(--transition-default);
   padding: 0;
   font-size: 0.7rem;
 }
 
 .tag-remove:hover {
   background: var(--ui-surface-hover);
-  transform: scale(1.1);
 }
 
 .tag-remove:focus-visible {
@@ -303,7 +299,7 @@ function removeFps(index) {
   width: 140px;
   border-top-right-radius: 0;
   border-bottom-right-radius: 0;
-  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', monospace;
+  font-family: var(--font-family-mono);
 }
 
 .add-input-fps {
@@ -329,7 +325,7 @@ function removeFps(index) {
   padding: 0.75rem;
   background: var(--ui-accent-soft);
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-sm);
+  border-radius: 0;
   color: var(--ui-text-secondary);
   margin-bottom: 1rem;
 }
@@ -342,13 +338,12 @@ function removeFps(index) {
 /* Transition animations */
 .tag-fade-enter-active,
 .tag-fade-leave-active {
-  transition: all 0.3s ease;
+  transition: var(--transition-default);
 }
 
 .tag-fade-enter-from,
 .tag-fade-leave-to {
   opacity: 0;
-  transform: scale(0.8);
 }
 
 @media (max-width: 575.98px) {

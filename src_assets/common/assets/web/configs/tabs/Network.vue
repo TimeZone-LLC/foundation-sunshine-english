@@ -210,7 +210,7 @@ const effectivePort = computed(() => +config.value?.port ?? defaultMoonlightPort
   margin-top: 1rem;
   overflow-x: auto;
   border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  border-radius: 0;
   background: var(--ui-surface);
 }
 

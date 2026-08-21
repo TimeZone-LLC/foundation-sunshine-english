@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <atomic>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <random>
 #include <map>
@@ -1254,24 +1255,6 @@ namespace confighttp {
     outputTree.put("pair_name", nvhttp::get_pair_name());
   }
 
-  void
-  getLocale(resp_https_t response, req_https_t request) {
-    // we need to return the locale whether authenticated or not
-
-    print_req(request);
-
-    pt::ptree outputTree;
-    auto g = util::fail_guard([&]() {
-      std::ostringstream data;
-
-      pt::write_json(data, outputTree);
-      response->write(data.str());
-    });
-
-    outputTree.put("status", "true");
-    outputTree.put("locale", config::sunshine.locale);
-  }
-
   std::vector<std::string>
   split(const std::string &str, char delimiter) {
     std::vector<std::string> tokens;
@@ -1315,7 +1298,7 @@ namespace confighttp {
     // 类似于 config.cpp 中的 path_f 函数逻辑，使用相对路径
     std::filesystem::path idd_option_path = platf::appdata() / "vdd_settings.xml";
 
-    BOOST_LOG(info) << "VDD配置文件路径: " << idd_option_path.string();
+    BOOST_LOG(info) << "VDD settings file path: " << idd_option_path.string();
 
     if (!fs::exists(idd_option_path)) {
         return false;
@@ -1359,7 +1342,7 @@ namespace confighttp {
       }
     } catch(std::exception &e) {
       // 读取失败，创建新的配置
-      BOOST_LOG(warning) << "读取现有VDD配置失败，创建新配置: " << e.what();
+      BOOST_LOG(warning) << "Failed to read the existing VDD settings, creating a new one: " << e.what();
 
       pt::ptree monitor_node;
       monitor_node.put("count", 1);
@@ -1392,7 +1375,7 @@ namespace confighttp {
       return true;
     }
     catch(std::exception &e) {
-      BOOST_LOG(warning) << "写入VDD配置失败: " << e.what();
+      BOOST_LOG(warning) << "Failed to write the VDD settings: " << e.what();
       return false;
     }
   }
@@ -3729,7 +3712,24 @@ namespace confighttp {
     auto port_https = net::map_port(PORT_HTTPS);
     auto address_family = net::af_from_enum_string(config::sunshine.address_family);
 
-    https_server_t server { config::nvhttp.cert, config::nvhttp.pkey };
+    // Constructing the HTTPS server loads the certificate and the private key, and throws when
+    // either file is missing, corrupt or locked by another program. This runs on a bare
+    // std::thread, so an escaping exception used to terminate Sunshine without a single log
+    // line - and with the Web UI gone there was nothing left to diagnose it with.
+    std::optional<https_server_t> server_storage;
+    try {
+      server_storage.emplace(config::nvhttp.cert, config::nvhttp.pkey);
+    }
+    catch (std::exception &err) {
+      BOOST_LOG(fatal) << "Couldn't load the TLS credentials for the Configuration HTTPS server on port ["sv
+                       << port_https << "]: "sv << err.what() << ". Certificate ["sv << config::nvhttp.cert
+                       << "], private key ["sv << config::nvhttp.pkey << ']';
+      http::listener_failed(http::listener_e::confighttp, port_https);
+      lifetime::exit_sunshine(http::exit_code::CREDENTIALS_UNUSABLE, true);
+      return;
+    }
+    auto &server = *server_storage;
+
     server.default_resource["GET"] = close_connection;
     server.resource["^/$"]["GET"] = getIndexPage;
     server.resource["^/pin/?$"]["GET"] = getPinPage;
@@ -3751,7 +3751,6 @@ namespace confighttp {
     server.resource["^/api/webhook/config$"]["GET"] = getWebhookConfig;
     server.resource["^/api/webhook/config$"]["POST"] = saveWebhookConfig;
     server.resource["^/api/webhook/test$"]["POST"] = testWebhook;
-    server.resource["^/api/configLocale$"]["GET"] = getLocale;
     server.resource["^/api/logout$"]["GET"] = handleLogout;
     server.resource["^/api/logout$"]["POST"] = handleLogout;
     server.resource["^/api/restart$"]["POST"] = restart;
@@ -3826,25 +3825,35 @@ namespace confighttp {
     // base64 cover-upload endpoint.
     server.config.max_request_streambuf_size = 16 * 1024 * 1024;
 
+    // A single port collision on the Web UI used to tear the whole process down, taking away
+    // the one interface that could have diagnosed it. http::start_with_bind_retry repeats a
+    // transient failure with escalating backoff instead, and only concedes - with a non-zero
+    // exit code - once the whole retry window is used up.
     auto accept_and_run = [&](https_server_t *server) {
       try {
-        server->start([](unsigned short port) {
-          BOOST_LOG(debug) << "Configuration UI available at [https://localhost:"sv << port << "]"sv;
+        http::start_with_bind_retry(http::listener_e::confighttp, port_https, [server]() -> boost::system::error_code {
+          try {
+            server->start([](unsigned short port) {
+              http::listener_ready(http::listener_e::confighttp, port);
+              BOOST_LOG(debug) << "Configuration UI available at [https://localhost:"sv << port << "]"sv;
+            });
+          }
+          catch (boost::system::system_error &err) {
+            // Close the acceptor again so the next attempt is able to reopen it.
+            server->stop();
+            return err.code();
+          }
+          return {};
         });
       }
-      catch (boost::system::system_error &err) {
+      catch (std::exception &err) {
         // It's possible the exception gets thrown after calling server->stop() from a different thread
         if (shutdown_event->peek()) {
           return;
         }
-        BOOST_LOG(fatal) << "Couldn't start Configuration HTTPS server on port ["sv << port_https << "]: "sv << err.what();
-        shutdown_event->raise(true);
-        return;
-      }
-      catch (std::exception &err) {
-        BOOST_LOG(fatal) << "Configuration HTTPS server failed to start: "sv << err.what();
-        shutdown_event->raise(true);
-        return;
+        BOOST_LOG(fatal) << "Configuration HTTPS server on port ["sv << port_https << "] failed: "sv << err.what();
+        http::listener_failed(http::listener_e::confighttp, port_https);
+        lifetime::exit_sunshine(http::exit_code::PORT_UNAVAILABLE, true);
       }
     };
     std::thread tcp { accept_and_run, &server };

@@ -114,11 +114,6 @@ export function getAgentCapabilityLabel(skillId, options = {}) {
   const capability = getAgentCapability(skillId, options.capabilities || [])
   if (!capability) return skillId
 
-  const locale = String(options.locale || '').toLowerCase()
-  if (locale.startsWith('zh')) {
-    return capability.labels?.zh || capability.label
-  }
-
   return capability.label || skillId
 }
 

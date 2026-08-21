@@ -7,14 +7,18 @@
 #include "process.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cctype>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <initializer_list>
+#include <string_view>
 #include <utility>
 #include <vector>
 
+#include <boost/asio/error.hpp>
 #include <boost/asio/ip/address.hpp>
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/steady_timer.hpp>
@@ -34,6 +38,7 @@
 #include "config.h"
 #include "crypto.h"
 #include "file_handler.h"
+#include "globals.h"
 #include "httpcommon.h"
 #include "logging.h"
 #include "network.h"
@@ -56,6 +61,294 @@ namespace http {
   std::string unique_id;
   net::net_e origin_web_ui_allowed;
 
+  namespace {
+    /**
+     * @brief Delay before the first repeat of a failed bind. Doubles on every further attempt.
+     */
+    constexpr auto BIND_RETRY_INITIAL_DELAY = 250ms;
+
+    /**
+     * @brief Ceiling for the escalating delay between two bind attempts.
+     */
+    constexpr auto BIND_RETRY_MAX_DELAY = 8s;
+
+    /**
+     * @brief Total time a listener may spend trying to bind before Sunshine concedes the port.
+     */
+    constexpr auto BIND_RETRY_WINDOW = 2min;
+
+    /**
+     * @brief How often the startup summary re-checks the listeners while it waits for them.
+     */
+    constexpr auto READINESS_POLL_INTERVAL = 100ms;
+
+    /**
+     * @brief How many times a credentials operation is repeated before Sunshine concedes.
+     */
+    constexpr int CREDS_RETRY_ATTEMPTS = 4;
+
+    /**
+     * @brief Delay before the second credentials attempt. Doubles on every further attempt.
+     */
+    constexpr auto CREDS_RETRY_INITIAL_DELAY = 250ms;
+
+    /**
+     * @brief Bring-up state of a single listening socket.
+     */
+    enum class listener_status_e {
+      pending,  ///< No verdict yet; the listener is still working on its port.
+      listening,  ///< Bound and accepting connections.
+      failed  ///< Gave up on the port.
+    };
+
+    /**
+     * @brief What is known about one listener, written by its server thread and read by main().
+     */
+    struct listener_record_t {
+      std::string_view name;  ///< English name used in every log line about this listener.
+      std::atomic<listener_status_e> status { listener_status_e::pending };
+      std::atomic<std::uint16_t> port { 0 };
+    };
+
+    constexpr auto LISTENER_COUNT = static_cast<std::size_t>(listener_e::count);
+
+    listener_record_t listener_records[LISTENER_COUNT] {
+      { "Web UI server"sv },
+      { "GameStream HTTP server"sv },
+      { "GameStream HTTPS server"sv },
+      { "RTSP server"sv },
+    };
+
+    listener_record_t &
+    record_for(listener_e listener) {
+      return listener_records[static_cast<std::size_t>(listener)];
+    }
+
+    /**
+     * @brief Decide whether a bind error can plausibly clear on its own.
+     * @details A port still held by a sunshine.exe on its way out, or a network interface the
+     *          operating system has not finished bringing up at boot, both resolve after a
+     *          moment. Anything else - a bad bind address in the configuration, a denied
+     *          privilege - fails exactly the same way on every further attempt.
+     * @param ec The error the bind attempt reported.
+     * @return `true` when the attempt is worth repeating.
+     */
+    bool
+    is_transient_bind_error(const boost::system::error_code &ec) {
+      return ec == boost::asio::error::address_in_use ||
+             ec == boost::system::errc::address_not_available ||
+             ec == boost::asio::error::network_down ||
+             ec == boost::asio::error::try_again ||
+             ec == boost::asio::error::interrupted;
+    }
+
+    /**
+     * @brief Sleep, but wake up early when Sunshine is asked to shut down.
+     * @param delay How long to sleep at most.
+     * @return `true` when the full delay elapsed, `false` when a shutdown was requested.
+     */
+    bool
+    sleep_unless_shutdown(std::chrono::milliseconds delay) {
+      auto shutdown_event = mail::man->event<bool>(mail::shutdown);
+      const auto deadline = std::chrono::steady_clock::now() + delay;
+
+      for (auto now = std::chrono::steady_clock::now(); now < deadline; now = std::chrono::steady_clock::now()) {
+        if (shutdown_event->peek()) {
+          return false;
+        }
+        shutdown_event->view(std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now));
+      }
+
+      return !shutdown_event->peek();
+    }
+
+    /**
+     * @brief Repeat an operation on the credentials files while it keeps failing.
+     * @details A virus scanner or a backup agent holding cakey.pem open for a second is enough
+     *          to fail a single attempt, and that used to end the whole process.
+     * @param what What is being attempted, named in the log lines.
+     * @param file The file the operation touches, named in the log lines.
+     * @param op The operation. Returns 0 on success, non-zero on failure.
+     * @return 0 once the operation succeeded, -1 when every attempt failed.
+     */
+    int
+    retry_credentials_op(std::string_view what, const std::string &file, const std::function<int()> &op) {
+      auto delay = std::chrono::duration_cast<std::chrono::milliseconds>(CREDS_RETRY_INITIAL_DELAY);
+
+      for (int attempt = 1; attempt <= CREDS_RETRY_ATTEMPTS; ++attempt) {
+        if (op() == 0) {
+          if (attempt > 1) {
+            BOOST_LOG(info) << what << " succeeded for ["sv << file << "] on attempt "sv << attempt;
+          }
+          return 0;
+        }
+
+        if (attempt == CREDS_RETRY_ATTEMPTS) {
+          break;
+        }
+
+        BOOST_LOG(warning) << what << " failed for ["sv << file << "] on attempt "sv << attempt << " of "sv
+                           << CREDS_RETRY_ATTEMPTS << "; retrying in "sv << delay.count()
+                           << "ms. Another program may be holding the file open."sv;
+
+        if (!sleep_unless_shutdown(delay)) {
+          break;
+        }
+        delay *= 2;
+      }
+
+      BOOST_LOG(error) << what << " failed for ["sv << file << "] after up to "sv << CREDS_RETRY_ATTEMPTS
+                       << " attempts; the reason is logged above."sv;
+      return -1;
+    }
+  }  // namespace
+
+  void
+  listener_ready(listener_e listener, std::uint16_t port) {
+    auto &record = record_for(listener);
+
+    record.port.store(port, std::memory_order_release);
+    record.status.store(listener_status_e::listening, std::memory_order_release);
+
+    BOOST_LOG(info) << record.name << " is listening on port ["sv << port << ']';
+  }
+
+  void
+  listener_failed(listener_e listener, std::uint16_t port) {
+    auto &record = record_for(listener);
+
+    record.port.store(port, std::memory_order_release);
+    record.status.store(listener_status_e::failed, std::memory_order_release);
+  }
+
+  bind_outcome_e
+  start_with_bind_retry(listener_e listener, std::uint16_t port, const bind_attempt_fn &attempt) {
+    auto shutdown_event = mail::man->event<bool>(mail::shutdown);
+    auto &record = record_for(listener);
+
+    record.port.store(port, std::memory_order_release);
+
+    const auto deadline = std::chrono::steady_clock::now() + BIND_RETRY_WINDOW;
+    auto delay = std::chrono::duration_cast<std::chrono::milliseconds>(BIND_RETRY_INITIAL_DELAY);
+
+    for (int attempt_no = 1;; ++attempt_no) {
+      const auto ec = attempt();
+      if (!ec) {
+        return bind_outcome_e::bound;
+      }
+
+      // Simple-Web-Server can throw out of start() long after the port was bound, because
+      // stop() ran on another thread. Neither case is a bind failure worth repeating.
+      if (shutdown_event->peek()) {
+        return bind_outcome_e::aborted;
+      }
+
+      if (record.status.load(std::memory_order_acquire) == listener_status_e::listening) {
+        BOOST_LOG(error) << record.name << " stopped serving port ["sv << port << "]: "sv << ec.message()
+                         << " (system error "sv << ec.value() << ')';
+        return bind_outcome_e::bound;
+      }
+
+      if (!is_transient_bind_error(ec)) {
+        BOOST_LOG(fatal) << record.name << " cannot bind port ["sv << port << "]: "sv << ec.message()
+                         << " (system error "sv << ec.value()
+                         << "). This will not clear by itself, so no further attempt is made."sv;
+        break;
+      }
+
+      const auto now = std::chrono::steady_clock::now();
+      if (now >= deadline) {
+        BOOST_LOG(fatal) << record.name << " could not bind port ["sv << port << "] within "sv
+                         << std::chrono::duration_cast<std::chrono::seconds>(BIND_RETRY_WINDOW).count()
+                         << "s and "sv << attempt_no << " attempts. Last error: "sv << ec.message()
+                         << " (system error "sv << ec.value()
+                         << "). Another program is holding the port; close it or change the port in the Web UI."sv;
+        break;
+      }
+
+      const auto wait = std::min(delay, std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now));
+      BOOST_LOG(warning) << record.name << " could not bind port ["sv << port << "]: "sv << ec.message()
+                         << " (system error "sv << ec.value() << "). Attempt "sv << attempt_no
+                         << " failed; retrying in "sv << wait.count()
+                         << "ms. A previous Sunshine process may still be shutting down."sv;
+
+      if (!sleep_unless_shutdown(wait)) {
+        return bind_outcome_e::aborted;
+      }
+
+      delay = std::min(delay * 2, std::chrono::duration_cast<std::chrono::milliseconds>(BIND_RETRY_MAX_DELAY));
+    }
+
+    record.status.store(listener_status_e::failed, std::memory_order_release);
+
+    // Go through lifetime so desired_exit_code stops being 0. Raising the shutdown event
+    // directly would make a dead port look exactly like a user-requested stop, and the
+    // service wrapper would respawn Sunshine straight back into the same collision.
+    lifetime::exit_sunshine(exit_code::PORT_UNAVAILABLE, true);
+    return bind_outcome_e::failed;
+  }
+
+  bool
+  report_listener_readiness(std::chrono::milliseconds timeout) {
+    auto shutdown_event = mail::man->event<bool>(mail::shutdown);
+    const auto deadline = std::chrono::steady_clock::now() + timeout;
+
+    auto every_listener_settled = []() {
+      for (const auto &record : listener_records) {
+        if (record.status.load(std::memory_order_acquire) == listener_status_e::pending) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    while (!every_listener_settled() && !shutdown_event->peek()) {
+      const auto now = std::chrono::steady_clock::now();
+      if (now >= deadline) {
+        break;
+      }
+      shutdown_event->view(std::min(READINESS_POLL_INTERVAL,
+        std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now)));
+    }
+
+    std::string listening;
+    std::string missing;
+    bool all_up = true;
+
+    for (const auto &record : listener_records) {
+      const auto status = record.status.load(std::memory_order_acquire);
+      const auto port = record.port.load(std::memory_order_acquire);
+      auto &line = status == listener_status_e::listening ? listening : missing;
+
+      if (!line.empty()) {
+        line += ", ";
+      }
+      line += std::string { record.name };
+      line += port == 0 ? std::string { " (port unknown)" } : " on port " + std::to_string(port);
+
+      if (status == listener_status_e::listening) {
+        continue;
+      }
+
+      all_up = false;
+      line += status == listener_status_e::failed ? " [gave up]" : " [still trying]";
+    }
+
+    if (listening.empty()) {
+      BOOST_LOG(error) << "No Sunshine server is listening, so nothing can connect to this host."sv;
+    }
+    else {
+      BOOST_LOG(info) << "Sunshine servers listening: "sv << listening;
+    }
+
+    if (!missing.empty()) {
+      BOOST_LOG(error) << "Sunshine servers that did not come up: "sv << missing
+                       << ". The port and the operating system error are logged above."sv;
+    }
+
+    return all_up;
+  }
+
   int
   init() {
     bool clean_slate = config::sunshine.flags[config::flag::FRESH_STATE];
@@ -68,14 +361,24 @@ namespace http {
       config::nvhttp.pkey = (dir / ("pkey-"s + unique_id)).string();
     }
 
-    if ((!fs::exists(config::nvhttp.pkey) || !fs::exists(config::nvhttp.cert)) &&
-        create_creds(config::nvhttp.pkey, config::nvhttp.cert)) {
-      return -1;
+    if (!fs::exists(config::nvhttp.pkey) || !fs::exists(config::nvhttp.cert)) {
+      const auto created = retry_credentials_op("Creating the TLS credentials"sv, config::nvhttp.cert, []() {
+        return create_creds(config::nvhttp.pkey, config::nvhttp.cert);
+      });
+      if (created) {
+        return -1;
+      }
     }
     if (!user_creds_exist(config::sunshine.credentials_file)) {
       BOOST_LOG(info) << "Open the Web UI to set your new username and password and getting started";
-    } else if (reload_user_creds(config::sunshine.credentials_file)) {
-      return -1;
+    }
+    else {
+      const auto loaded = retry_credentials_op("Loading the user credentials"sv, config::sunshine.credentials_file, []() {
+        return reload_user_creds(config::sunshine.credentials_file);
+      });
+      if (loaded) {
+        return -1;
+      }
     }
     return 0;
   }

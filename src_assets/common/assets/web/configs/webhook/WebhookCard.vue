@@ -802,21 +802,19 @@ onUnmounted(() => {
   gap: 1.25rem;
   padding: 1.5rem;
   border: 1px solid var(--bs-border-color);
-  border-radius: 1.25rem;
+  border-radius: 0;
   color: var(--bs-body-color);
-  background:
-    radial-gradient(circle at 12% 20%, rgba(13, 110, 253, 0.16), transparent 34%),
-    var(--bs-body-bg);
+  background: var(--ui-surface);
   text-align: left;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
-  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+  transition: var(--transition-default);
 
-  &:hover,
+  &:hover {
+    border-color: var(--ui-border-strong);
+  }
+
   &:focus-visible {
-    transform: translateY(-2px);
-    border-color: rgba(13, 110, 253, 0.65);
-    box-shadow: 0 16px 38px rgba(13, 110, 253, 0.14);
-    outline: none;
+    outline: 2px solid var(--ui-text-primary);
+    outline-offset: 0;
   }
 }
 
@@ -825,11 +823,10 @@ onUnmounted(() => {
   height: 70px;
   display: grid;
   place-items: center;
-  border-radius: 1.25rem;
-  color: #fff;
-  background: linear-gradient(135deg, #0d6efd, #6f42c1);
+  border-radius: 0;
+  color: var(--ui-accent-contrast);
+  background: var(--ui-accent);
   font-size: 1.75rem;
-  box-shadow: 0 10px 24px rgba(13, 110, 253, 0.28);
 }
 
 .notification-card-content {
@@ -860,12 +857,11 @@ onUnmounted(() => {
 .status-dot {
   width: 0.65rem;
   height: 0.65rem;
-  border-radius: 50%;
+  border-radius: 0;
   background: var(--bs-secondary);
 
   &.enabled {
     background: var(--bs-success);
-    box-shadow: 0 0 0 4px rgba(25, 135, 84, 0.14);
   }
 }
 
@@ -885,8 +881,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   padding: 1.25rem;
-  background: rgba(0, 0, 0, 0.68);
-  backdrop-filter: blur(8px);
+  background: var(--ui-overlay);
 }
 
 .webhook-toast-container {
@@ -900,7 +895,6 @@ onUnmounted(() => {
   .toast {
     width: 100%;
     max-width: none;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.24);
   }
 
   .btn-close {
@@ -915,10 +909,9 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--bs-border-color);
-  border-radius: 1.25rem;
+  border-radius: 0;
   color: var(--ui-text-primary);
   background: var(--ui-surface-strong);
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
 }
 
 .notification-modal-header,
@@ -970,17 +963,6 @@ onUnmounted(() => {
 
   .form-control {
     color: var(--ui-text-primary);
-  }
-}
-
-[data-bs-theme='light'] .notification-modal {
-  background: #f8fbff;
-
-  .form-text,
-  .curl-details p,
-  .notification-loading,
-  .notification-load-error {
-    color: #475569;
   }
 }
 
@@ -1036,7 +1018,7 @@ onUnmounted(() => {
   height: 100%;
   padding: 0.75rem 0.75rem 0.75rem 2.25rem;
   border: 1px solid var(--bs-border-color);
-  border-radius: 0.75rem;
+  border-radius: 0;
 }
 
 .event-id {
@@ -1045,9 +1027,9 @@ onUnmounted(() => {
   height: 1.55rem;
   place-items: center;
   margin-right: 0.35rem;
-  border-radius: 0.45rem;
-  color: var(--bs-primary);
-  background: rgba(13, 110, 253, 0.12);
+  border-radius: 0;
+  color: var(--ui-text-primary);
+  background: var(--ui-surface-hover);
   font-size: 0.78rem;
   font-weight: 700;
 }
@@ -1072,7 +1054,7 @@ onUnmounted(() => {
 .curl-details {
   padding: 0.9rem;
   border: 1px solid var(--bs-border-color);
-  border-radius: 0.75rem;
+  border-radius: 0;
 
   &.disabled {
     opacity: 0.55;
@@ -1094,7 +1076,7 @@ onUnmounted(() => {
     max-height: 220px;
     overflow: auto;
     padding: 0.85rem;
-    border-radius: 0.6rem;
+    border-radius: 0;
     background: var(--bs-tertiary-bg);
     white-space: pre-wrap;
     word-break: break-all;
@@ -1112,10 +1094,10 @@ onUnmounted(() => {
 
 .notification-modal-enter-active,
 .notification-modal-leave-active {
-  transition: opacity 160ms ease;
+  transition: var(--transition-default);
 
   .notification-modal {
-    transition: transform 160ms ease, opacity 160ms ease;
+    transition: var(--transition-default);
   }
 }
 
@@ -1125,19 +1107,17 @@ onUnmounted(() => {
 
   .notification-modal {
     opacity: 0;
-    transform: translateY(12px) scale(0.985);
   }
 }
 
 .webhook-toast-enter-active,
 .webhook-toast-leave-active {
-  transition: opacity 160ms ease, transform 160ms ease;
+  transition: var(--transition-default);
 }
 
 .webhook-toast-enter-from,
 .webhook-toast-leave-to {
   opacity: 0;
-  transform: translate(-50%, -10px);
 }
 
 @media (max-width: 575.98px) {

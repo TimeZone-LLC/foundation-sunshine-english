@@ -23,7 +23,7 @@ export class AppService {
       const data = await apiJson(API_ENDPOINTS.APPS);
       return data.apps || [];
     } catch (error) {
-      console.error('获取应用列表失败:', error);
+      console.error('Failed to fetch the app list:', error);
       throw new Error(formatError(error));
     }
   }
@@ -39,7 +39,7 @@ export class AppService {
       await apiPostJson(API_ENDPOINTS.APPS, { apps, editApp });
       return true;
     } catch (error) {
-      console.error('保存应用失败:', error);
+      console.error('Failed to save the app:', error);
       throw new Error(formatError(error));
     }
   }
@@ -54,7 +54,7 @@ export class AppService {
       await apiJson(API_ENDPOINTS.APP_DELETE(index), { method: 'DELETE' });
       return true;
     } catch (error) {
-      console.error('删除应用失败:', error);
+      console.error('Failed to delete the app:', error);
       throw new Error(formatError(error));
     }
   }
@@ -68,14 +68,14 @@ export class AppService {
     try {
       const data = await apiPostJson(API_ENDPOINTS.APPS_BATCH_DELETE, { indices });
       if (data.status === false || data.status === 'false') {
-        throw new Error(data.error || '批量删除失败');
+        throw new Error(data.error || 'Batch delete failed');
       }
       return {
         deleted: Number(data.deleted) || 0,
         remaining: Number(data.remaining) || 0
       };
     } catch (error) {
-      console.error('批量删除应用失败:', error);
+      console.error('Failed to batch delete apps:', error);
       throw new Error(formatError(error));
     }
   }
@@ -89,7 +89,7 @@ export class AppService {
       const data = await apiJson(API_ENDPOINTS.CONFIG);
       return data.platform || 'windows';
     } catch (error) {
-      console.error('获取平台信息失败:', error);
+      console.error('Failed to fetch platform info:', error);
       // 默认返回windows平台
       return 'windows';
     }
@@ -165,17 +165,17 @@ export class AppService {
     const errors = [];
     
     if (!app.name || !app.name.trim()) {
-      errors.push('应用名称不能为空');
+      errors.push('App name cannot be empty');
     }
     
     if (!app.cmd || !app.cmd.trim()) {
-      errors.push('应用命令不能为空');
+      errors.push('App command cannot be empty');
     }
     
     // 验证退出超时时间
     if (app['exit-timeout'] !== undefined && 
         (isNaN(app['exit-timeout']) || app['exit-timeout'] < 0)) {
-      errors.push('退出超时时间必须是非负数');
+      errors.push('Exit timeout must be a non-negative number');
     }
     
     return {

@@ -12,36 +12,36 @@ export const validationRules = {
     minLength: 1,
     maxLength: 100,
     pattern: /^[^<>:"\\|?*\x00-\x1F]+$/,
-    message: '应用名称不能为空，且不能包含特殊字符',
+    message: 'App name is required and cannot contain special characters',
   },
   command: {
     required: false,
     minLength: 0,
     maxLength: 1000,
-    message: '命令不规范，请输入正确的命令',
+    message: 'Invalid command. Please enter a valid command',
   },
   workingDir: {
     required: false,
     maxLength: 500,
-    message: '工作目录路径过长',
+    message: 'Working directory path is too long',
   },
   outputName: {
     required: false,
     maxLength: 100,
     pattern: /^[a-zA-Z0-9_\-\.]*$/,
-    message: '输出名称只能包含字母、数字、下划线、连字符和点',
+    message: 'Output name may only contain letters, numbers, underscores, hyphens, and dots',
   },
   timeout: {
     required: false,
     min: 0,
     max: 3600,
-    message: '超时时间必须在0-3600秒之间',
+    message: 'Timeout must be between 0 and 3600 seconds',
   },
   imagePath: {
     required: false,
     maxLength: 500,
     allowedTypes: ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'],
-    message: '图片路径无效或格式不支持',
+    message: 'Image path is invalid or the format is not supported',
   },
 }
 
@@ -64,7 +64,7 @@ export function validateField(fieldName, value, customRules = {}) {
 
   // 必填验证
   if (rules.required && isEmpty) {
-    return { isValid: false, message: rules.message || '此字段为必填项' }
+    return { isValid: false, message: rules.message || 'This field is required' }
   }
 
   // 如果字段为空且不是必填，则跳过其他验证
@@ -74,30 +74,30 @@ export function validateField(fieldName, value, customRules = {}) {
 
   // 长度验证
   if (rules.minLength && strValue.length < rules.minLength) {
-    return { isValid: false, message: `最少需要${rules.minLength}个字符` }
+    return { isValid: false, message: `Must be at least ${rules.minLength} characters` }
   }
 
   if (rules.maxLength && strValue.length > rules.maxLength) {
-    return { isValid: false, message: `最多允许${rules.maxLength}个字符` }
+    return { isValid: false, message: `Must be at most ${rules.maxLength} characters` }
   }
 
   // 数值验证
   if (rules.min !== undefined || rules.max !== undefined) {
     const numValue = Number(value)
     if (isNaN(numValue)) {
-      return { isValid: false, message: '请输入有效的数字' }
+      return { isValid: false, message: 'Please enter a valid number' }
     }
     if (rules.min !== undefined && numValue < rules.min) {
-      return { isValid: false, message: `最小值为${rules.min}` }
+      return { isValid: false, message: `Minimum value is ${rules.min}` }
     }
     if (rules.max !== undefined && numValue > rules.max) {
-      return { isValid: false, message: `最大值为${rules.max}` }
+      return { isValid: false, message: `Maximum value is ${rules.max}` }
     }
   }
 
   // 正则表达式验证
   if (rules.pattern && !rules.pattern.test(strValue)) {
-    return { isValid: false, message: rules.message || '格式不正确' }
+    return { isValid: false, message: rules.message || 'Invalid format' }
   }
 
   // 文件类型验证
@@ -111,7 +111,7 @@ export function validateField(fieldName, value, customRules = {}) {
       if (extension && !rules.allowedTypes.includes(extension)) {
         return {
           isValid: false,
-          message: `只支持以下格式：${rules.allowedTypes.join(', ')}`,
+          message: `Only these formats are supported: ${rules.allowedTypes.join(', ')}`,
         }
       }
     }
@@ -122,12 +122,12 @@ export function validateField(fieldName, value, customRules = {}) {
 
 // 字段映射配置
 const FIELD_MAPPINGS = [
-  { key: 'name', rule: 'appName', label: '应用名称' },
-  { key: 'cmd', rule: 'command', label: '命令' },
-  { key: 'working-dir', rule: 'workingDir', label: '工作目录' },
-  { key: 'output', rule: 'outputName', label: '输出名称' },
-  { key: 'exit-timeout', rule: 'timeout', label: '超时时间' },
-  { key: 'image-path', rule: 'imagePath', label: '图片路径' },
+  { key: 'name', rule: 'appName', label: 'App name' },
+  { key: 'cmd', rule: 'command', label: 'Command' },
+  { key: 'working-dir', rule: 'workingDir', label: 'Working directory' },
+  { key: 'output', rule: 'outputName', label: 'Output name' },
+  { key: 'exit-timeout', rule: 'timeout', label: 'Timeout' },
+  { key: 'image-path', rule: 'imagePath', label: 'Image path' },
 ]
 
 /**
@@ -151,24 +151,24 @@ export function validateAppForm(formData) {
   // 验证准备命令
   formData['prep-cmd']?.forEach((cmd, index) => {
     if (!cmd.do?.trim() && !cmd.undo?.trim()) {
-      errors.push(`准备命令 ${index + 1}: 打开时执行命令或退出应用时要执行的命令至少需要填写一个`)
+      errors.push(`Prep command ${index + 1}: enter at least one of the do or undo commands`)
     }
   })
 
   // 验证菜单命令
   formData['menu-cmd']?.forEach((cmd, index) => {
     if (!cmd.name?.trim()) {
-      errors.push(`菜单命令 ${index + 1}: 显示名称不能为空`)
+      errors.push(`Menu command ${index + 1}: display name is required`)
     }
     if (!cmd.cmd?.trim()) {
-      errors.push(`菜单命令 ${index + 1}: 命令不能为空`)
+      errors.push(`Menu command ${index + 1}: command is required`)
     }
   })
 
   // 验证独立命令
   formData.detached?.forEach((cmd, index) => {
     if (cmd && !cmd.trim()) {
-      errors.push(`独立命令 ${index + 1}: 命令不能为空`)
+      errors.push(`Detached command ${index + 1}: command is required`)
     }
   })
 
@@ -193,27 +193,27 @@ export function validateFile(file, options = {}) {
   } = options
 
   if (!file) {
-    return { isValid: false, message: '请选择文件' }
+    return { isValid: false, message: 'Please select a file' }
   }
 
   if (!allowedTypes.includes(file.type)) {
     return {
       isValid: false,
-      message: `不支持的文件类型。支持的格式：${allowedTypes.join(', ')}`,
+      message: `Unsupported file type. Supported formats: ${allowedTypes.join(', ')}`,
     }
   }
 
   if (file.size > maxSize) {
     return {
       isValid: false,
-      message: `文件大小不能超过 ${(maxSize / (1024 * 1024)).toFixed(1)}MB`,
+      message: `File must be no larger than ${(maxSize / (1024 * 1024)).toFixed(1)}MB`,
     }
   }
 
   if (file.size < minSize) {
     return {
       isValid: false,
-      message: `文件大小不能小于 ${(minSize / 1024).toFixed(1)}KB`,
+      message: `File must be at least ${(minSize / 1024).toFixed(1)}KB`,
     }
   }
 

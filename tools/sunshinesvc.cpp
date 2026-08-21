@@ -12,6 +12,7 @@
 #include <wtsapi32.h>
 
 #include <algorithm>
+#include <atomic>
 #include <string>
 #include <vector>
 
@@ -26,6 +27,10 @@ SERVICE_STATUS_HANDLE service_status_handle;
 SERVICE_STATUS service_status;
 HANDLE stop_event;
 HANDLE session_change_event;
+HANDLE power_resume_event;
+
+// Set from the SCM handler thread, consumed by the ServiceMain() loop.
+std::atomic<bool> power_suspend_seen { false };
 
 #define SERVICE_NAME "SunshineService"
 
@@ -33,6 +38,25 @@ DWORD WINAPI
 HandlerEx(DWORD dwControl, DWORD dwEventType, LPVOID lpEventData, LPVOID lpContext) {
   switch (dwControl) {
     case SERVICE_CONTROL_INTERROGATE:
+      return NO_ERROR;
+
+    case SERVICE_CONTROL_POWEREVENT:
+      // This runs on an SCM thread with a tight deadline, so only record the
+      // power transition here. ServiceMain() re-probes the console session and
+      // the supervised processes once it wakes up.
+      switch (dwEventType) {
+        case PBT_APMSUSPEND:
+          power_suspend_seen.store(true);
+          break;
+
+        case PBT_APMRESUMEAUTOMATIC:
+        case PBT_APMRESUMESUSPEND:
+          SetEvent(power_resume_event);
+          break;
+
+        default:
+          break;
+      }
       return NO_ERROR;
 
     case SERVICE_CONTROL_SESSIONCHANGE:
@@ -444,6 +468,16 @@ ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv) {
     return;
   }
 
+  // Create an auto-reset power resume event
+  power_resume_event = CreateEventA(NULL, FALSE, FALSE, NULL);
+  if (power_resume_event == NULL) {
+    // Tell SCM we failed to start
+    service_status.dwWin32ExitCode = GetLastError();
+    service_status.dwCurrentState = SERVICE_STOPPED;
+    SetServiceStatus(service_status_handle, &service_status);
+    return;
+  }
+
   auto log_file_handle = OpenLogFileHandle();
   if (log_file_handle == INVALID_HANDLE_VALUE) {
     // Tell SCM we failed to start
@@ -482,7 +516,7 @@ ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv) {
     NULL);
 
   // Tell SCM we're running (and stoppable now)
-  service_status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_PRESHUTDOWN | SERVICE_ACCEPT_SESSIONCHANGE;
+  service_status.dwControlsAccepted = SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_PRESHUTDOWN | SERVICE_ACCEPT_SESSIONCHANGE | SERVICE_ACCEPT_POWEREVENT;
   service_status.dwCurrentState = SERVICE_RUNNING;
   SetServiceStatus(service_status_handle, &service_status);
 
@@ -493,6 +527,20 @@ ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv) {
   sunshinesvc::GuiRestartBackoff gui_agent_backoff;
   sunshinesvc::GuiAgentRestartPolicy gui_agent_restart_policy;
   sunshinesvc::GuiAgentCrashLogLimiter gui_agent_log_limiter;
+
+  sunshinesvc::CoreRestartBackoff core_backoff;
+  DWORD core_retry_delay_ms = sunshinesvc::CORE_RESTART_INITIAL_DELAY_MS;
+  DWORD core_last_launch_error = ERROR_SUCCESS;
+  ULONGLONG core_started_at_ms = 0;
+
+  const auto log_power_resume = [&](const std::string &action) {
+    // A resume without a recorded suspend still needs the same recovery work,
+    // because the suspend notification can be dropped under a tight deadline.
+    const bool after_suspend = power_suspend_seen.exchange(false);
+    WriteServiceLog(log_file_handle,
+      std::string(after_suspend ? "Resumed from suspend" : "Received a power resume without a recorded suspend") +
+        "; " + action);
+  };
 
   const auto acquire_gui_agent = [&]() {
     bool attached_to_existing = false;
@@ -589,11 +637,30 @@ ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv) {
     }
   };
 
-  // Loop every 3 seconds until the stop event is set or Sunshine.exe is running
-  while (WaitForSingleObject(stop_event, 3000) != WAIT_OBJECT_0) {
+  // Wait out the current restart delay before each Sunshine.exe launch, until
+  // the stop event is set. A resume from suspend cuts the wait short so the
+  // console session is re-probed as soon as the machine is usable again.
+  while (true) {
+    const HANDLE core_wait_objects[] = { stop_event, power_resume_event };
+    const auto core_wait_result =
+      WaitForMultipleObjects(_countof(core_wait_objects), core_wait_objects, FALSE, core_retry_delay_ms);
+    if (core_wait_result == WAIT_OBJECT_0) {
+      break;
+    }
+    if (core_wait_result == WAIT_OBJECT_0 + 1) {
+      log_power_resume("re-probing the console session before relaunching Sunshine.exe");
+    }
+    else if (core_wait_result != WAIT_TIMEOUT) {
+      // The wait itself failed, which we have no way to recover from.
+      SetEvent(stop_event);
+      break;
+    }
+
     auto console_session_id = WTSGetActiveConsoleSessionId();
     if (console_session_id == 0xFFFFFFFF) {
-      // No console session yet
+      // No console session yet. This is not a Sunshine failure, so keep polling
+      // at the base cadence instead of at an escalated restart delay.
+      core_retry_delay_ms = sunshinesvc::CORE_RESTART_INITIAL_DELAY_MS;
       continue;
     }
 
@@ -640,9 +707,31 @@ ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv) {
           NULL,
           (LPSTARTUPINFOW) &startup_info,
           &process_info)) {
+      auto launch_error = GetLastError();
+      if (launch_error == ERROR_SUCCESS) {
+        launch_error = ERROR_GEN_FAILURE;
+      }
       CloseHandle(console_token);
       CloseHandle(job_handle);
+
+      // A launch that never happened is a failed start, so escalate.
+      core_retry_delay_ms = core_backoff.next_delay();
+      if (launch_error != core_last_launch_error) {
+        WriteServiceLog(log_file_handle,
+          "Failed to launch Sunshine.exe in session " + std::to_string(console_session_id) +
+            " (Win32 error " + std::to_string(launch_error) + "); retrying in " +
+            std::to_string(core_retry_delay_ms) + " ms");
+      }
+      core_last_launch_error = launch_error;
       continue;
+    }
+
+    core_started_at_ms = GetTickCount64();
+    if (core_last_launch_error != ERROR_SUCCESS) {
+      WriteServiceLog(log_file_handle,
+        "Sunshine.exe launched in session " + std::to_string(console_session_id) +
+          " (PID " + std::to_string(process_info.dwProcessId) + ") after a launch failure");
+      core_last_launch_error = ERROR_SUCCESS;
     }
 
     // The GUI may have exited after the previous Core stopped, while no inner
@@ -675,8 +764,8 @@ ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv) {
       // Wait on the exact GUI process while it is managed. After a clean exit,
       // only a low-frequency lookup runs so externally launched replacements
       // can be reattached without allowing the service to revive the GUI.
-      const HANDLE wait_objects[] = { stop_event, process_info.hProcess, session_change_event, gui_agent.handle };
-      const DWORD wait_object_count = gui_agent.handle == NULL ? 3 : 4;
+      const HANDLE wait_objects[] = { stop_event, process_info.hProcess, session_change_event, power_resume_event, gui_agent.handle };
+      const DWORD wait_object_count = gui_agent.handle == NULL ? 4 : 5;
       const DWORD wait_timeout = gui_agent.handle == NULL ? RetryWaitTimeout(gui_agent_retry_at_ms) : INFINITE;
       const auto wait_result = WaitForMultipleObjects(wait_object_count, wait_objects, FALSE, wait_timeout);
       switch (wait_result) {
@@ -714,22 +803,82 @@ ServiceMain(DWORD dwArgc, LPTSTR *lpszArgv) {
             // If it won't terminate gracefully, kill it now
             TerminateProcess(process_info.hProcess, ERROR_PROCESS_ABORTED);
           }
+          // A service-driven stop is not a Sunshine failure, so any relaunch
+          // starts from the base cadence again.
+          core_backoff.reset();
+          core_retry_delay_ms = sunshinesvc::CORE_RESTART_INITIAL_DELAY_MS;
           still_running = false;
           break;
 
         case WAIT_OBJECT_0 + 1: {
           // Sunshine terminated itself.
 
-          DWORD exit_code;
-          if (GetExitCodeProcess(process_info.hProcess, &exit_code) && exit_code == ERROR_SHUTDOWN_IN_PROGRESS) {
+          DWORD exit_code = ERROR_PROCESS_ABORTED;
+          if (!GetExitCodeProcess(process_info.hProcess, &exit_code)) {
+            exit_code = ERROR_PROCESS_ABORTED;
+          }
+          const auto core_runtime_ms = GetTickCount64() - core_started_at_ms;
+
+          if (exit_code == ERROR_SHUTDOWN_IN_PROGRESS) {
             // Sunshine is asking for us to shut down, so gracefully stop ourselves.
             SetEvent(stop_event);
+          }
+          else if (sunshinesvc::classify_core_exit(exit_code) == sunshinesvc::CoreExitKind::clean) {
+            // A requested stop is not a failure, so relaunch at the base cadence
+            // instead of escalating into a respawn storm.
+            core_backoff.reset();
+            core_retry_delay_ms = sunshinesvc::CORE_RESTART_INITIAL_DELAY_MS;
+          }
+          else {
+            // A non-zero exit means Sunshine failed to start or crashed. Escalate
+            // so a persistently broken install stops hammering the machine.
+            core_retry_delay_ms = core_backoff.next_delay(core_runtime_ms);
+            WriteServiceLog(log_file_handle,
+              "Sunshine.exe exited in session " + std::to_string(console_session_id) +
+                " (PID " + std::to_string(process_info.dwProcessId) + ", exit code " +
+                std::to_string(exit_code) + ", runtime " + std::to_string(core_runtime_ms) +
+                " ms); restarting in " + std::to_string(core_retry_delay_ms) + " ms");
           }
           still_running = false;
           break;
         }
 
         case WAIT_OBJECT_0 + 3: {
+          // The machine resumed from sleep. Re-probe everything that a power
+          // transition can invalidate before trusting the current lifecycle.
+          log_power_resume("verifying the console session and the supervised processes");
+
+          if (WTSGetActiveConsoleSessionId() != console_session_id) {
+            // Let the session change branch re-verify and restart Sunshine.exe
+            // in the new console session.
+            SetEvent(session_change_event);
+            still_running = true;
+            break;
+          }
+
+          if (WaitForSingleObject(process_info.hProcess, 0) == WAIT_OBJECT_0) {
+            // Sunshine.exe did not survive the power transition. Let the next
+            // wait dispatch it through the normal exit code handling so the
+            // restart cadence stays consistent.
+            still_running = true;
+            break;
+          }
+
+          // Re-acquire the per-user GUI agent, which the session can lose while
+          // the machine is suspended.
+          if (gui_agent.handle != NULL && WaitForSingleObject(gui_agent.handle, 0) == WAIT_OBJECT_0) {
+            handle_gui_agent_exit();
+          }
+          if (gui_agent.handle == NULL && gui_agent_restart_policy.launch_allowed()) {
+            // Do not sit out a pre-suspend backoff window across a resume.
+            gui_agent_retry_at_ms = 0;
+            acquire_gui_agent();
+          }
+          still_running = true;
+          break;
+        }
+
+        case WAIT_OBJECT_0 + 4: {
           handle_gui_agent_exit();
           still_running = true;
           break;

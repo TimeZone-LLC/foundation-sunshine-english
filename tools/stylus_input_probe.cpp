@@ -33,7 +33,7 @@
 
 namespace {
   constexpr wchar_t window_class_name[] = L"SunshineStylusInputProbe";
-  constexpr wchar_t window_title[] = L"AlkaidLab - 手写笔输入检测";
+  constexpr wchar_t window_title[] = L"AlkaidLab - Stylus Input Probe";
 
   constexpr UINT_PTR report_timer_id = 1;
   constexpr UINT_PTR repaint_timer_id = 2;
@@ -225,8 +225,8 @@ namespace {
     UINT32 last_rotation {};
     bool last_rotation_available {false};
 
-    std::wstring last_report {L"等待输入。请在白色画布内按下后用手写笔连续绘制。"};
-    std::wstring last_event {L"尚未收到检测区输入事件。"};
+    std::wstring last_report {L"Waiting for input. Press inside the white canvas and draw a continuous stroke with the stylus."};
+    std::wstring last_event {L"No input events received in the probe area yet."};
     std::filesystem::path log_path;
     std::filesystem::path recording_directory;
     log_writer_t log_writer;
@@ -478,14 +478,14 @@ namespace {
       std::error_code filesystem_error;
       std::filesystem::create_directories(path, filesystem_error);
       if (filesystem_error || !std::filesystem::is_directory(path, filesystem_error)) {
-        error = L"无法创建录制目录。";
+        error = L"Failed to create the recording directory.";
         return false;
       }
       error.clear();
       return true;
     }
     catch (...) {
-      error = L"创建录制目录时发生异常。";
+      error = L"An exception occurred while creating the recording directory.";
       return false;
     }
   }
@@ -498,18 +498,18 @@ namespace {
     std::error_code size_error;
     const auto file_size = std::filesystem::file_size(path, size_error);
     if (!size_error && file_size > max_data_file_bytes) {
-      error = L"数据文件超过 64 MiB 的读取上限。";
+      error = L"The data file exceeds the 64 MiB read limit.";
       return false;
     }
     std::ifstream stream(path, std::ios::binary);
     if (!stream) {
-      error = L"无法打开数据文件。";
+      error = L"Failed to open the data file.";
       return false;
     }
 
     std::string line;
     if (!std::getline(stream, line)) {
-      error = L"数据文件为空。";
+      error = L"The data file is empty.";
       return false;
     }
     if (line.ends_with('\r')) {
@@ -519,7 +519,7 @@ namespace {
       line.erase(0, 3);
     }
     if (line != stylus_data_magic) {
-      error = L"不是受支持的手写笔数据文件。";
+      error = L"Not a supported stylus data file.";
       return false;
     }
 
@@ -549,12 +549,12 @@ namespace {
       if (!(record >> record_type >> sample.timestamp_us >> event_type >> sample.x >> sample.y >>
             sample.pressure >> rotation >> tilt) ||
           record_type != 'P') {
-        error = L"第 " + std::to_wstring(line_number) + L" 行格式无效。";
+        error = L"Line " + std::to_wstring(line_number) + L" has an invalid format.";
         return false;
       }
       std::string trailing;
       if (record >> trailing) {
-        error = L"第 " + std::to_wstring(line_number) + L" 行包含多余字段。";
+        error = L"Line " + std::to_wstring(line_number) + L" contains extra fields.";
         return false;
       }
       if (event_type > 7 ||
@@ -563,15 +563,15 @@ namespace {
           !std::isfinite(sample.pressure) || sample.pressure < 0.0 || sample.pressure > 1.0 ||
           (rotation > 359 && rotation != stylus_rotation_unknown) ||
           (tilt < 0 || (tilt > 90 && tilt != stylus_tilt_unknown))) {
-        error = L"第 " + std::to_wstring(line_number) + L" 行的数据超出有效范围。";
+        error = L"Line " + std::to_wstring(line_number) + L" contains values outside the valid range.";
         return false;
       }
       if (have_previous_timestamp && sample.timestamp_us < previous_timestamp) {
-        error = L"第 " + std::to_wstring(line_number) + L" 行的时间戳发生倒退。";
+        error = L"Line " + std::to_wstring(line_number) + L" has a timestamp that moves backwards.";
         return false;
       }
       if (data.samples.size() >= max_data_samples) {
-        error = L"数据文件超过 200000 个样本的导入上限。";
+        error = L"The data file exceeds the import limit of 200000 samples.";
         return false;
       }
 
@@ -584,11 +584,11 @@ namespace {
     }
 
     if (stream.bad()) {
-      error = L"读取数据文件时发生错误。";
+      error = L"An error occurred while reading the data file.";
       return false;
     }
     if (data.samples.empty()) {
-      error = L"数据文件不包含手写笔样本。";
+      error = L"The data file contains no stylus samples.";
       return false;
     }
     return true;
@@ -602,12 +602,12 @@ namespace {
     }
     catch (const std::exception &) {
       data = {};
-      error = L"读取数据文件时发生异常。";
+      error = L"An exception occurred while reading the data file.";
       return false;
     }
     catch (...) {
       data = {};
-      error = L"读取数据文件时发生未知异常。";
+      error = L"An unknown exception occurred while reading the data file.";
       return false;
     }
   }
@@ -653,7 +653,7 @@ namespace {
 
     std::ofstream stream(temporary_path, std::ios::binary | std::ios::trunc);
     if (!stream) {
-      error = L"无法创建数据文件。";
+      error = L"Failed to create the data file.";
       return false;
     }
 
@@ -667,17 +667,17 @@ namespace {
     }
     stream.flush();
     if (!stream) {
-      error = L"写入数据文件时发生错误。";
+      error = L"An error occurred while writing the data file.";
       stream.close();
       return false;
     }
     stream.close();
     if (stream.fail()) {
-      error = L"关闭数据文件时发生错误。";
+      error = L"An error occurred while closing the data file.";
       return false;
     }
     if (!MoveFileExW(temporary_path.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-      error = L"替换目标数据文件时发生错误。";
+      error = L"An error occurred while replacing the target data file.";
       return false;
     }
     temporary_file_guard.active = false;
@@ -691,11 +691,11 @@ namespace {
       return write_stylus_data_impl(path, data, error);
     }
     catch (const std::exception &) {
-      error = L"写入数据文件时发生异常。";
+      error = L"An exception occurred while writing the data file.";
       return false;
     }
     catch (...) {
-      error = L"写入数据文件时发生未知异常。";
+      error = L"An unknown exception occurred while writing the data file.";
       return false;
     }
   }
@@ -708,7 +708,7 @@ namespace {
       state.recording_stream.clear();
       state.recording_stream.open(path, std::ios::binary | std::ios::trunc);
       if (!state.recording_stream) {
-        error = L"无法创建数据文件。";
+        error = L"Failed to create the data file.";
         return false;
       }
 
@@ -716,7 +716,7 @@ namespace {
       write_stylus_data_header(state.recording_stream);
       state.recording_stream.flush();
       if (!state.recording_stream) {
-        error = L"写入数据文件头时发生错误。";
+        error = L"An error occurred while writing the data file header.";
         state.recording_stream.close();
         return false;
       }
@@ -729,7 +729,7 @@ namespace {
     }
     catch (...) {
       state.recording_stream.close();
-      error = L"创建数据文件时发生异常。";
+      error = L"An exception occurred while creating the data file.";
       return false;
     }
   }
@@ -739,7 +739,7 @@ namespace {
   checkpoint_recording_file(app_state_t &state, std::wstring &error) noexcept {
     try {
       if (!state.recording_stream.is_open()) {
-        error = L"录制数据文件已关闭。";
+        error = L"The recording data file is already closed.";
         return false;
       }
 
@@ -752,7 +752,7 @@ namespace {
       }
       state.recording_stream.flush();
       if (!state.recording_stream) {
-        error = L"写入录制数据时发生错误。";
+        error = L"An error occurred while writing the recording data.";
         state.recording_stream.close();
         return false;
       }
@@ -764,7 +764,7 @@ namespace {
     }
     catch (...) {
       state.recording_stream.close();
-      error = L"写入录制数据时发生异常。";
+      error = L"An exception occurred while writing the recording data.";
       return false;
     }
   }
@@ -775,7 +775,7 @@ namespace {
     auto saved = checkpoint_recording_file(state, error);
     state.recording_stream.close();
     if (saved && state.recording_stream.fail()) {
-      error = L"关闭录制数据文件时发生错误。";
+      error = L"An error occurred while closing the recording data file.";
       saved = false;
     }
     return saved;
@@ -1094,24 +1094,24 @@ namespace {
     }
     state.sampling_analysis = analyze_sampling(state.pen_trace);
     state.sampling_analysis_dirty = false;
-    state.last_event = L"已导入 " + path.filename().wstring();
+    state.last_event = L"Imported " + path.filename().wstring();
 
     std::wostringstream report;
-    report << L"已导入 " << data.samples.size() << L" 个手写笔样本，完整笔划 "
-           << complete_strokes << L" 段";
+    report << L"Imported " << data.samples.size() << L" stylus samples, "
+           << complete_strokes << L" complete strokes";
     if (data.truncated) {
-      report << L"，源文件已在样本上限处截断";
+      report << L", the source file was truncated at the sample limit";
     }
     if (partial_strokes != 0) {
-      report << L"，缺少 DOWN 的部分笔划 " << partial_strokes << L" 段";
+      report << L", " << partial_strokes << L" partial strokes missing DOWN";
     }
     if (unterminated_strokes != 0) {
-      report << L"，缺少结束事件的笔划 " << unterminated_strokes << L" 段";
+      report << L", " << unterminated_strokes << L" strokes missing an end event";
     }
     if (contact_samples > state.pen_trace.size()) {
-      report << L"。画布仅显示最近 " << state.pen_trace.size() << L" 个接触样本";
+      report << L". The canvas only shows the most recent " << state.pen_trace.size() << L" contact samples";
     }
-    report << L"。采样图使用数据文件中的时间戳；点击“清空画布”可返回实时检测。";
+    report << L". The sampling graph uses the timestamps from the data file; click 'Clear canvas' to return to live capture.";
     state.last_report = report.str();
 
     write_log_line(state,
@@ -1132,11 +1132,11 @@ namespace {
     OPENFILENAMEW dialog {
       .lStructSize = sizeof(OPENFILENAMEW),
       .hwndOwner = window,
-      .lpstrFilter = L"手写笔数据 (*.dat)\0*.dat\0所有文件 (*.*)\0*.*\0\0",
+      .lpstrFilter = L"Stylus data (*.dat)\0*.dat\0All files (*.*)\0*.*\0\0",
       .lpstrFile = file_path.data(),
       .nMaxFile = static_cast<DWORD>(file_path.size()),
       .lpstrInitialDir = directory_ready ? initial_directory.c_str() : nullptr,
-      .lpstrTitle = L"导入手写笔数据",
+      .lpstrTitle = L"Import stylus data",
       .Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR,
       .lpstrDefExt = L"dat",
     };
@@ -1144,7 +1144,7 @@ namespace {
       if (const auto dialog_error = CommDlgExtendedError(); dialog_error != 0) {
         MessageBoxW(
           window,
-          (L"无法打开文件选择窗口，错误码：" + std::to_wstring(dialog_error)).c_str(),
+          (L"Failed to open the file picker, error code: " + std::to_wstring(dialog_error)).c_str(),
           window_title,
           MB_OK | MB_ICONERROR
         );
@@ -1193,7 +1193,7 @@ namespace {
     OPENFILENAMEW dialog {
       .lStructSize = sizeof(OPENFILENAMEW),
       .hwndOwner = window,
-      .lpstrFilter = L"手写笔数据 (*.dat)\0*.dat\0所有文件 (*.*)\0*.*\0\0",
+      .lpstrFilter = L"Stylus data (*.dat)\0*.dat\0All files (*.*)\0*.*\0\0",
       .lpstrFile = file_path.data(),
       .nMaxFile = static_cast<DWORD>(file_path.size()),
       .lpstrInitialDir = initial_directory.empty() ? nullptr : initial_directory.c_str(),
@@ -1205,7 +1205,7 @@ namespace {
       if (const auto dialog_error = CommDlgExtendedError(); dialog_error != 0) {
         MessageBoxW(
           window,
-          (L"无法打开文件保存窗口，错误码：" + std::to_wstring(dialog_error)).c_str(),
+          (L"Failed to open the save dialog, error code: " + std::to_wstring(dialog_error)).c_str(),
           window_title,
           MB_OK | MB_ICONERROR
         );
@@ -1220,14 +1220,14 @@ namespace {
   void
   export_stylus_data(HWND window, app_state_t &state) {
     if (state.pen_data.samples.empty()) {
-      MessageBoxW(window, L"当前没有可导出的手写笔数据。", window_title, MB_OK | MB_ICONINFORMATION);
+      MessageBoxW(window, L"There is no stylus data to export.", window_title, MB_OK | MB_ICONINFORMATION);
       return;
     }
 
     std::filesystem::path path;
     std::wstring directory_error;
     const auto directory_ready = ensure_recording_directory(state.recording_directory, directory_error);
-    if (!select_data_save_path(window, L"导出手写笔数据", directory_ready ? state.recording_directory : std::filesystem::path {}, path)) {
+    if (!select_data_save_path(window, L"Export stylus data", directory_ready ? state.recording_directory : std::filesystem::path {}, path)) {
       return;
     }
     std::wstring error;
@@ -1236,10 +1236,10 @@ namespace {
       return;
     }
 
-    state.last_event = L"已导出 " + path.filename().wstring();
-    state.last_report = L"已导出 " + std::to_wstring(state.pen_data.samples.size()) + L" 个手写笔样本。";
+    state.last_event = L"Exported " + path.filename().wstring();
+    state.last_report = L"Exported " + std::to_wstring(state.pen_data.samples.size()) + L" stylus samples.";
     if (state.pen_data.truncated) {
-      state.last_report += L"本次记录达到样本上限，文件只包含达到上限前的数据。";
+      state.last_report += L" This capture hit the sample limit, so the file only contains the data recorded before the limit.";
     }
     write_log_line(state, L"EXPORT | samples=" + std::to_wstring(state.pen_data.samples.size()));
     state.canvas_dirty = true;
@@ -1250,7 +1250,7 @@ namespace {
   void
   update_recording_controls(app_state_t &state) {
     if (state.record_data_button != nullptr) {
-      SetWindowTextW(state.record_data_button, state.recording ? L"停止录制" : L"开始录制");
+      SetWindowTextW(state.record_data_button, state.recording ? L"Stop recording" : L"Start recording");
     }
     const auto enabled = state.recording ? FALSE : TRUE;
     if (state.clear_button != nullptr) {
@@ -1283,11 +1283,11 @@ namespace {
       state.pen_data.samples.reserve(max_data_samples);
     }
     catch (const std::exception &) {
-      MessageBoxW(window, L"无法为录制数据分配内存。", window_title, MB_OK | MB_ICONERROR);
+      MessageBoxW(window, L"Failed to allocate memory for the recording data.", window_title, MB_OK | MB_ICONERROR);
       return;
     }
     catch (...) {
-      MessageBoxW(window, L"准备录制数据时发生未知异常。", window_title, MB_OK | MB_ICONERROR);
+      MessageBoxW(window, L"An unknown exception occurred while preparing the recording data.", window_title, MB_OK | MB_ICONERROR);
       return;
     }
     if (!open_recording_file(state, path, error)) {
@@ -1297,8 +1297,8 @@ namespace {
 
     state.recording_path = path;
     state.recording = true;
-    state.last_event = L"录制已开始";
-    state.last_report = L"正在录制画布内的手写笔输入。文件保存在专用录制目录：" + state.recording_directory.wstring();
+    state.last_event = L"Recording started";
+    state.last_report = L"Recording stylus input inside the canvas. Files are saved to the dedicated recording directory: " + state.recording_directory.wstring();
     update_recording_controls(state);
     write_log_line(state, L"RECORD | started");
     state.canvas_dirty = true;
@@ -1317,10 +1317,10 @@ namespace {
     state.recording = false;
     update_recording_controls(state);
     if (!saved) {
-      state.last_event = L"录制保存失败";
+      state.last_event = L"Failed to save the recording";
       state.last_report = closing ?
-                            error + L" 窗口仍将关闭。" :
-                            error + L" 当前数据仍保留在内存中，可使用“导出数据”另存。";
+                            error + L" The window will close anyway." :
+                            error + L" The current data is still held in memory; use 'Export data' to save it elsewhere.";
       write_log_line(state, L"RECORD | save failed");
       MessageBoxW(window, state.last_report.c_str(), window_title, MB_OK | MB_ICONERROR);
       state.canvas_dirty = true;
@@ -1328,10 +1328,10 @@ namespace {
       return false;
     }
 
-    state.last_event = L"录制已保存为 " + state.recording_path.filename().wstring();
-    state.last_report = L"录制完成，共保存 " + std::to_wstring(state.pen_data.samples.size()) + L" 个手写笔样本。";
+    state.last_event = L"Recording saved as " + state.recording_path.filename().wstring();
+    state.last_report = L"Recording finished, saved " + std::to_wstring(state.pen_data.samples.size()) + L" stylus samples.";
     if (state.pen_data.truncated) {
-      state.last_report += L"本次录制达到样本上限，文件只包含达到上限前的数据。";
+      state.last_report += L" This recording hit the sample limit, so the file only contains the data recorded before the limit.";
     }
     write_log_line(state, L"RECORD | stopped | samples=" + std::to_wstring(state.pen_data.samples.size()));
     state.log_writer.flush();
@@ -1347,8 +1347,8 @@ namespace {
     state.recording = false;
     state.recording_checkpoint_requested = false;
     update_recording_controls(state);
-    state.last_event = L"录制保存失败";
-    state.last_report = error + L" 当前数据仍保留在内存中，可使用“导出数据”另存。";
+    state.last_event = L"Failed to save the recording";
+    state.last_report = error + L" The current data is still held in memory; use 'Export data' to save it elsewhere.";
     write_log_line(state, L"RECORD | checkpoint failed");
     MessageBoxW(window, state.last_report.c_str(), window_title, MB_OK | MB_ICONERROR);
     state.canvas_dirty = true;
@@ -1420,22 +1420,22 @@ namespace {
 
     std::wstring conclusion;
     if (pen_events == 0 && mouse_events == 0) {
-      conclusion = L"等待输入：本周期没有检测到画布内的输入变化。";
+      conclusion = L"Waiting for input: no input activity detected inside the canvas during this interval.";
     }
     else if (pen_events == 0) {
-      conclusion = L"未识别为手写笔：只收到了鼠标消息，没有收到 PT_PEN。";
+      conclusion = L"Not recognized as a stylus: only mouse messages arrived, no PT_PEN.";
     }
     else if (!stats.pressure_seen) {
-      conclusion = L"已收到 PT_PEN，但本周期没有有效压力字段。";
+      conclusion = L"PT_PEN received, but no valid pressure field during this interval.";
     }
     else if (state.filter_promoted_mouse && stats.filtered_promoted_mouse != 0) {
-      conclusion = L"已过滤画布内的笔兼容鼠标消息；可与关闭开关时的蓝色笔迹进行 A/B 对比。";
+      conclusion = L"Pen-promoted mouse messages inside the canvas were filtered; compare against the blue trace with the filter off for an A/B check.";
     }
     else if (stats.promoted_mouse != 0 || stats.correlated_mouse != 0) {
-      conclusion = L"手写笔和压力正常；同时存在与笔关联的兼容鼠标消息，绘图程序应避免混用两条轨迹。";
+      conclusion = L"Stylus and pressure look correct; pen-correlated mouse messages are also present, so drawing applications should avoid mixing the two traces.";
     }
     else {
-      conclusion = L"手写笔输入正常：已收到 PT_PEN、压力和连续轨迹。";
+      conclusion = L"Stylus input is working: PT_PEN, pressure and a continuous trace were all received.";
     }
 
     std::wostringstream output;
@@ -1548,7 +1548,7 @@ namespace {
       return;
     }
     if (!state.log_writer.open(state.log_path)) {
-      state.last_report = L"无法创建运行日志。";
+      state.last_report = L"Failed to create the run log.";
       return;
     }
 
@@ -1774,20 +1774,20 @@ namespace {
 
     const auto inset = scale_for_dpi(6, dpi);
     RECT title_rect {bounds.left + inset, bounds.top + inset, bounds.right - inset, bounds.top + scale_for_dpi(22, dpi)};
-    const auto interval_label = imported_data ? L"导入数据样本间隔" : L"主机 PT_PEN 接收间隔";
+    const auto interval_label = imported_data ? L"Imported data sample interval" : L"Host PT_PEN delivery interval";
     if (analysis.recent_intervals_ms.empty()) {
-      const auto waiting_text = std::wstring(interval_label) + L"：等待至少两个连续的落笔点";
+      const auto waiting_text = std::wstring(interval_label) + L": waiting for at least two consecutive contact points";
       DrawTextW(device_context, waiting_text.c_str(), -1, &title_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
       return;
     }
 
     std::wostringstream title;
-    title << interval_label << L"：最近 " << analysis.recent_intervals_ms.size() << L" 个间隔"
-          << L"，中位 " << std::fixed << std::setprecision(1) << analysis.interval_median_ms
-          << L" ms，P95 " << analysis.interval_p95_ms
-          << L" ms，最大 " << analysis.interval_max_ms << L" ms"
-          << L"；方向变化中位 " << analysis.turn_median_degrees
-          << L"°，P95 " << analysis.turn_p95_degrees << L"°";
+    title << interval_label << L": last " << analysis.recent_intervals_ms.size() << L" intervals"
+          << L", median " << std::fixed << std::setprecision(1) << analysis.interval_median_ms
+          << L" ms, P95 " << analysis.interval_p95_ms
+          << L" ms, max " << analysis.interval_max_ms << L" ms"
+          << L"; direction change median " << analysis.turn_median_degrees
+          << L"°, P95 " << analysis.turn_p95_degrees << L"°";
     const auto title_text = title.str();
     DrawTextW(device_context, title_text.c_str(), -1, &title_rect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_VCENTER);
 
@@ -1877,10 +1877,10 @@ namespace {
     DrawTextW(memory_context, window_title, -1, &title_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
     RECT instruction_rect {margin, scale_for_dpi(36, state.dpi), client.right - margin, scale_for_dpi(60, state.dpi)};
     const auto instruction = state.recording ?
-                               L"正在录制画布内的手写笔数据；完成后点击“停止录制”。蓝线线宽表示压感。" :
+                               L"Recording stylus data inside the canvas; click 'Stop recording' when finished. Blue line width indicates pressure." :
                              state.viewing_imported_data ?
-                               L"正在查看导入数据；蓝线线宽表示压感。点击“清空画布”返回实时检测。" :
-                               L"请在白色检测区内按下后拖动。仅画布内接触计入统计；蓝线=PT_PEN，红线=未过滤的鼠标消息。";
+                               L"Viewing imported data; blue line width indicates pressure. Click 'Clear canvas' to return to live capture." :
+                               L"Press inside the white probe area and drag. Only contact inside the canvas counts toward the statistics; blue = PT_PEN, red = unfiltered mouse messages.";
     DrawTextW(memory_context, instruction, -1, &instruction_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 
     auto canvas_brush = CreateSolidBrush(RGB(255, 255, 255));
@@ -1903,9 +1903,9 @@ namespace {
     draw_sampling_graph(memory_context, sampling_graph_rect, state.sampling_analysis, state.dpi, state.viewing_imported_data);
 
     std::wostringstream live_text;
-    live_text << L"当前：pointerId=" << state.last_pointer_id
-              << L"，pressure=" << state.last_pressure
-              << L"，tilt=(" << state.last_tilt_x << L", " << state.last_tilt_y << L")";
+    live_text << L"Current: pointerId=" << state.last_pointer_id
+              << L", pressure=" << state.last_pressure
+              << L", tilt=(" << state.last_tilt_x << L", " << state.last_tilt_y << L")";
     RECT live_rect {margin, state.canvas.bottom + scale_for_dpi(96, state.dpi), client.right - margin, state.canvas.bottom + scale_for_dpi(120, state.dpi)};
     DrawTextW(memory_context, live_text.str().c_str(), -1, &live_rect, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 
@@ -1932,32 +1932,32 @@ namespace {
     else {
       detail_text << L"not-reported";
     }
-    detail_text << L" | 蓝色笔迹线宽=压感";
+    detail_text << L" | blue trace width = pressure";
     RECT detail_rect {margin, state.canvas.bottom + scale_for_dpi(120, state.dpi), client.right - margin, state.canvas.bottom + scale_for_dpi(144, state.dpi)};
     DrawTextW(memory_context, detail_text.str().c_str(), -1, &detail_rect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_VCENTER);
 
     std::wostringstream status_text;
-    status_text << L"状态：" << (state.recording ? L"录制中" : state.viewing_imported_data ? L"导入数据" : L"实时检测")
-                << L"，PT_PEN=" << (state.pen_event_seen ? L"已收到" : L"未收到")
-                << L"，鼠标=" << (state.mouse_event_seen ? L"已收到" : L"未收到")
-                << L"；本周期笔事件=" << (state.stats.pen_down + state.stats.pen_update + state.stats.pen_up + state.stats.pen_hover)
-                << L"，鼠标事件=" << (state.stats.mouse_down + state.stats.mouse_move + state.stats.mouse_up)
-                << L"，兼容鼠标=" << state.stats.promoted_mouse
-                << L"，过滤=" << (state.filter_promoted_mouse ? L"开启" : L"关闭")
-                << L"，已过滤=" << state.stats.filtered_promoted_mouse;
+    status_text << L"State: " << (state.recording ? L"recording" : state.viewing_imported_data ? L"imported data" : L"live capture")
+                << L", PT_PEN=" << (state.pen_event_seen ? L"received" : L"not received")
+                << L", mouse=" << (state.mouse_event_seen ? L"received" : L"not received")
+                << L"; pen events this interval=" << (state.stats.pen_down + state.stats.pen_update + state.stats.pen_up + state.stats.pen_hover)
+                << L", mouse events=" << (state.stats.mouse_down + state.stats.mouse_move + state.stats.mouse_up)
+                << L", promoted mouse=" << state.stats.promoted_mouse
+                << L", filter=" << (state.filter_promoted_mouse ? L"on" : L"off")
+                << L", filtered=" << state.stats.filtered_promoted_mouse;
     if (state.recording) {
-      status_text << L"，已录制样本=" << state.pen_data.samples.size();
+      status_text << L", recorded samples=" << state.pen_data.samples.size();
     }
     RECT status_rect {margin, scale_for_dpi(98, state.dpi), client.right - margin, scale_for_dpi(122, state.dpi)};
     DrawTextW(memory_context, status_text.str().c_str(), -1, &status_rect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_VCENTER);
 
     RECT event_rect {margin, state.canvas.bottom + scale_for_dpi(148, state.dpi), client.right - margin, state.canvas.bottom + scale_for_dpi(172, state.dpi)};
-    DrawTextW(memory_context, (L"最近事件：" + state.last_event).c_str(), -1, &event_rect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_VCENTER);
+    DrawTextW(memory_context, (L"Last event: " + state.last_event).c_str(), -1, &event_rect, DT_LEFT | DT_SINGLELINE | DT_END_ELLIPSIS | DT_VCENTER);
 
     RECT report_rect {margin, state.canvas.bottom + scale_for_dpi(176, state.dpi), client.right - margin, client.bottom - scale_for_dpi(40, state.dpi)};
     DrawTextW(memory_context, state.last_report.c_str(), -1, &report_rect, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
 
-    const auto log_text = L"运行日志：" + state.log_path.wstring();
+    const auto log_text = L"Run log: " + state.log_path.wstring();
     SetTextColor(memory_context, RGB(85, 92, 102));
     const auto footer_buttons_width = scale_for_dpi(112 * 2 + 8, state.dpi);
     RECT log_rect {margin, client.bottom - scale_for_dpi(40, state.dpi), client.right - margin - footer_buttons_width, client.bottom - scale_for_dpi(10, state.dpi)};
@@ -2396,7 +2396,7 @@ namespace {
     }
     if (state.filter_promoted_mouse && promoted) {
       ++state.stats.filtered_promoted_mouse;
-      state.last_event = L"已过滤笔兼容鼠标消息";
+      state.last_event = L"Filtered a pen-promoted mouse message";
       state.mouse_in_contact = false;
       state.canvas_dirty = true;
       return true;
@@ -2472,21 +2472,21 @@ namespace {
     switch (message) {
       case WM_CREATE: {
         state->dpi = get_window_dpi(window);
-        state->clear_button = CreateWindowW(L"BUTTON", L"清空画布", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(clear_button_id), nullptr, nullptr);
-        state->copy_button = CreateWindowW(L"BUTTON", L"复制报告", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(copy_button_id), nullptr, nullptr);
-        state->import_data_button = CreateWindowW(L"BUTTON", L"导入数据", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(import_data_button_id), nullptr, nullptr);
-        state->export_data_button = CreateWindowW(L"BUTTON", L"导出数据", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(export_data_button_id), nullptr, nullptr);
-        state->record_data_button = CreateWindowW(L"BUTTON", L"开始录制", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(record_data_button_id), nullptr, nullptr);
-        state->open_log_button = CreateWindowW(L"BUTTON", L"打开日志", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(open_log_button_id), nullptr, nullptr);
-        state->copy_log_path_button = CreateWindowW(L"BUTTON", L"复制日志路径", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(copy_log_path_button_id), nullptr, nullptr);
-        state->open_recording_folder_button = CreateWindowW(L"BUTTON", L"打开录制目录", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(open_recording_folder_button_id), nullptr, nullptr);
-        state->filter_promoted_mouse_checkbox = CreateWindowW(L"BUTTON", L"过滤笔兼容鼠标消息（仅本工具）", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(filter_promoted_mouse_checkbox_id), nullptr, nullptr);
+        state->clear_button = CreateWindowW(L"BUTTON", L"Clear canvas", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(clear_button_id), nullptr, nullptr);
+        state->copy_button = CreateWindowW(L"BUTTON", L"Copy report", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(copy_button_id), nullptr, nullptr);
+        state->import_data_button = CreateWindowW(L"BUTTON", L"Import data", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(import_data_button_id), nullptr, nullptr);
+        state->export_data_button = CreateWindowW(L"BUTTON", L"Export data", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(export_data_button_id), nullptr, nullptr);
+        state->record_data_button = CreateWindowW(L"BUTTON", L"Start recording", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(record_data_button_id), nullptr, nullptr);
+        state->open_log_button = CreateWindowW(L"BUTTON", L"Open log", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(open_log_button_id), nullptr, nullptr);
+        state->copy_log_path_button = CreateWindowW(L"BUTTON", L"Copy log path", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(copy_log_path_button_id), nullptr, nullptr);
+        state->open_recording_folder_button = CreateWindowW(L"BUTTON", L"Open recording folder", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(open_recording_folder_button_id), nullptr, nullptr);
+        state->filter_promoted_mouse_checkbox = CreateWindowW(L"BUTTON", L"Filter pen-promoted mouse messages (this tool only)", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_AUTOCHECKBOX, 0, 0, 0, 0, window, reinterpret_cast<HMENU>(filter_promoted_mouse_checkbox_id), nullptr, nullptr);
         if (state->clear_button == nullptr || state->copy_button == nullptr ||
             state->import_data_button == nullptr || state->export_data_button == nullptr ||
             state->record_data_button == nullptr || state->open_log_button == nullptr ||
             state->copy_log_path_button == nullptr || state->open_recording_folder_button == nullptr ||
             state->filter_promoted_mouse_checkbox == nullptr) {
-          MessageBoxW(window, L"创建检测工具界面失败。", window_title, MB_OK | MB_ICONERROR);
+          MessageBoxW(window, L"Failed to create the probe interface.", window_title, MB_OK | MB_ICONERROR);
           return -1;
         }
         update_ui_font(*state);
@@ -2494,11 +2494,11 @@ namespace {
         update_recording_controls(*state);
         open_log(*state);
         if (SetTimer(window, report_timer_id, report_interval_ms, nullptr) == 0) {
-          state->last_report = L"统计计时器启动失败，实时绘制仍可使用。";
+          state->last_report = L"Failed to start the statistics timer; live drawing still works.";
           write_log_line(*state, L"TIMER | report timer failed");
         }
         if (SetTimer(window, repaint_timer_id, repaint_interval_ms, nullptr) == 0) {
-          MessageBoxW(window, L"刷新计时器启动失败，检测工具无法继续运行。", window_title, MB_OK | MB_ICONERROR);
+          MessageBoxW(window, L"Failed to start the repaint timer; the probe cannot continue.", window_title, MB_OK | MB_ICONERROR);
           return -1;
         }
         return 0;
@@ -2548,8 +2548,8 @@ namespace {
         switch (LOWORD(w_param)) {
           case clear_button_id:
             clear_capture_state(*state);
-            state->last_event = L"尚未收到检测区输入事件。";
-            state->last_report = L"画布与本周期统计已清空。";
+            state->last_event = L"No input events received in the probe area yet.";
+            state->last_report = L"Canvas and interval statistics cleared.";
             InvalidateRect(window, nullptr, FALSE);
             return 0;
           case copy_button_id:
@@ -2560,12 +2560,12 @@ namespace {
             return 0;
           case copy_log_path_button_id:
             if (copy_text_to_clipboard(window, state->log_path.wstring())) {
-              state->last_event = L"已复制运行日志路径";
+              state->last_event = L"Run log path copied";
               state->canvas_dirty = true;
               InvalidateRect(window, nullptr, FALSE);
             }
             else {
-              MessageBoxW(window, L"无法复制运行日志路径。", window_title, MB_OK | MB_ICONERROR);
+              MessageBoxW(window, L"Failed to copy the run log path.", window_title, MB_OK | MB_ICONERROR);
             }
             return 0;
           case open_recording_folder_button_id: {
@@ -2575,7 +2575,7 @@ namespace {
               return 0;
             }
             if (reinterpret_cast<INT_PTR>(ShellExecuteW(window, L"open", state->recording_directory.c_str(), nullptr, nullptr, SW_SHOWNORMAL)) <= 32) {
-              MessageBoxW(window, L"无法打开录制目录。", window_title, MB_OK | MB_ICONERROR);
+              MessageBoxW(window, L"Failed to open the recording directory.", window_title, MB_OK | MB_ICONERROR);
             }
             return 0;
           }
@@ -2593,8 +2593,8 @@ namespace {
             state->mouse_in_contact = false;
             state->last_mouse_point_available = false;
             state->last_report = state->filter_promoted_mouse ?
-                                          L"已开启兼容鼠标过滤：仅此工具的画布会忽略 Windows 为 PT_PEN 生成的鼠标消息。" :
-                                          L"已关闭兼容鼠标过滤：画布会重新处理 Windows 为 PT_PEN 生成的鼠标消息。";
+                                          L"Promoted mouse filtering enabled: only this tool's canvas ignores the mouse messages Windows generates for PT_PEN." :
+                                          L"Promoted mouse filtering disabled: the canvas processes the mouse messages Windows generates for PT_PEN again.";
             write_log_line(*state, std::wstring(L"SETTING | filter promoted mouse=") + (state->filter_promoted_mouse ? L"enabled" : L"disabled"));
             state->canvas_dirty = true;
             InvalidateRect(window, nullptr, FALSE);
@@ -2712,7 +2712,7 @@ namespace {
     }
     MessageBoxW(
       window,
-      L"检测工具遇到异常并已停止。若当时正在录制，程序已尝试保存现有数据。",
+      L"The probe hit an exception and stopped. If a recording was active, it tried to save the existing data.",
       window_title,
       MB_OK | MB_ICONERROR
     );
@@ -2759,7 +2759,7 @@ wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
   };
 
   if (RegisterClassExW(&window_class) == 0) {
-    MessageBoxW(nullptr, L"注册检测工具窗口失败。", window_title, MB_OK | MB_ICONERROR);
+    MessageBoxW(nullptr, L"Failed to register the probe window.", window_title, MB_OK | MB_ICONERROR);
     return 1;
   }
 
@@ -2779,7 +2779,7 @@ wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
     nullptr
   );
   if (window == nullptr) {
-    MessageBoxW(nullptr, L"创建检测工具窗口失败。", window_title, MB_OK | MB_ICONERROR);
+    MessageBoxW(nullptr, L"Failed to create the probe window.", window_title, MB_OK | MB_ICONERROR);
     return 1;
   }
 
@@ -2793,7 +2793,7 @@ wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int show_command) {
     DispatchMessageW(&message);
   }
   if (message_result == -1) {
-    MessageBoxW(nullptr, L"读取窗口消息失败，检测工具已停止。", window_title, MB_OK | MB_ICONERROR);
+    MessageBoxW(nullptr, L"Failed to read window messages; the probe has stopped.", window_title, MB_OK | MB_ICONERROR);
     return 1;
   }
 

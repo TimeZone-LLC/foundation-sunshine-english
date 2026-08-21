@@ -37,7 +37,7 @@ export const DIAGNOSTICS_CAPABILITIES = [
     icon: 'fa-chart-simple',
     label: 'Log severity summary',
     labels: {
-      zh: '日志严重度摘要',
+      zh: 'Log severity summary',
     },
     defaultEnabled: true,
     userSelectable: true,
@@ -48,7 +48,7 @@ export const DIAGNOSTICS_CAPABILITIES = [
     icon: 'fa-magnifying-glass-chart',
     label: 'Log pattern detection',
     labels: {
-      zh: '日志模式检测',
+      zh: 'Log pattern detection',
     },
     defaultEnabled: true,
     userSelectable: true,
@@ -59,7 +59,7 @@ export const DIAGNOSTICS_CAPABILITIES = [
     icon: 'fa-screwdriver-wrench',
     label: 'Log remediation suggestions',
     labels: {
-      zh: '日志修复建议',
+      zh: 'Log remediation suggestions',
     },
     defaultEnabled: true,
     userSelectable: true,

@@ -49,7 +49,7 @@ const iconClass = computed(() => `fas ${props.icon} text-${props.color} me-2`)
 
 <style scoped>
 .alert {
-  border-radius: 8px;
+  border-radius: 0;
   font-size: 0.9rem;
   padding: 0.75rem 1rem;
 }

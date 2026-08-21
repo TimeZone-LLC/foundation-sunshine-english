@@ -294,8 +294,11 @@ Filename: "{app}\scripts\migrate-config.bat"; StatusMsg: "{cm:StatusMigrateConfi
 Filename: "{app}\scripts\add-firewall-rule.bat"; StatusMsg: "{cm:StatusFirewall}"; Flags: runhidden waituntilterminated; Components: firewall
 Filename: "{app}\scripts\install-gamepad.bat"; StatusMsg: "{cm:StatusInstallGamepad}"; Flags: runhidden waituntilterminated; Components: gamepad
 Filename: "{app}\scripts\vmouse\install-vmouse.bat"; StatusMsg: "{cm:StatusInstallVmouse}"; Flags: runhidden waituntilterminated; Components: vmouse
+; The start type is part of this step now (see GetServiceInstallParameters).
+; It used to be a separate, conditional autostart-service.bat entry, which meant
+; a compact install, a VDD failure or a silent auto-update left the service
+; stranded in Manual with nothing starting Sunshine at boot.
 Filename: "{app}\scripts\install-service.bat"; Parameters: "{code:GetServiceInstallParameters}"; StatusMsg: "{cm:StatusInstallService}"; Flags: runhidden waituntilterminated; AfterInstall: VerifyServiceInstalled
-Filename: "{app}\scripts\autostart-service.bat"; StatusMsg: "{cm:StatusAutostart}"; Flags: runhidden waituntilterminated; Components: autostart; Check: ShouldConfigureServiceAutostart
 
 ; Finish page actions - user selectable
 Filename: "https://docs.qq.com/aio/DSGdQc3htbFJjSFdO?p=DXpTjzl2kZwBjN7jlRMkRJ"; Description: "{cm:FinishOpenDocs}"; Flags: postinstall shellexec runasoriginaluser unchecked nowait skipifsilent
@@ -383,11 +386,22 @@ begin
     Result := ''
   else
     Result := '--no-start';
-end;
 
-function ShouldConfigureServiceAutostart(): Boolean;
-begin
-  Result := VDDResultCode <> 101;
+  // The autostart component is only a genuine user choice on an interactive
+  // run. A silent auto-update inherits Inno's remembered component set, so
+  // passing a start type there would let an update quietly change how Sunshine
+  // starts; without the flag install-service.bat preserves the live start type.
+  // Note this is deliberately NOT gated on VDDResultCode: a failed virtual
+  // display install must never decide whether the host comes up at boot.
+  if not WizardSilent then
+  begin
+    if Result <> '' then
+      Result := Result + ' ';
+    if WizardIsComponentSelected('autostart') then
+      Result := Result + '--start-type delayed-auto'
+    else
+      Result := Result + '--start-type demand';
+  end;
 end;
 
 procedure InstallAndVerifyVDD();

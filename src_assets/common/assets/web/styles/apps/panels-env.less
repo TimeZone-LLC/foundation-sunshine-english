@@ -7,7 +7,7 @@
     overflow: hidden;
     background: var(--ui-surface);
     border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius-md);
+    border-radius: 0;
 
     .table-responsive {
       margin: 0;
@@ -41,7 +41,7 @@
         vertical-align: middle;
         background: transparent;
         border-color: var(--ui-border);
-        transition: background-color 0.18s ease;
+        transition: var(--transition-default);
       }
 
       tbody tr:hover td {
@@ -58,13 +58,13 @@
     display: inline-block;
     padding: 0.28rem 0.5rem !important;
     color: var(--ui-accent-text) !important;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-family: var(--font-family-mono) !important;
     font-size: 0.8rem;
     font-weight: 650;
     white-space: nowrap;
     background: var(--ui-accent-soft) !important;
     border: 1px solid var(--ui-border-strong) !important;
-    border-radius: var(--ui-radius-sm) !important;
+    border-radius: 0 !important;
   }
 
   .code-example {
@@ -74,14 +74,13 @@
     padding: 0.9rem 1rem !important;
     overflow-x: auto;
     color: var(--ui-text-primary) !important;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
+    font-family: var(--font-family-mono) !important;
     font-size: var(--font-size-sm) !important;
     line-height: 1.55;
     white-space: pre;
     background: var(--ui-surface) !important;
     border: 1px solid var(--ui-border) !important;
-    border-radius: var(--ui-radius-md) !important;
-    box-shadow: var(--ui-shadow-sm);
+    border-radius: 0 !important;
   }
 }
 
