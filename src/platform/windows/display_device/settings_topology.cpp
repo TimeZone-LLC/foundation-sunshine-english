@@ -1,4 +1,5 @@
 // standard includes
+#include <algorithm>
 #include <thread>
 
 // local includes
@@ -203,6 +204,198 @@ namespace display_device {
       return final_topology ? *final_topology : topology;
     }
 
+    /**
+     * @brief Check whether the device preparation mode is allowed to turn displays off.
+     * @param device_prep The device preparation setting from user configuration.
+     * @return True if the mode deactivates displays, false otherwise.
+     * @note Every other mode can only extend the desktop, so for those a restore baseline with fewer
+     *       displays than the topology we switch to is perfectly legitimate.
+     */
+    bool
+    can_deactivate_displays(parsed_config_t::device_prep_e device_prep) {
+      return device_prep == parsed_config_t::device_prep_e::ensure_only_display;
+    }
+
+    /**
+     * @brief Check whether the device preparation mode can leave the user with a reduced desktop.
+     * @param device_prep The device preparation setting from user configuration.
+     * @return True if the mode reduces the topology, false otherwise.
+     */
+    bool
+    is_display_reducing_device_prep(parsed_config_t::device_prep_e device_prep) {
+      // ensure_only_display deactivates every other display, while ensure_primary can also leave the
+      // user with fewer active displays when the requested device takes over a duplicated group.
+      return device_prep == parsed_config_t::device_prep_e::ensure_only_display ||
+             device_prep == parsed_config_t::device_prep_e::ensure_primary;
+    }
+
+    /**
+     * @brief Collect devices that are connected to the machine, but are currently not active.
+     * @return A list of physical (non-VDD) device ids that are in the inactive state.
+     * @note The VDD is created by us and must never become part of a restore baseline.
+     */
+    std::unordered_set<std::string>
+    collect_connected_but_inactive_devices() {
+      std::unordered_set<std::string> inactive_devices;
+
+      for (const auto &[device_id, device_info] : enum_available_devices()) {
+        if (device_info.device_state != device_state_e::inactive) {
+          continue;
+        }
+
+        if (device_info.friendly_name == ZAKO_NAME) {
+          continue;
+        }
+
+        inactive_devices.insert(device_id);
+      }
+
+      return inactive_devices;
+    }
+
+    /**
+     * @brief Extend a restore baseline candidate with displays that are connected, but currently disabled.
+     * @param candidate The baseline that we would persist otherwise.
+     * @param inactive_devices Devices that are connected, but are not part of the active topology.
+     * @return The extended topology, or an empty optional if nothing could be added safely.
+     */
+    boost::optional<active_topology_t>
+    extend_baseline_with_inactive_devices(const active_topology_t &candidate, const std::unordered_set<std::string> &inactive_devices) {
+      if (candidate.empty() || inactive_devices.empty()) {
+        return boost::none;
+      }
+
+      const auto candidate_ids { get_device_ids_from_topology(candidate) };
+      active_topology_t extended_topology { candidate };
+      for (const auto &device_id : inactive_devices) {
+        if (candidate_ids.count(device_id) > 0) {
+          continue;
+        }
+
+        // The disabled displays are added as extended (separate) groups - we have no way of knowing
+        // whether they used to be duplicated, and extending is the least destructive assumption.
+        extended_topology.push_back({ device_id });
+      }
+
+      if (is_topology_the_same(candidate, extended_topology)) {
+        return boost::none;
+      }
+
+      if (!is_topology_valid(extended_topology)) {
+        BOOST_LOG(warning) << "Refusing the extended restore baseline " << to_string(extended_topology) << " - the topology is not valid.";
+        return boost::none;
+      }
+
+      return extended_topology;
+    }
+
+    /**
+     * @brief Determine the topology that the user's desktop must be restored to.
+     * @param config Configuration to be evaluated.
+     * @param current_topology The topology that is active right now.
+     * @param final_topology The topology that we have switched to for this session.
+     * @param previously_configured_topology A result from an earlier call of handle_device_topology_configuration.
+     * @param pre_saved_initial_topology Topology captured before anything was modified (VDD scenario).
+     * @return The topology to persist as the "initial" one.
+     *
+     * The precedence is:
+     *   1. the pre-saved initial topology (captured before we touched anything),
+     *   2. the persisted initial topology, carried forward when the desktop we see right now is
+     *      still the reduced topology that an earlier, never-restored session left behind,
+     *   3. the current topology.
+     *
+     * Blindly taking the current topology is what allowed a previously reduced desktop to become the
+     * new "initial" baseline - every unrestored session then baked the damage in deeper until the real
+     * topology was unrecoverable.
+     */
+    active_topology_t
+    resolve_restore_baseline_topology(
+      const parsed_config_t &config,
+      const active_topology_t &current_topology,
+      const active_topology_t &final_topology,
+      const boost::optional<topology_pair_t> &previously_configured_topology,
+      const boost::optional<active_topology_t> &pre_saved_initial_topology) {
+      // Priority 1: a topology that was captured before anything was modified.
+      if (pre_saved_initial_topology && !pre_saved_initial_topology->empty()) {
+        return *pre_saved_initial_topology;
+      }
+
+      active_topology_t baseline { current_topology };
+
+      // Priority 2: the desktop that is active right now can be leftover damage of an earlier session
+      // that was never restored (crash, kill, power loss, sleep, service restart). If it still matches
+      // the topology we switched to back then, the persisted initial topology is the only truthful
+      // baseline we have and it must be carried forward instead of being overwritten.
+      const bool have_persisted_pair { previously_configured_topology.has_value() &&
+                                       !previously_configured_topology->initial.empty() &&
+                                       !previously_configured_topology->modified.empty() };
+      const bool current_is_leftover_damage {
+        have_persisted_pair &&
+        is_topology_the_same(previously_configured_topology->modified, current_topology)
+      };
+
+      if (current_is_leftover_damage &&
+          !is_topology_the_same(previously_configured_topology->initial, current_topology)) {
+        BOOST_LOG(info) << "Display topology " << to_string(current_topology)
+                        << " is still the one a previous session switched to, so it is not the user's own setup."
+                        << " Carrying the persisted initial topology " << to_string(previously_configured_topology->initial)
+                        << " forward as the restore baseline.";
+
+        const auto available_devices { enum_available_devices() };
+        std::vector<std::string> missing_devices;
+        for (const auto &device_id : get_device_ids_from_topology(previously_configured_topology->initial)) {
+          if (available_devices.find(device_id) == std::end(available_devices)) {
+            missing_devices.push_back(device_id);
+          }
+        }
+
+        if (!missing_devices.empty()) {
+          // Keep the baseline anyway - a display that is powered off or asleep can disappear from the
+          // enumeration and dropping the baseline here is exactly how the real topology gets lost.
+          BOOST_LOG(warning) << "The carried-over initial topology references " << missing_devices.size()
+                             << " display(s) that are not currently connected; keeping it as the restore baseline regardless.";
+        }
+
+        baseline = previously_configured_topology->initial;
+      }
+
+      // Defensive check: a mode that turns displays off can never legitimately end up with a baseline
+      // that has fewer displays than the topology we switched to. Restoring such a pair would take
+      // displays away from the user, so prefer the richer topology.
+      if (can_deactivate_displays(config.device_prep) && is_strict_device_subset(baseline, final_topology)) {
+        BOOST_LOG(info) << "Restore baseline " << to_string(baseline) << " has fewer displays than the topology we are switching to "
+                        << to_string(final_topology) << "; using the richer topology as the restore baseline instead.";
+        baseline = final_topology;
+      }
+
+      // Defensive check: a single-display baseline that is captured while other displays are connected
+      // but disabled is the signature of an earlier session that reduced the desktop and never restored
+      // it. We only act on it when our own persisted data proves that the active topology is one that we
+      // produced - otherwise the user may simply have disabled those displays themselves and we must not
+      // enable them behind their back. A genuine single-display machine has no inactive devices to add,
+      // so it keeps its single-display baseline.
+      if (is_display_reducing_device_prep(config.device_prep) &&
+          get_device_ids_from_topology(baseline).size() <= 1) {
+        const auto inactive_devices { collect_connected_but_inactive_devices() };
+        if (inactive_devices.empty()) {
+          // Nothing to recover - this is the normal single-display case.
+        }
+        else if (!current_is_leftover_damage) {
+          BOOST_LOG(info) << "Restore baseline " << to_string(baseline) << " is a single display while " << inactive_devices.size()
+                          << " connected display(s) are disabled, but there is no evidence that we disabled them."
+                          << " Keeping the baseline as is.";
+        }
+        else if (const auto extended { extend_baseline_with_inactive_devices(baseline, inactive_devices) }) {
+          BOOST_LOG(info) << "Restore baseline " << to_string(baseline) << " is a single display while " << inactive_devices.size()
+                          << " connected display(s) are disabled by a previous session of ours. Using "
+                          << to_string(*extended) << " as the restore baseline instead.";
+          baseline = *extended;
+        }
+      }
+
+      return baseline;
+    }
+
   }  // namespace
 
   std::unordered_set<std::string>
@@ -301,6 +494,20 @@ namespace display_device {
     }
 
     return device_ids;
+  }
+
+  bool
+  is_strict_device_subset(const active_topology_t &subset, const active_topology_t &superset) {
+    const auto subset_ids { get_device_ids_from_topology(subset) };
+    const auto superset_ids { get_device_ids_from_topology(superset) };
+
+    if (subset_ids.empty() || subset_ids.size() >= superset_ids.size()) {
+      return false;
+    }
+
+    return std::all_of(std::begin(subset_ids), std::end(subset_ids), [&superset_ids](const auto &device_id) {
+      return superset_ids.count(device_id) > 0;
+    });
   }
 
   std::unordered_set<std::string>
@@ -433,8 +640,17 @@ namespace display_device {
 
     // 如果有预保存的初始拓扑（在VDD创建前保存的），使用它作为真实初始拓扑
     // 否则使用当前拓扑（可能已被VDD破坏）
-    const auto real_initial_topology = pre_saved_initial_topology ? *pre_saved_initial_topology : current_topology;
-    
+    //
+    // The current topology is only the last resort: it is "whatever is active right now", which is the
+    // damage itself whenever an earlier session reduced the desktop and was never restored.
+    const auto real_initial_topology = resolve_restore_baseline_topology(
+      config, current_topology, final_topology, previously_configured_topology, pre_saved_initial_topology);
+
+    if (!is_topology_the_same(real_initial_topology, current_topology)) {
+      BOOST_LOG(info) << "Display restore baseline: " << to_string(real_initial_topology)
+                      << " (the topology that will be restored once the stream ends).";
+    }
+
     return handled_topology_result_t {
       topology_pair_t {
         real_initial_topology,  // 使用真实的初始拓扑

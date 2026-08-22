@@ -172,6 +172,13 @@ namespace display_device {
     reset_persistence();
 
     /**
+     * @brief Re-enable every connected display and drop any stale saved state.
+     * @return True when the desktop ends up spanning all connected displays.
+     */
+    bool
+    refresh_displays();
+
+    /**
      * @brief Create VDD monitor
      * @param client_name 客户端名称，用于驱动识别客户端并启动对应的显示器
      */
@@ -265,6 +272,24 @@ namespace display_device {
      */
     void
     restore_state_impl(revert_reason_e reason = revert_reason_e::stream_ended);
+
+    /**
+     * @brief Revert the persisted display settings, deferring the attempt if Windows refuses it now.
+     *
+     * This is the single revert path shared by the end-of-session restore and the
+     * crash / unclean-exit recovery performed on start-up. It restores the topology, the
+     * display modes, the HDR states and the primary display.
+     *
+     * When the settings cannot be reverted right away (typically a locked console session or an
+     * unavailable CCD API) the restore stays armed and is retried on the next session or power
+     * event surfaced by SessionEventListener (unlock, console connect, logon, resume from sleep).
+     *
+     * @param reason The reason for reverting settings.
+     * @note This method does NOT acquire the mutex! It is intended to be used from places
+     *       where the mutex has already been locked.
+     */
+    void
+    finalize_settings_revert(revert_reason_e reason);
 
     /**
      * @brief Start polling mechanism as fallback when CCD API is temporarily unavailable.

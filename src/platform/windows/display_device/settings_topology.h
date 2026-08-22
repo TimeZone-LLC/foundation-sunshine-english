@@ -67,6 +67,23 @@ namespace display_device {
   get_newly_enabled_devices_from_topology(const active_topology_t &previous_topology, const active_topology_t &new_topology);
 
   /**
+   * @brief Check whether a topology contains only devices of another one, but fewer of them.
+   * @param subset Topology that is expected to contain fewer devices.
+   * @param superset Topology that is expected to contain all of the devices.
+   * @return True if every device of the subset is in the superset and the superset has more devices.
+   *
+   * EXAMPLES:
+   * ```cpp
+   * active_topology_t small_topology { { "ID_1" } };
+   * active_topology_t large_topology { { "ID_1" }, { "ID_2" } };
+   * const bool is_subset = is_strict_device_subset(small_topology, large_topology);
+   * // is_subset == true
+   * ```
+   */
+  bool
+  is_strict_device_subset(const active_topology_t &subset, const active_topology_t &superset);
+
+  /**
    * @brief Check whether the active topology contains only the supplied VDD device.
    * @param topology Topology to inspect.
    * @param vdd_device_id Device id of the VDD.
@@ -86,9 +103,17 @@ namespace display_device {
    * since the new topology is not compatible with the previously configured one, the revert_settings
    * parameter will be called to completely revert all changes.
    *
+   * The returned "initial" topology is the baseline that the user's desktop will be restored to.
+   * It is resolved with the following precedence:
+   *   1. pre_saved_initial_topology - captured before anything was modified (VDD scenario),
+   *   2. the initial topology of previously_configured_topology - carried forward when the currently
+   *      active topology is still the one an earlier, never-restored session switched to,
+   *   3. the currently active topology.
+   *
    * @param config Configuration to be evaluated.
    * @param previously_configured_topology A result from a earlier call of this function.
    * @param revert_settings A function-proxy that can be used to revert all of the changes made to the device displays.
+   * @param pre_saved_initial_topology Topology captured before any modification was made, if available.
    * @return A result object, or an empty optional if the function fails.
    */
   boost::optional<handled_topology_result_t>

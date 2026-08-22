@@ -3,6 +3,7 @@
 #include <boost/process/v1.hpp>
 #include <future>
 #include <thread>
+#include <unordered_set>
 #include <utility>
 
 // local includes
@@ -905,6 +906,70 @@ namespace display_device {
     current_vdd_client_id.clear();
   }
 
+  bool
+  session_t::refresh_displays() {
+    std::lock_guard lock { mutex };
+
+    const auto devices { display_device::enum_available_devices() };
+    if (devices.empty()) {
+      BOOST_LOG(error) << "refresh_displays: no display devices are connected, there is nothing to enable";
+      return false;
+    }
+
+    // Built from the live device list on purpose. This is the user's manual escape hatch, so it
+    // must not go through the persisted "initial" topology - that is exactly the value that is
+    // suspected to be stale or wrong when somebody reaches for this method.
+    active_topology_t extended_topology;
+    extended_topology.reserve(devices.size());
+    for (const auto &[device_id, device_info] : devices) {
+      extended_topology.push_back({ device_id });
+    }
+
+    BOOST_LOG(info) << "refresh_displays: enabling all " << devices.size()
+                    << " connected display(s) as an extended desktop: " << to_string(extended_topology);
+
+    if (!is_topology_valid(extended_topology)) {
+      BOOST_LOG(error) << "refresh_displays: Windows rejected the all-displays topology as invalid, leaving the desktop untouched";
+      return false;
+    }
+
+    if (is_topology_the_same(get_current_topology(), extended_topology)) {
+      BOOST_LOG(info) << "refresh_displays: the desktop already spans every connected display, no topology change needed";
+    }
+    else if (!set_topology(extended_topology)) {
+      BOOST_LOG(error) << "refresh_displays: failed to enable every connected display";
+    }
+
+    // Verify against what the OS actually ended up with rather than trusting the call above.
+    const auto applied_topology { get_current_topology() };
+    std::unordered_set<std::string> active_ids;
+    for (const auto &group : applied_topology) {
+      active_ids.insert(group.begin(), group.end());
+    }
+
+    bool all_active { true };
+    for (const auto &[device_id, device_info] : devices) {
+      if (!active_ids.contains(device_id)) {
+        BOOST_LOG(warning) << "refresh_displays: display " << device_id
+                           << " (" << device_info.friendly_name << ") is still not part of the desktop";
+        all_active = false;
+      }
+    }
+
+    // Drop the saved state either way: it is the stale reduced topology that a later restore
+    // would otherwise re-apply, undoing what the user just asked for.
+    if (settings.has_persistent_data()) {
+      BOOST_LOG(info) << "refresh_displays: discarding the saved original display settings so a later restore cannot re-apply them";
+    }
+    settings.reset_persistence();
+    stop_timer_and_clear_vdd_state();
+    current_vdd_client_id.clear();
+
+    BOOST_LOG(info) << "refresh_displays: finished, the desktop "
+                    << (all_active ? "now spans every connected display" : "does NOT span every connected display");
+    return all_active;
+  }
+
   void
   session_t::restore_state_impl(revert_reason_e reason) {
 #ifdef _WIN32
@@ -924,10 +989,16 @@ namespace display_device {
     // 2. 或者上一次会话已经正常结束且清理了状态
     // 此时不需要恢复拓扑（没有拓扑被修改过），只需要清理可能残留的 VDD
     if (!current_use_vdd.has_value()) {
-      BOOST_LOG(debug) << " No session config (current_use_vdd=nullopt), performing VDD cleanup only";
-      
+      // current_use_vdd only lives in memory, so it is ALWAYS empty on a fresh process and can
+      // never tell us whether a restore is owed. The durable evidence is the persistence file:
+      // if it is still on disk, a previous run modified the display state and never reverted it
+      // (crash, kill, power loss, sleep, service restart), and that revert has to happen now.
+      const bool leftover_state_owed = settings.has_persistent_data();
+      BOOST_LOG(info) << "No in-memory session config (current_use_vdd=nullopt); leftover persisted display state: "
+                      << (leftover_state_owed ? "yes, a restore is owed" : "no, nothing to restore");
+
       if (!vdd_id.empty() && !is_keep_enabled) {
-        if (settings.has_persistent_data()) {
+        if (leftover_state_owed) {
           BOOST_LOG(info) << "Not in persistent mode, destroying the leftover VDD";
         }
         else {
@@ -935,6 +1006,13 @@ namespace display_device {
         }
         destroy_vdd_monitor();
         std::this_thread::sleep_for(1000ms);
+      }
+
+      if (leftover_state_owed) {
+        // Use the same revert path as the end-of-session restore so the topology, the display
+        // modes, the HDR states and the primary display all come back - not just the topology.
+        BOOST_LOG(info) << "Restoring the display state left behind by a previous Sunshine run";
+        finalize_settings_revert(reason);
       }
 
       // 无头主机自动创建检查
@@ -951,7 +1029,11 @@ namespace display_device {
         }
       }
 
-      stop_timer_and_clear_vdd_state();
+      if (!leftover_state_owed) {
+        // Nothing was owed, so nothing can be pending - this is the genuine
+        // "clean shutdown, nothing to restore" case.
+        stop_timer_and_clear_vdd_state();
+      }
       return;
     }
 
@@ -977,14 +1059,15 @@ namespace display_device {
       ? (vdd_prep == parsed_config_t::vdd_prep_e::no_operation)
       : (device_prep == parsed_config_t::device_prep_e::no_operation);
 
-    BOOST_LOG(debug) << "restore_state_impl decision inputs:"
-                     << " is_vdd_mode=" << is_vdd_mode
-                     << " vdd_prep=" << static_cast<int>(vdd_prep)
-                     << " device_prep=" << static_cast<int>(device_prep)
-                     << " is_no_operation=" << is_no_operation;
-
     // 检查 apply_config 是否曾成功执行（persistent_data 是否存在）
     const bool has_persistent = settings.has_persistent_data();
+
+    BOOST_LOG(info) << "restore_state_impl decision inputs:"
+                    << " is_vdd_mode=" << is_vdd_mode
+                    << " vdd_prep=" << static_cast<int>(vdd_prep)
+                    << " device_prep=" << static_cast<int>(device_prep)
+                    << " is_no_operation=" << is_no_operation
+                    << " has_persistent=" << has_persistent;
 
     // 立即执行完整 restore
     // VDD 销毁逻辑
@@ -993,7 +1076,7 @@ namespace display_device {
       
       // 判断1：常驻模式 - 保留VDD
       if (is_keep_enabled) {
-        BOOST_LOG(debug) << "Persistent mode, keeping the VDD";
+        BOOST_LOG(info) << "Persistent mode, keeping the VDD";
       }
       // 判断2：非常驻模式 - 销毁VDD（无论是否是无操作模式）
       else if (has_persistent) {
@@ -1031,24 +1114,34 @@ namespace display_device {
       return;
     }
 
+    finalize_settings_revert(reason);
+  }
+
+  void
+  session_t::finalize_settings_revert(revert_reason_e reason) {
     // 添加诊断日志
     const bool settings_will_fail = settings.is_changing_settings_going_to_fail();
-    BOOST_LOG(debug) << "Checking if reverting settings will fail: " << settings_will_fail;
-    
+    BOOST_LOG(info) << "Checking if reverting settings will fail: " << settings_will_fail;
+
     // VDD生命周期已在上面的逻辑中决定（销毁或保留），通知revert_settings不要再处理VDD销毁
     const bool vdd_already_handled = true;
-    
+
     if (!settings_will_fail && settings.revert_settings(reason, vdd_already_handled)) {
+      BOOST_LOG(info) << "Display settings were restored";
       stop_timer_and_clear_vdd_state();
     }
     else {
       // 无法立即恢复，添加任务到解锁队列
       BOOST_LOG(warning) << "Unable to restore the display settings right now";
-      
+
       // 设置待恢复标志
       pending_restore_ = true;
-      
+
       // 添加恢复任务（自动处理锁屏检查和立即执行）
+      // SessionEventListener dispatches this task on the next session unlock, console
+      // connect, logon, resume from suspend, display change or monitor device change, so a
+      // restore that cannot run now (locked console, sleeping machine) is retried instead of
+      // being lost.
       SessionEventListener::add_unlock_task([this, reason]() {
         // 快速检查是否还需要恢复（最小化锁持有时间）
         {
@@ -1058,7 +1151,7 @@ namespace display_device {
             return;
           }
         }
-        
+
         // 在锁外执行CCD检查和恢复操作（避免阻塞托盘等其他操作）
         if (settings.is_changing_settings_going_to_fail()) {
           BOOST_LOG(warning) << "The CCD API is still unavailable, starting the polling retry loop";
@@ -1066,14 +1159,23 @@ namespace display_device {
           this->start_polling_restore(reason);
           return;
         }
-        
+
         // 执行恢复
         auto result = settings.revert_settings(reason, true);
         BOOST_LOG(info) << "Display settings restore " << (result ? "succeeded" : "failed");
-        
+
         // 恢复完成后清除标志和状态
         {
           std::lock_guard lock { mutex };
+          if (!result && settings.has_persistent_data()) {
+            // The displays are still owed a restore. Dropping the pending flag here would
+            // abandon them on the streaming topology until the next Sunshine start, so keep
+            // the restore armed and let the polling loop (which waits out a locked session)
+            // pick it up on the next unlock or resume.
+            BOOST_LOG(info) << "The display state is still not restored, keeping the restore armed";
+            this->start_polling_restore(reason);
+            return;
+          }
           pending_restore_ = false;
           stop_timer_and_clear_vdd_state();
         }

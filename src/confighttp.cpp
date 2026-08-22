@@ -1620,6 +1620,30 @@ namespace confighttp {
     outputTree.put("status", true);
   }
 
+  /**
+   * @brief Re-enable every connected display and clear the saved display state.
+   * @param response The HTTP response object.
+   * @param request The HTTP request object.
+   *
+   * Recovery path for the case where a previous stream left the desktop reduced to
+   * fewer displays than the machine actually has. The boolean outcome is reported
+   * back so the Web UI can tell the user whether the desktop was actually restored.
+   */
+  void
+  refreshDisplays(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) return;
+
+    print_req(request);
+
+    const bool refreshed = display_device::session_t::get().refresh_displays();
+    BOOST_LOG(info) << "Web UI requested a display refresh, outcome: " << (refreshed ? "displays restored" : "failed");
+
+    send_response(response, nlohmann::json {
+      {"status", refreshed},
+      {"refreshed", refreshed},
+    });
+  }
+
   void
   testMicrophone(resp_https_t response, req_https_t request) {
     if (!authenticate(response, request)) return;
@@ -3757,6 +3781,7 @@ namespace confighttp {
     server.resource["^/api/restart$"]["GET"] = restart;
     server.resource["^/api/boom$"]["GET"] = boom;
     server.resource["^/api/reset-display-device-persistence$"]["POST"] = resetDisplayDevicePersistence;
+    server.resource["^/api/display/refresh$"]["POST"] = refreshDisplays;
     server.resource["^/api/microphone/test$"]["POST"] = testMicrophone;
 #ifdef _WIN32
     server.resource["^/api/vdd/status$"]["GET"] = getVddStatus;

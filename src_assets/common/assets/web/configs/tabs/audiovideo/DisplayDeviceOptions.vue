@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { $tp } from '../../../platform-i18n'
+import { apiPostJson } from '../../../utils/apiFetch.js'
 import PlatformLayout from '../../../components/layout/PlatformLayout.vue'
 import Checkbox from '../../../components/Checkbox.vue'
 import DisplayModeRemapping from './DisplayModeRemapping.vue'
@@ -104,6 +105,30 @@ const hdrRuntimeConversionLabel = computed(() => {
   return 'D3D11 Pixel Shader'
 })
 
+const displayRefreshRunning = ref(false)
+const displayRefreshResult = ref(null)
+
+async function refreshDisplays() {
+  displayRefreshRunning.value = true
+  displayRefreshResult.value = null
+
+  try {
+    const result = await apiPostJson('/api/display/refresh')
+    const refreshed = result.refreshed === true || result.status === true
+    displayRefreshResult.value = {
+      success: refreshed,
+      messageKey: refreshed ? 'config.display_refresh_success' : 'config.display_refresh_failed',
+    }
+  } catch {
+    displayRefreshResult.value = {
+      success: false,
+      messageKey: 'config.display_refresh_failed',
+    }
+  } finally {
+    displayRefreshRunning.value = false
+  }
+}
+
 async function handleVisibilityChange() {
   if (!hdrRuntimeStatusActive || document.hidden) return
   await refreshHdrRuntimeStatus()
@@ -177,6 +202,36 @@ onUnmounted(() => {
                 </summary>
                 <p class="pre-line">{{ $tp('config.display_device_options_note_desc') }}</p>
               </details>
+
+              <div class="display-recovery mb-3">
+                <div class="display-recovery-header">
+                  <div>
+                    <div class="display-recovery-title">{{ $t('config.display_refresh') }}</div>
+                    <div id="display_refresh_desc" class="form-text mt-0">
+                      {{ $t('config.display_refresh_desc') }}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-primary display-recovery-btn"
+                    :disabled="displayRefreshRunning"
+                    aria-describedby="display_refresh_desc"
+                    @click="refreshDisplays"
+                  >
+                    <i class="fas fa-rotate me-1" aria-hidden="true"></i>
+                    {{ displayRefreshRunning ? $t('config.display_refresh_running') : $t('config.display_refresh') }}
+                  </button>
+                </div>
+                <div
+                  v-if="displayRefreshResult"
+                  class="alert mt-2 mb-0 py-2"
+                  :class="displayRefreshResult.success ? 'alert-success' : 'alert-danger'"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {{ $t(displayRefreshResult.messageKey) }}
+                </div>
+              </div>
 
               <div class="display-rule-grid">
                 <DisplayRuleRadioGroup
@@ -357,6 +412,32 @@ onUnmounted(() => {
   line-height: 1.5;
 }
 
+.display-recovery {
+  padding: 0.85rem;
+  border: 1px solid var(--ui-border);
+  border-radius: 0;
+  background: var(--ui-surface-strong);
+}
+
+.display-recovery-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.display-recovery-title {
+  color: var(--ui-text-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.display-recovery-btn {
+  flex-shrink: 0;
+  border-radius: 0;
+  white-space: nowrap;
+}
+
 .display-rule-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
@@ -435,6 +516,15 @@ onUnmounted(() => {
   .nested-setting,
   .hdr-feature-card {
     padding: 0.75rem;
+  }
+
+  .display-recovery-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .display-recovery-btn {
+    width: 100%;
   }
 
   .display-options-note {

@@ -602,6 +602,11 @@ namespace display_device {
       }
 
       if (!data.contains_modifications()) {
+        // Nothing to undo. Most often this means the persisted initial and modified topologies are
+        // identical, so there is no display state that we could restore from this data.
+        BOOST_LOG(info) << "Persisted display settings contain no modifications (restore baseline "
+                        << to_string(data.topology.initial) << " matches the modified topology "
+                        << to_string(data.topology.modified) << "), nothing to restore.";
         return true;
       }
 
@@ -1028,6 +1033,14 @@ namespace display_device {
         !pre_saved_initial_topology &&
         is_vdd_only_topology(new_settings.topology.initial, config.device_id);
 
+      // A mode that turns displays off can never legitimately produce a restore baseline that has
+      // fewer displays than the topology we switched to. Persisting such a pair would mean that the
+      // "restore" itself takes displays away from the user, which is worse than not restoring at all.
+      const bool should_skip_reducing_baseline_persistence =
+        !persistent_data &&
+        config.device_prep == parsed_config_t::device_prep_e::ensure_only_display &&
+        is_strict_device_subset(new_settings.topology.initial, new_settings.topology.modified);
+
       const auto persist_settings = [&]() -> apply_result_t {
         if (current_settings.contains_modifications()) {
           if (!persistent_data) {
@@ -1036,6 +1049,16 @@ namespace display_device {
               return { apply_result_t::result_e::success };
             }
 
+            if (should_skip_reducing_baseline_persistence) {
+              BOOST_LOG(warning) << "Refusing to persist the restore baseline " << to_string(new_settings.topology.initial)
+                                 << " because it has fewer displays than the topology we switched to "
+                                 << to_string(new_settings.topology.modified)
+                                 << "; continuing without new display restore data.";
+              return { apply_result_t::result_e::success };
+            }
+
+            BOOST_LOG(info) << "Recording the display restore baseline: " << to_string(new_settings.topology.initial)
+                            << " (displays will be restored to it when the stream ends).";
             persistent_data = std::make_unique<persistent_data_t>(new_settings);
           }
 
@@ -1214,6 +1237,9 @@ namespace display_device {
       }
 
       BOOST_LOG(info) << "Display device settings reverted";
+    }
+    else {
+      BOOST_LOG(info) << "No persisted display device settings found, there is nothing to restore";
     }
     return true;
   }
