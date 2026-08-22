@@ -395,7 +395,7 @@ onUnmounted(() => {
 
 .display-options-note summary::after {
   margin-left: auto;
-  font-family: 'Font Awesome 6 Free';
+  font-family: 'Font Awesome 7 Free';
   font-weight: 900;
   content: '\f078';
   transition: var(--transition-default);
