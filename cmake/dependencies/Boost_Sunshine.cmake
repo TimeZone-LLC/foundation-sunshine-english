@@ -17,6 +17,7 @@ set(BOOST_COMPONENTS
         program_options
         property_tree
         system
+        thread
 )
 # system is not used by Sunshine, but by Simple-Web-Server, added here for convenience
 
