@@ -753,6 +753,35 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### input_only_mode
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Put new connections on the lowest-impact input path. Clients with native control-only support use no
+            media transport. Standard clients receive a pre-encoded 16x16 black H.264 heartbeat at one frame per
+            second so their video handshake remains alive. Sunshine skips display preparation, capture, live video
+            encoding, and microphone routing. Host audio, keyboard, mouse, and controller input remain available.
+            @note{The compatibility heartbeat has a 52-byte encoded media payload per second before packet and FEC
+            overhead. It does not create a GPU capture or encoder context.}
+            @note{Changing this setting does not alter sessions that are already connected.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            input_only_mode = enabled
+            @endcode</td>
+    </tr>
+</table>
+
 ### stream_audio
 
 <table>

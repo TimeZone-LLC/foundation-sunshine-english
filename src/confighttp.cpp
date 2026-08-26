@@ -91,6 +91,7 @@ namespace confighttp {
   // return busy if not acquired
   static std::atomic<bool> apps_writing { false };
   static std::mutex file_mapping_store_transaction_mutex;
+  static std::mutex input_only_mode_mutex;
 
   using https_server_t = SimpleWeb::Server<SimpleWeb::HTTPS>;
 
@@ -1253,6 +1254,64 @@ namespace confighttp {
 
     outputTree.put("active_encoder", video::active_encoder_name());
     outputTree.put("pair_name", nvhttp::get_pair_name());
+  }
+
+  void
+  getInputOnlyMode(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) return;
+
+    print_req(request);
+    const json body {
+      { "enabled", config::input_only_mode.load(std::memory_order_acquire) },
+      { "activeSessions", rtsp_stream::session_count() },
+      { "appliesToExistingSessions", false },
+    };
+    send_response(response, body);
+  }
+
+  void
+  setInputOnlyMode(resp_https_t response, req_https_t request) {
+    if (!check_content_type(response, request, "application/json")) return;
+    if (!authenticate(response, request)) return;
+
+    print_req(request);
+
+    try {
+      std::stringstream content;
+      content << request->content.rdbuf();
+      const auto request_body = json::parse(content.str());
+      if (!request_body.contains("enabled") || !request_body["enabled"].is_boolean()) {
+        response->write(SimpleWeb::StatusCode::client_error_bad_request,
+                        json { { "error", "The enabled field must be a boolean" } }.dump());
+        return;
+      }
+
+      const bool enabled = request_body["enabled"].get<bool>();
+      std::lock_guard lock { input_only_mode_mutex };
+      const bool current = config::input_only_mode.load(std::memory_order_acquire);
+
+      if (current != enabled &&
+          !config::update_config({ { "input_only_mode", enabled ? "true" : "false" } })) {
+        response->write(SimpleWeb::StatusCode::server_error_internal_server_error,
+                        json { { "error", "Failed to persist input-only mode" } }.dump());
+        return;
+      }
+
+      config::input_only_mode.store(enabled, std::memory_order_release);
+      BOOST_LOG(info) << "Input-only mode "sv << (enabled ? "enabled"sv : "disabled"sv)
+                      << "; existing sessions are unchanged"sv;
+
+      const json body {
+        { "enabled", enabled },
+        { "activeSessions", rtsp_stream::session_count() },
+        { "appliesToExistingSessions", false },
+      };
+      send_response(response, body);
+    }
+    catch (const json::exception &e) {
+      response->write(SimpleWeb::StatusCode::client_error_bad_request,
+                      json { { "error", std::string { "Invalid JSON: " } + e.what() } }.dump());
+    }
   }
 
   std::vector<std::string>
@@ -3772,6 +3831,8 @@ namespace confighttp {
     server.resource["^/api/apps$"]["POST"] = saveApp;
     server.resource["^/api/config$"]["GET"] = getConfig;
     server.resource["^/api/config$"]["POST"] = saveConfig;
+    server.resource["^/api/input-only-mode$"]["GET"] = getInputOnlyMode;
+    server.resource["^/api/input-only-mode$"]["POST"] = setInputOnlyMode;
     server.resource["^/api/webhook/config$"]["GET"] = getWebhookConfig;
     server.resource["^/api/webhook/config$"]["POST"] = saveWebhookConfig;
     server.resource["^/api/webhook/test$"]["POST"] = testWebhook;

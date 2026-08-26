@@ -5,6 +5,7 @@
 #include "process.h"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 #include <cstdint>
@@ -693,6 +694,9 @@ namespace stream {
 
     // 标识这是仅控制流会话（只作为输入设备，不传输视频/音频）
     bool control_only { false };
+    // Standard clients require video transport even in input-only mode. This
+    // path sends a pre-encoded black heartbeat without capture or an encoder.
+    bool input_only_mode { false };
   };
 
   namespace session {
@@ -3898,6 +3902,56 @@ namespace stream {
   }
 
   void
+  inputOnlyVideoThread(session_t *session) {
+    auto global_shutdown_event = mail::man->event<bool>(mail::shutdown);
+    auto fg = util::fail_guard([&]() {
+      const auto reason = global_shutdown_event->peek() ? session::stop_reason_e::host_terminate : session::stop_reason_e::video_ended;
+      session::stop(*session, reason);
+    });
+
+    while_starting_do_nothing(session->lifecycle);
+
+    auto ref = broadcast_shared.ref();
+    auto error = recv_ping(session, ref, socket_e::video, session->video.ping_payload, session->video.peer, config::stream.ping_timeout);
+    if (error < 0) {
+      return;
+    }
+
+    auto address = session->video.peer.address();
+    session->video.qos = platf::enable_socket_qos(ref->video_sock.native_handle(), address,
+      session->video.peer.port(), platf::qos_data_type_e::video, session->config.videoQosType != 0);
+
+    // One 16x16 black H.264 baseline IDR access unit: AUD, SPS, PPS, and IDR.
+    // It was encoded offline and contains no SEI or encoder metadata. Reusing
+    // it means this thread performs no capture, colorspace conversion, or live
+    // encoding. At one frame per second, the media payload is 52 bytes/s before
+    // the protocol's packet and FEC overhead.
+    static constexpr std::array<std::uint8_t, 52> black_h264_idr {
+      0x00, 0x00, 0x00, 0x01, 0x09, 0x10, 0x00, 0x00, 0x00, 0x01, 0x67, 0x42,
+      0xc0, 0x1e, 0xdd, 0xec, 0x04, 0x40, 0x00, 0x00, 0x03, 0x00, 0x40, 0x00,
+      0x00, 0x03, 0x00, 0xa3, 0xc5, 0x8b, 0xe0, 0x00, 0x00, 0x00, 0x01, 0x68,
+      0xce, 0x0f, 0xc8, 0x00, 0x00, 0x01, 0x65, 0x88, 0x84, 0x3a, 0x26, 0x28,
+      0x00, 0x09, 0x02, 0xe0,
+    };
+
+    BOOST_LOG(info) << "Input-only mode: starting 16x16 H.264 compatibility heartbeat at 1 fps"sv;
+    auto packets = mail::man->queue<video::packet_t>(mail::video_packets);
+    std::int64_t frame_index = 1;
+
+    while (!session->shutdown_event->peek() && !global_shutdown_event->peek()) {
+      std::vector<std::uint8_t> frame_data { black_h264_idr.begin(), black_h264_idr.end() };
+      auto packet = std::make_unique<video::packet_raw_generic>(std::move(frame_data), frame_index++, true);
+      packet->channel_data = session;
+      packet->frame_timestamp = std::chrono::steady_clock::now();
+      packets->raise(std::move(packet));
+
+      if (session->shutdown_event->view(1s) || global_shutdown_event->peek()) {
+        break;
+      }
+    }
+  }
+
+  void
   audioThread(session_t *session) {
     auto global_shutdown_event = mail::man->event<bool>(mail::shutdown);
     auto fg = util::fail_guard([&]() {
@@ -3986,8 +4040,14 @@ namespace stream {
         task_pool.cancel(force_kill);
       });
 
+      if (session.input_only_mode && !session.control_only) {
+        BOOST_LOG(debug) << "Waiting for input-only compatibility video to end..."sv;
+        session.videoThread.join();
+        BOOST_LOG(debug) << "Waiting for input-only audio to end..."sv;
+        session.audioThread.join();
+      }
       // 仅控制流会话没有视频/音频线程
-      if (!session.control_only) {
+      else if (!session.control_only) {
         BOOST_LOG(debug) << "Waiting for video to end..."sv;
         session.videoThread.join();
         BOOST_LOG(debug) << "Waiting for audio to end..."sv;
@@ -4005,9 +4065,9 @@ namespace stream {
 
       // 对于仅控制流会话，只减少总会话计数，不调用 streaming_will_stop
       // 只有当所有非控制流会话都结束时才调用 streaming_will_stop
-      if (session.control_only) {
+      if (session.control_only || session.input_only_mode) {
         --running_sessions;
-        BOOST_LOG(debug) << "Control-only session ended (remaining sessions: "sv << running_sessions.load() << ")"sv;
+        BOOST_LOG(debug) << "Input-only session ended (remaining sessions: "sv << running_sessions.load() << ")"sv;
       }
       else {
         // 非仅控制流会话：减少两个计数器
@@ -4098,7 +4158,7 @@ namespace stream {
 
       bool first_video_session {false};
       bool video_session_registered {false};
-      if (!session.control_only) {
+      if (!session.control_only && !session.input_only_mode) {
         const auto registration = register_video_session();
         if (!registration) {
           return -1;
@@ -4131,6 +4191,10 @@ namespace stream {
       if (session.control_only) {
         BOOST_LOG(info) << "Starting control-only session from ["sv << addr_string << "] - will only handle input control"sv;
       }
+      else if (session.input_only_mode) {
+        BOOST_LOG(info) << "Starting input-only compatibility session from ["sv << addr_string
+                        << "] - host audio, synthetic video heartbeat, and input control"sv;
+      }
       else {
         BOOST_LOG(debug) << "Expecting incoming session connections from "sv << addr_string;
       }
@@ -4143,7 +4207,11 @@ namespace stream {
       clipboard_bridge::bridge_t::instance().session_started(session.launch_session_id);
 
       // 仅控制流会话不启动视频/音频线程
-      if (!session.control_only) {
+      if (session.input_only_mode && !session.control_only) {
+        session.audioThread = std::thread { audioThread, &session };
+        session.videoThread = std::thread { inputOnlyVideoThread, &session };
+      }
+      else if (!session.control_only) {
         session.audioThread = std::thread { audioThread, &session };
         session.videoThread = std::thread { videoThread, &session };
       }
@@ -4153,7 +4221,7 @@ namespace stream {
 
       // 在生命周期仍为 STARTING 时完成麦克风注册。session::stop() 会等待该边界，
       // 避免 join() 在套接字引用和路由信息配对前释放会话。
-      if (!session.control_only) {
+      if (!session.control_only && !session.input_only_mode) {
         if (session.audio.enable_mic) {
           setup_mic_for_session(session, addr);
         }
@@ -4171,7 +4239,7 @@ namespace stream {
         session.current_total_bitrate.load(std::memory_order_relaxed),
         ::config::video.encoder.empty() ? "auto" : ::config::video.encoder,
         ::config::video.capture.empty() ? "auto" : ::config::video.capture,
-        session.control_only,
+        session.control_only || session.input_only_mode,
       });
       tray_state::add_session(
         session.launch_session_id,
@@ -4181,8 +4249,8 @@ namespace stream {
 
       // 仅控制流会话不触发 streaming_will_start 回调，因为它们不传输视频/音频
       // 但它们仍然需要被计入 running_sessions，以便正确管理会话
-      if (session.control_only) {
-        BOOST_LOG(debug) << "Control-only session started (total sessions: "sv << running_sessions.load() << ")"sv;
+      if (session.control_only || session.input_only_mode) {
+        BOOST_LOG(debug) << "Input-only session started (total sessions: "sv << running_sessions.load() << ")"sv;
       }
       else {
         // If this is the first non-control-only session, invoke the platform callbacks
@@ -4337,6 +4405,7 @@ namespace stream {
       session->audio.enable_mic = launch_session.enable_mic;
 
       session->control_only = launch_session.control_only;
+      session->input_only_mode = launch_session.input_only_mode;
 
       session->control.peer = nullptr;
 

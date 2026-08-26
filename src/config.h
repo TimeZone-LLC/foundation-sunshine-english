@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include <atomic>
 #include <bitset>
 #include <chrono>
 #include <map>
@@ -288,6 +289,11 @@ namespace config {
   extern video_t video;
   extern audio_t audio;
   extern stream_t stream;
+  /**
+   * When enabled, new launches must use the protocol's control-only handshake.
+   * This is atomic because the Web UI can change it without restarting Sunshine.
+   */
+  extern std::atomic_bool input_only_mode;
   extern nvhttp_t nvhttp;
   extern input_t input;
   extern sunshine_t sunshine;

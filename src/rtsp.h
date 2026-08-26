@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include <boost/function.hpp>
 #include <boost/process/v1.hpp>
@@ -73,12 +74,31 @@ namespace rtsp_stream {
     bool setup_control { false };
     bool setup_mic { false };
     bool control_only { false };
+    // Captured when /launch or /resume is accepted so a live UI toggle cannot
+    // change the policy halfway through this RTSP handshake.
+    bool input_only_mode { false };
 
     // GameStream 的 RTSP 请求可能分别使用独立 TCP 连接，
     // 但一个启动票据最多只能创建一个串流会话。
     bool stream_session_started { false };
     std::string stream_announce_payload;
   };
+
+  /**
+   * @brief Return true when the client requested only the control stream.
+   */
+  inline bool
+  is_control_only_handshake(const launch_session_t &session) {
+    return session.setup_control && !session.setup_video && !session.setup_audio && !session.setup_mic;
+  }
+
+  /**
+   * @brief Return true when input-only mode should provide a compatibility video stream.
+   */
+  inline bool
+  uses_input_only_keepalive_video(const launch_session_t &session) {
+    return session.input_only_mode && session.setup_control && session.setup_video;
+  }
 
   launch_ticket_register_e
   launch_session_raise(std::shared_ptr<launch_session_t> launch_session);

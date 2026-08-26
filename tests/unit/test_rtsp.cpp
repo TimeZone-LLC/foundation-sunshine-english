@@ -31,6 +31,33 @@ namespace {
   }
 }  // namespace
 
+TEST(RtspInputOnly, RecognizesControlOnlyHandshake) {
+  rtsp_stream::launch_session_t session {};
+  session.setup_control = true;
+  EXPECT_TRUE(rtsp_stream::is_control_only_handshake(session));
+
+  session.setup_video = true;
+  EXPECT_FALSE(rtsp_stream::is_control_only_handshake(session));
+  session.setup_video = false;
+  session.setup_audio = true;
+  EXPECT_FALSE(rtsp_stream::is_control_only_handshake(session));
+  session.setup_audio = false;
+  session.setup_mic = true;
+  EXPECT_FALSE(rtsp_stream::is_control_only_handshake(session));
+}
+
+TEST(RtspInputOnly, UsesCompatibilityVideoForStandardClientHandshake) {
+  rtsp_stream::launch_session_t session {};
+  EXPECT_FALSE(rtsp_stream::uses_input_only_keepalive_video(session));
+
+  session.input_only_mode = true;
+  session.setup_control = true;
+  EXPECT_FALSE(rtsp_stream::uses_input_only_keepalive_video(session));
+
+  session.setup_video = true;
+  EXPECT_TRUE(rtsp_stream::uses_input_only_keepalive_video(session));
+}
+
 TEST(LaunchSessionManager, RoutesConcurrentPlaintextClientsAndPreservesSingletonFallback) {
   rtsp_stream::launch_session_manager_t manager;
   const auto now = rtsp_stream::launch_session_manager_t::clock_t::now();

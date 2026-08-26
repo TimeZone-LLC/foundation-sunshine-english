@@ -1171,15 +1171,15 @@ namespace rtsp_stream {
                     << ", AUDIO=" << ((encryption_flags_requested & SS_ENC_AUDIO) ? "1" : "0")
                     << ", MIC=" << ((encryption_flags_requested & SS_ENC_MIC) ? "1" : "0") << ")";
 
-    if (video::last_encoder_probe_supported_ref_frames_invalidation) {
+    if (!session.input_only_mode && video::last_encoder_probe_supported_ref_frames_invalidation) {
       ss << "a=x-nv-video[0].refPicInvalidation:1"sv << std::endl;
     }
 
-    if (video::active_hevc_mode != 1) {
+    if (!session.input_only_mode && video::active_hevc_mode != 1) {
       ss << "sprop-parameter-sets=AAAAAU"sv << std::endl;
     }
 
-    if (video::active_av1_mode != 1) {
+    if (!session.input_only_mode && video::active_av1_mode != 1) {
       ss << "a=rtpmap:98 AV1/90000"sv << std::endl;
     }
 
@@ -1626,10 +1626,29 @@ namespace rtsp_stream {
       return;
     }
 
-    // 检测是否仅控制流会话（只有 control 流被设置，没有 video 和 audio）
-    session.control_only = session.setup_control && !session.setup_video && !session.setup_audio;
+    // A client may request a genuine control-only session independently. Older
+    // clients still require a video transport, so input-only mode supplies a
+    // tiny pre-encoded black H.264 heartbeat without capture or live encoding.
+    session.control_only = is_control_only_handshake(session);
+    if (session.input_only_mode && !session.control_only && !uses_input_only_keepalive_video(session)) {
+      BOOST_LOG(warning) << "Input-only mode requires control and video SETUP streams"sv;
+      respond(sock, session, &option, 412, "PRECONDITION FAILED", req->sequenceNumber, {});
+      return;
+    }
+    if (uses_input_only_keepalive_video(session) && config.monitor.videoFormat != 0) {
+      BOOST_LOG(warning) << "Input-only compatibility video requires H.264; client requested format "sv
+                         << config.monitor.videoFormat;
+      respond(sock, session, &option, 415, "UNSUPPORTED MEDIA TYPE", req->sequenceNumber, {});
+      return;
+    }
     if (session.control_only) {
       BOOST_LOG(info) << "Control-only session detected: client ["sv << session.client_name << "] will only provide input control"sv;
+    }
+    else if (session.input_only_mode) {
+      config.monitor.dynamicRange = 0;
+      config.monitor.chromaSamplingType = 0;
+      BOOST_LOG(info) << "Input-only compatibility session detected: client ["sv << session.client_name
+                      << "] will receive host audio, a synthetic H.264 heartbeat, and input control"sv;
     }
 
     // Check that any required encryption is enabled

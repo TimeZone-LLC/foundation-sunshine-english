@@ -48,6 +48,27 @@
             </div>
           </div>
 
+          <div class="input-only-control" :class="{ active: inputOnlyEnabled === true }">
+            <span class="input-only-icon" aria-hidden="true">
+              <i class="fas fa-keyboard"></i>
+            </span>
+            <div class="input-only-copy">
+              <strong>{{ inputOnlyEnabled ? $t('index.input_only_on') : $t('index.input_only_off') }}</strong>
+              <span>{{ $t('index.input_only_summary') }}</span>
+              <span v-if="inputOnlyMessage" class="input-only-message" role="status">{{ inputOnlyMessage }}</span>
+            </div>
+            <button
+              type="button"
+              class="input-only-toggle"
+              :aria-pressed="inputOnlyEnabled === true"
+              :disabled="inputOnlyEnabled === null || inputOnlySaving"
+              @click="toggleInputOnlyMode"
+            >
+              <i v-if="inputOnlySaving" class="fas fa-spinner fa-spin" aria-hidden="true"></i>
+              <span>{{ inputOnlyEnabled ? $t('index.input_only_disable') : $t('index.input_only_enable') }}</span>
+            </button>
+          </div>
+
         </div>
       </section>
 
@@ -99,6 +120,9 @@ const hostConfig = ref(null)
 const hostStatus = ref('loading')
 const appsCount = ref(null)
 const clientsCount = ref(null)
+const inputOnlyEnabled = ref(null)
+const inputOnlySaving = ref(false)
+const inputOnlyMessage = ref('')
 
 const hasStableUpdate = computed(() => stableBuildAvailable.value)
 
@@ -116,6 +140,34 @@ const countCollection = (payload, key) => {
   if (Array.isArray(payload?.[key])) return payload[key].length
   if (key === 'clients' && Array.isArray(payload?.named_certs)) return payload.named_certs.length
   return null
+}
+
+const loadInputOnlyMode = async () => {
+  const result = await apiJson('/api/input-only-mode')
+  inputOnlyEnabled.value = result.enabled === true
+}
+
+const toggleInputOnlyMode = async () => {
+  if (inputOnlyEnabled.value === null || inputOnlySaving.value) return
+
+  inputOnlySaving.value = true
+  inputOnlyMessage.value = ''
+  const nextEnabled = !inputOnlyEnabled.value
+
+  try {
+    const result = await apiJson('/api/input-only-mode', {
+      method: 'POST',
+      body: { enabled: nextEnabled },
+    })
+    inputOnlyEnabled.value = result.enabled === true
+    inputOnlyMessage.value = result.activeSessions > 0
+      ? t('index.input_only_existing_sessions')
+      : t('index.input_only_saved')
+  } catch (error) {
+    inputOnlyMessage.value = error.message || t('index.input_only_failed')
+  } finally {
+    inputOnlySaving.value = false
+  }
 }
 
 // 使用组合式函数
@@ -176,12 +228,17 @@ onMounted(async () => {
       return
     }
 
-    const [appsResult, clientsResult] = await Promise.allSettled([
+    const [appsResult, clientsResult, inputOnlyResult] = await Promise.allSettled([
       apiJson('/api/apps'),
       apiJson('/api/clients/list'),
+      loadInputOnlyMode(),
     ])
     if (appsResult.status === 'fulfilled') appsCount.value = countCollection(appsResult.value, 'apps')
     if (clientsResult.status === 'fulfilled') clientsCount.value = countCollection(clientsResult.value, 'clients')
+    if (inputOnlyResult.status === 'rejected') {
+      inputOnlyEnabled.value = false
+      inputOnlyMessage.value = t('index.input_only_failed')
+    }
 
     // 版本和日志互不阻塞，避免外部版本检查拖延本机状态提示
     await Promise.allSettled([fetchVersions(config), fetchLogs()])
@@ -417,6 +474,89 @@ onMounted(async () => {
   line-height: 1.1;
 }
 
+.input-only-control {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  gap: 0.55rem;
+  align-items: center;
+  padding: 0.48rem 0.55rem;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface-strong);
+}
+
+.input-only-control.active {
+  border-color: var(--ui-border-strong);
+  background: var(--ui-surface-hover);
+}
+
+.input-only-icon {
+  display: inline-flex;
+  width: 2rem;
+  height: 2rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ui-border);
+  background: var(--ui-surface);
+  color: var(--ui-text-muted);
+}
+
+.input-only-copy {
+  min-width: 0;
+}
+
+.input-only-copy > strong,
+.input-only-copy > span {
+  display: block;
+}
+
+.input-only-copy > strong {
+  color: var(--ui-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.input-only-copy > span {
+  color: var(--ui-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.25;
+}
+
+.input-only-copy > .input-only-message {
+  margin-top: 0.18rem;
+  color: var(--ui-text-primary);
+}
+
+.input-only-toggle {
+  display: inline-flex;
+  min-height: 2rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--ui-border-strong);
+  border-radius: 0;
+  background: var(--ui-surface);
+  color: var(--ui-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  transition: background-color 100ms, color 100ms, border-color 100ms;
+}
+
+.input-only-toggle:hover:not(:disabled) {
+  background: var(--ui-surface-hover);
+}
+
+.input-only-toggle:focus-visible {
+  outline: 2px solid var(--ui-text-primary);
+  outline-offset: 1px;
+}
+
+.input-only-toggle:disabled {
+  cursor: not-allowed;
+  color: var(--ui-text-muted);
+}
+
 .quick-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -583,6 +723,10 @@ onMounted(async () => {
   .quick-actions {
     grid-column: 1 / -1;
   }
+
+  .input-only-control {
+    grid-column: 1 / -1;
+  }
 }
 
 .home-alert {
@@ -642,6 +786,15 @@ onMounted(async () => {
 
   .quick-actions {
     grid-template-columns: 1fr;
+  }
+
+  .input-only-control {
+    grid-template-columns: 2rem minmax(0, 1fr);
+  }
+
+  .input-only-toggle {
+    grid-column: 1 / -1;
+    width: 100%;
   }
 }
 </style>

@@ -499,6 +499,8 @@ namespace config {
     ENCRYPTION_MODE_OPPORTUNISTIC,  // wan_encryption_mode
   };
 
+  std::atomic_bool input_only_mode { false };
+
   nvhttp_t nvhttp {
     "lan",  // origin web manager
 
@@ -1487,6 +1489,10 @@ namespace config {
     bool_f(vars, "stream_audio", audio.stream);
     bool_f(vars, "stream_mic", audio.stream_mic);
     bool_f(vars, "install_steam_audio_drivers", audio.install_steam_drivers);
+
+    bool input_only = input_only_mode.load(std::memory_order_relaxed);
+    bool_f(vars, "input_only_mode", input_only);
+    input_only_mode.store(input_only, std::memory_order_release);
 
     string_restricted_f(vars, "origin_web_ui_allowed", nvhttp.origin_web_ui_allowed, { "pc"sv, "lan"sv, "wan"sv });
 

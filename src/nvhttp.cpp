@@ -508,7 +508,9 @@ namespace nvhttp {
     tree.put("root.uniqueid", http::unique_id);
     tree.put("root.HttpsPort", net::map_port(PORT_HTTPS));
     tree.put("root.ExternalPort", net::map_port(PORT_HTTP));
-    tree.put("root.MaxLumaPixelsHEVC", video::active_hevc_mode > 1 ? "1869449984" : "0");
+    const bool input_only_mode = config::input_only_mode.load(std::memory_order_acquire);
+    tree.put("root.MaxLumaPixelsHEVC", !input_only_mode && video::active_hevc_mode > 1 ? "1869449984" : "0");
+    tree.put("root.InputOnlyMode", input_only_mode ? 1 : 0);
 
     // Only include the MAC address for requests sent from paired clients over HTTPS.
     // For HTTP requests, use a placeholder MAC address that Moonlight knows to ignore.
@@ -536,28 +538,28 @@ namespace nvhttp {
     }
 
     uint32_t codec_mode_flags = SCM_H264;
-    if (video::last_encoder_probe_supported_yuv444_for_codec[0]) {
+    if (!input_only_mode && video::last_encoder_probe_supported_yuv444_for_codec[0]) {
       codec_mode_flags |= SCM_H264_HIGH8_444;
     }
-    if (video::active_hevc_mode >= 2) {
+    if (!input_only_mode && video::active_hevc_mode >= 2) {
       codec_mode_flags |= SCM_HEVC;
       if (video::last_encoder_probe_supported_yuv444_for_codec[1]) {
         codec_mode_flags |= SCM_HEVC_REXT8_444;
       }
     }
-    if (video::active_hevc_mode >= 3) {
+    if (!input_only_mode && video::active_hevc_mode >= 3) {
       codec_mode_flags |= SCM_HEVC_MAIN10;
       if (video::last_encoder_probe_supported_yuv444_for_codec[1]) {
         codec_mode_flags |= SCM_HEVC_REXT10_444;
       }
     }
-    if (video::active_av1_mode >= 2) {
+    if (!input_only_mode && video::active_av1_mode >= 2) {
       codec_mode_flags |= SCM_AV1_MAIN8;
       if (video::last_encoder_probe_supported_yuv444_for_codec[2]) {
         codec_mode_flags |= SCM_AV1_HIGH8_444;
       }
     }
-    if (video::active_av1_mode >= 3) {
+    if (!input_only_mode && video::active_av1_mode >= 3) {
       codec_mode_flags |= SCM_AV1_MAIN10;
       if (video::last_encoder_probe_supported_yuv444_for_codec[2]) {
         codec_mode_flags |= SCM_AV1_HIGH10_444;
@@ -646,6 +648,8 @@ namespace nvhttp {
 
     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
     const auto launch_session = make_launch_session(host_audio, args);
+    launch_session->input_only_mode = config::input_only_mode.load(std::memory_order_acquire);
+    launch_session->env["SUNSHINE_INPUT_ONLY_MODE"] = launch_session->input_only_mode ? "true" : "false";
     launch_session->rtsp_peer_address = net::addr_to_normalized_string(request->remote_endpoint().address());
     const auto fingerprint_match = client_fingerprint::match_client(args);
     launch_session->highly_suspected_unknown_client = fingerprint_match.suspicious;
@@ -656,7 +660,9 @@ namespace nvhttp {
       launch_session->client_cert_uuid = client_cert_uuid;
       launch_session->env["SUNSHINE_CLIENT_CERT_UUID"] = client_cert_uuid;
     }
-    hdr::resolve_session_target(*launch_session);
+    if (!launch_session->input_only_mode) {
+      hdr::resolve_session_target(*launch_session);
+    }
     if (launch_session->highly_suspected_unknown_client) {
       BOOST_LOG(warning) << "Launch request highly resembles a known unauthorized client fork"
                          << " [client_uuid=" << client_cert_uuid
@@ -666,7 +672,10 @@ namespace nvhttp {
                          << ", rule_source=" << fingerprint_match.source << ']';
     }
 
-    if (rtsp_stream::session_count() == 0) {
+    if (launch_session->input_only_mode) {
+      BOOST_LOG(info) << "Input-only mode: skipping display preparation and encoder probing for launch"sv;
+    }
+    else if (rtsp_stream::session_count() == 0) {
       // We want to prepare display only if there are no active sessions at
       // the moment. This should to be done before probing encoders as it could
       // change display device's state.
@@ -716,6 +725,7 @@ namespace nvhttp {
                                    net::addr_to_url_escaped_string(request->local_endpoint().address()) + ':' +
                                    std::to_string(net::map_port(rtsp_stream::RTSP_SETUP_PORT)));
     tree.put("root.gamesession", 1);
+    tree.put("root.inputOnly", launch_session->input_only_mode ? 1 : 0);
 
     try {
       std::map<std::string, std::string> extra_data {
@@ -814,6 +824,8 @@ namespace nvhttp {
       host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
     }
     const auto launch_session = make_launch_session(host_audio, args);
+    launch_session->input_only_mode = config::input_only_mode.load(std::memory_order_acquire);
+    launch_session->env["SUNSHINE_INPUT_ONLY_MODE"] = launch_session->input_only_mode ? "true" : "false";
     launch_session->rtsp_peer_address = net::addr_to_normalized_string(request->remote_endpoint().address());
     const auto fingerprint_match = client_fingerprint::match_client(args);
     launch_session->highly_suspected_unknown_client = fingerprint_match.suspicious;
@@ -824,7 +836,9 @@ namespace nvhttp {
       launch_session->client_cert_uuid = client_cert_uuid;
       launch_session->env["SUNSHINE_CLIENT_CERT_UUID"] = client_cert_uuid;
     }
-    hdr::resolve_session_target(*launch_session);
+    if (!launch_session->input_only_mode) {
+      hdr::resolve_session_target(*launch_session);
+    }
     if (launch_session->highly_suspected_unknown_client) {
       BOOST_LOG(warning) << "Resume request highly resembles a known unauthorized client fork"
                          << " [client_uuid=" << client_cert_uuid
@@ -834,7 +848,10 @@ namespace nvhttp {
                          << ", rule_source=" << fingerprint_match.source << ']';
     }
 
-    if (no_active_sessions) {
+    if (launch_session->input_only_mode) {
+      BOOST_LOG(info) << "Input-only mode: skipping display preparation and encoder probing for resume"sv;
+    }
+    else if (no_active_sessions) {
       // Prepare before publishing the ticket so the handshake expiration
       // window starts only when the host is ready to accept RTSP.
       if (!stream_start::prepare_display_and_probe_encoders(tree, *launch_session, false)) {
@@ -864,6 +881,7 @@ namespace nvhttp {
                                    net::addr_to_url_escaped_string(request->local_endpoint().address()) + ':' +
                                    std::to_string(net::map_port(rtsp_stream::RTSP_SETUP_PORT)));
     tree.put("root.resume", 1);
+    tree.put("root.inputOnly", launch_session->input_only_mode ? 1 : 0);
     need_to_restore_display_state = false;
 
     try {

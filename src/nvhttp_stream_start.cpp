@@ -416,6 +416,7 @@ namespace nvhttp::stream_start {
       recovery_session.setup_control = launch_session.setup_control;
       recovery_session.setup_mic = launch_session.setup_mic;
       recovery_session.control_only = launch_session.control_only;
+      recovery_session.input_only_mode = launch_session.input_only_mode;
       recovery_session.env["SUNSHINE_CLIENT_USE_VDD"] = "true";
     }
 

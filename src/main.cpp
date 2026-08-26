@@ -554,7 +554,12 @@ main(int argc, char *argv[]) {
   // so they stay behind it.
   std::thread configThread { confighttp::start };
 
-  probe_encoders_with_watchdog();
+  if (config::input_only_mode.load(std::memory_order_acquire)) {
+    BOOST_LOG(info) << "Input-only mode: skipping startup display capture and encoder probe"sv;
+  }
+  else {
+    probe_encoders_with_watchdog();
+  }
 
   std::thread httpThread { nvhttp::start };
   std::thread rtspThread { rtsp_stream::start };
