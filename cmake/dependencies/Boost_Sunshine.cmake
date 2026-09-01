@@ -7,6 +7,7 @@ set(BOOST_VERSION "1.92.0")
 set(BOOST_RELEASE_VERSION "1.92.0")
 set(BOOST_COMPONENTS
         atomic
+        asio
         beast
         filesystem
         format
@@ -14,6 +15,7 @@ set(BOOST_COMPONENTS
         locale
         log
         optional
+        process
         program_options
         property_tree
         system
@@ -58,9 +60,7 @@ if(NOT Boost_FOUND)
     # more components required for compiling boost targets
     # (format and property_tree are already in the base list above)
     list(APPEND BOOST_COMPONENTS
-            asio
-            crc
-            process)
+            crc)
 
     set(BOOST_ENABLE_CMAKE ON)
 
