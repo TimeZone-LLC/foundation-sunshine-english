@@ -321,6 +321,14 @@ namespace config {
   get_clients_config();
 
   /**
+   * Return the per-client touch-keyboard preference: true when the client
+   * entry exists and its touch.enabled is true.  Unknown clients and
+   * entries without a touch object default to false.
+   */
+  bool
+  get_client_touch_keyboard_enabled(const std::string &uuid);
+
+  /**
    * Persist per-client settings and publish them to the running process.
    * An unchanged value is treated as a successful save.
    */

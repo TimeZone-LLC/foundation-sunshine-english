@@ -493,6 +493,9 @@ namespace nvhttp {
         BOOST_LOG(info) << "Client declared gamepad preference: "sv << declared_gamepad;
       }
     }
+    // Client-declared touch-keyboard intent (Sunshine protocol extension).
+    // -1 undeclared: fall back to the per-client server profile.
+    launch_session->touch_keyboard = util::from_view(get_arg(args, "touchKeyboard", "-1"));
     const auto hdr_capabilities = hdr::parse_client_display_capabilities(
       find_arg(args, "maxBrightness"),
       find_arg(args, "minBrightness"),

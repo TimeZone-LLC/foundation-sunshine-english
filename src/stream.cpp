@@ -68,6 +68,8 @@ extern "C" {
 #include "cursor_channel.h"
 #include "platform/common.h"
 #include "text_context/bridge.h"
+#include "touch_keyboard_session.h"
+#include "virtual_touchscreen_session.h"
 
 #define IDX_START_A 0
 #define IDX_START_B 1
@@ -4343,6 +4345,11 @@ namespace stream {
 
       // Only real video sessions acquire the platform streaming optimizations.
       if (!session.control_only && !session.input_only_mode && unregister_video_session() == 0) {
+#ifdef _WIN32
+        // Touch experience teardown is paired with the mount at stream start.
+        touch_kb::end_session();
+        vts::stop();
+#endif
         platf::streaming_will_stop();
         const auto stop_reason = session.lifecycle.snapshot().stop_reason;
         if (config::stream.stop_on_last_video_session &&

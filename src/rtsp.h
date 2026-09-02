@@ -64,6 +64,13 @@ namespace rtsp_stream {
     // Empty = undeclared: the host-side selection chain applies as before.
     // One of: auto, x360, ds4, ds5.
     std::string client_gamepad;
+
+    // Client-declared intent to use the on-screen touch keyboard during the
+    // session.  Tri-state: -1 undeclared (fall back to the per-client server
+    // profile), 0 explicitly off, 1 explicitly on.  When effective-on, the
+    // host attaches the virtual USB touchscreen and applies the touch
+    // keyboard AutoInvoke registry key group for the session.
+    int touch_keyboard { -1 };
     hdr::client_display_capabilities_t reported_hdr_capabilities;
     hdr::client_display_capabilities_t hdr_capabilities;
     hdr::target_source_e hdr_target_source { hdr::target_source_e::safe_defaults };
