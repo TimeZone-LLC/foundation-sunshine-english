@@ -91,7 +91,6 @@ dependencies=(
   "mingw-w64-ucrt-x86_64-MinHook"
   "mingw-w64-ucrt-x86_64-miniupnpc"
   "mingw-w64-ucrt-x86_64-nlohmann-json"
-  "mingw-w64-ucrt-x86_64-nodejs"
   "mingw-w64-ucrt-x86_64-nsis"
   "mingw-w64-ucrt-x86_64-onevpl"
   "mingw-w64-ucrt-x86_64-openssl"
@@ -100,6 +99,10 @@ dependencies=(
 )
 pacman -S ${dependencies[@]}
 ```
+
+Install native [Node.js](https://nodejs.org/en/download) for the target architecture to build
+the frontend. The MSYS2 Node.js package uses a shared runtime that cannot load the native
+binding required by Rolldown.
 
 ### Clone
 Ensure [git](https://git-scm.com) is installed on your system, then clone the repository using the following command:
