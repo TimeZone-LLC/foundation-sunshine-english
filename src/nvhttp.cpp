@@ -855,6 +855,10 @@ namespace nvhttp {
     const auto launch_session = make_launch_session(host_audio, args);
     launch_session->input_only_mode = config::input_only_mode.load(std::memory_order_acquire);
     launch_session->env["SUNSHINE_INPUT_ONLY_MODE"] = launch_session->input_only_mode ? "true" : "false";
+    if (launch_session->width <= 0 || launch_session->height <= 0 || launch_session->fps <= 0) {
+      BOOST_LOG(warning) << "Resume request has no usable mode; keeping the current display resolution and refresh rate for compatibility. "sv
+                            "Update Moonlight-Switch to a version that sends mode on Resume when one is available."sv;
+    }
     launch_session->rtsp_peer_address = net::addr_to_normalized_string(request->remote_endpoint().address());
     const auto fingerprint_match = client_fingerprint::match_client(args);
     launch_session->highly_suspected_unknown_client = fingerprint_match.suspicious;

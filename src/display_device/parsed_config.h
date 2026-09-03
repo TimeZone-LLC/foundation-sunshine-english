@@ -202,16 +202,17 @@ namespace display_device {
    * @brief Parse the user configuration and the session information.
    * @param config User's video related configuration.
    * @param session Session information.
+   * @param is_reconfigure True for Launch and dynamic reconfiguration; false for Resume.
    * @returns Parsed configuration or empty optional if parsing has failed.
    *
    * EXAMPLES:
    * ```cpp
    * const std::shared_ptr<rtsp_stream::launch_session_t> launch_session; // Assuming ptr is properly initialized
    * const config::video_t &video_config { config::video };
-   * const auto parsed_config = make_parsed_config(video_config, *launch_session);
+   * const auto parsed_config = make_parsed_config(video_config, *launch_session, false);
    * ```
    */
   boost::optional<parsed_config_t>
-  make_parsed_config(const config::video_t &config, const rtsp_stream::launch_session_t &session);
+  make_parsed_config(const config::video_t &config, const rtsp_stream::launch_session_t &session, bool is_reconfigure);
 
 }  // namespace display_device
