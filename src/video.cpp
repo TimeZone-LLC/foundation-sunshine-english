@@ -28,6 +28,7 @@ extern "C" {
 }
 
 // lib includes
+#include "blank_output.h"
 #include "cbs.h"
 #include "config.h"
 #include "display_device/display_device.h"
@@ -1990,6 +1991,7 @@ namespace video {
 
     while (capture_ctx_queue->running()) {
       bool artificial_reinit = false;
+      bool blank_pause = false;
 
       auto push_captured_image_callback = [&](std::shared_ptr<platf::img_t> &&img, bool frame_captured) -> bool {
         KITTY_WHILE_LOOP(auto capture_ctx = std::begin(capture_ctxs), capture_ctx != std::end(capture_ctxs), {
@@ -2002,6 +2004,12 @@ namespace video {
         })
 
         if (!capture_ctx_queue->running()) {
+          return false;
+        }
+
+        if (blank_output::enabled()) {
+          // Hand control back to the loop below so the display is left alone until the flag clears.
+          blank_pause = true;
           return false;
         }
 
@@ -2032,6 +2040,17 @@ namespace video {
       };
 
       auto status = disp->capture(push_captured_image_callback, pull_free_image_callback, &display_cursor);
+
+      if (blank_pause && status == platf::capture_e::ok) {
+        // Blank output: no snapshots, so the GPU does no capture work. The encode loops send a
+        // static black picture on their own until the flag clears or the last session ends.
+        BOOST_LOG(info) << "Blank output enabled, capture paused on display ["sv << target_display_name << ']';
+        while (capture_ctx_queue->running() && blank_output::enabled()) {
+          std::this_thread::sleep_for(blank_output::capture_poll_interval);
+        }
+        BOOST_LOG(info) << "Blank output disabled, capture resumed on display ["sv << target_display_name << ']';
+        continue;
+      }
 
       if (artificial_reinit && status != platf::capture_e::error) {
         status = platf::capture_e::reinit;
@@ -3318,6 +3337,8 @@ namespace video {
       }
     }
 
+    blank_output::edge_tracker_t blank_edge;
+
     while (true) {
       // Break out of the encoding loop if any of the following are true:
       // a) The stream is ending
@@ -3341,6 +3362,29 @@ namespace video {
       if (idr_events->peek()) {
         requested_idr_frame = true;
         idr_events->pop();
+      }
+
+      const auto blank_transition = blank_edge.update(blank_output::enabled());
+      switch (blank_transition) {
+        case blank_output::transition_e::entered: {
+          // The capture thread has stopped delivering images, so the black frame stays in the
+          // encoder input until the flag clears.
+          auto black_img = disp->alloc_img();
+          if (!black_img || disp->dummy_img(black_img.get()) || session->convert(*black_img)) {
+            BOOST_LOG(error) << "Could not prepare the blank output frame"sv;
+          }
+          else {
+            BOOST_LOG(info) << "Blank output enabled, sending a black picture"sv;
+          }
+          requested_idr_frame = true;
+          break;
+        }
+        case blank_output::transition_e::exited:
+          BOOST_LOG(info) << "Blank output disabled, resuming the captured picture"sv;
+          requested_idr_frame = true;
+          break;
+        case blank_output::transition_e::none:
+          break;
       }
 
       // 处理动态参数调整
@@ -3375,7 +3419,19 @@ namespace video {
 
       // Encode at a minimum FPS to avoid image quality issues with static content
       // When variable_refresh_rate is enabled, only encode when we have a new frame
-      if (!requested_idr_frame || images->peek()) {
+      if (blank_edge.blanked()) {
+        // Anything captured before the toggle is dropped so the last real picture never leaks.
+        // Waiting on the image queue keeps shutdown responsive while pacing the keepalive.
+        if (blank_transition == blank_output::transition_e::entered) {
+          while (images->peek()) {
+            images->pop();
+          }
+        }
+        else if (!images->pop(blank_output::keepalive_frame_time) && !images->running()) {
+          break;
+        }
+      }
+      else if (!requested_idr_frame || images->peek()) {
         if (auto frame = pop_image_interruptible(effective_frame_time, input_activity_boost_policy.useful && !input_boost_active)) {
           auto &img = frame->image;
           if (!frame->is_replay) {
@@ -3413,7 +3469,7 @@ namespace video {
       // This allows the stream framerate to match the render framerate for VRR support
       // However, if minimum_fps_target is set, or input activity boost is active, we still encode
       // to maintain a temporary minimum FPS floor for better visual input feedback.
-      if (config::video.variable_refresh_rate && !has_new_frame && !requested_idr_frame) {
+      if (config::video.variable_refresh_rate && !blank_edge.blanked() && !has_new_frame && !requested_idr_frame) {
         // Only skip if minimum_fps_target is 0 (disabled) and input activity boost is inactive.
         if (config::video.minimum_fps_target == 0 && !input_boost_active) {
           continue;
@@ -3663,8 +3719,16 @@ namespace video {
     }
 
     auto ec = platf::capture_e::ok;
+    bool blank_loop_active = false;
     while (encode_session_ctx_queue.running()) {
       auto push_captured_image_callback = [&](std::shared_ptr<platf::img_t> &&img, bool frame_captured) -> bool {
+        if (!blank_loop_active && blank_output::enabled()) {
+          // Leave the display alone. Reinitialising is the only way back into this loop; the
+          // re-created sessions then send the black dummy image until the flag clears.
+          ec = platf::capture_e::reinit;
+          return false;
+        }
+
         while (encode_session_ctx_queue.peek()) {
           auto encode_session_ctx = encode_session_ctx_queue.pop();
           if (!encode_session_ctx) {
@@ -3760,6 +3824,27 @@ namespace video {
         img_out->pipeline_trace.reset();
         return true;
       };
+
+      if (blank_output::enabled()) {
+        // `img` still holds the black dummy picture the sessions were created around. Re-send it
+        // at the keepalive cadence and leave the display alone until the flag clears.
+        BOOST_LOG(info) << "Blank output enabled, capture paused on display ["sv << active_display_name << ']';
+        blank_loop_active = true;
+        while (encode_session_ctx_queue.running() && blank_output::enabled()) {
+          auto black_img = img;
+          if (!push_captured_image_callback(std::move(black_img), true)) {
+            blank_loop_active = false;
+            return ec != platf::capture_e::ok ? ec : encode_e::ok;
+          }
+          std::this_thread::sleep_for(blank_output::keepalive_frame_time);
+        }
+        blank_loop_active = false;
+        BOOST_LOG(info) << "Blank output disabled, capture resumed on display ["sv << active_display_name << ']';
+        for (auto &synced_session : synced_sessions) {
+          synced_session.session->request_idr_frame();
+        }
+        continue;
+      }
 
       auto status = disp->capture(push_captured_image_callback, pull_free_image_callback, &display_cursor);
       switch (status) {

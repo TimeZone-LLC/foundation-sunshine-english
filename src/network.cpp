@@ -171,6 +171,24 @@ namespace net {
     }
   }
 
+  int
+  fec_percentage_for_address(boost::asio::ip::address address) {
+    auto nettype = net::from_address(address.to_string());
+    if (nettype == net::net_e::PC || nettype == net::net_e::LAN) {
+      return config::stream.lan_fec_percentage;
+    }
+    return config::stream.fec_percentage;
+  }
+
+  bool
+  video_pacing_for_address(boost::asio::ip::address address) {
+    auto nettype = net::from_address(address.to_string());
+    if (nettype == net::net_e::PC || nettype == net::net_e::LAN) {
+      return config::stream.lan_video_pacing;
+    }
+    return true;
+  }
+
   host_t
   host_create(af_e af, ENetAddress &addr, std::uint16_t port) {
     static std::once_flag enet_init_flag;

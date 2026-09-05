@@ -1784,6 +1784,62 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### [lan_fec_percentage](https://localhost:47990/config/#lan_fec_percentage)
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Percentage of error correcting packets per data packet for clients on the local network.
+            Wired LAN links rarely lose packets, so a low value leaves more of the bitrate for video.
+            Frames of fewer than four packets never carry parity.
+            @note{0 disables parity for LAN clients entirely.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            5
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Range</td>
+        <td colspan="2">0-255</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            lan_fec_percentage = 5
+            @endcode</td>
+    </tr>
+</table>
+
+### [lan_video_pacing](https://localhost:47990/config/#lan_video_pacing)
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Spread each video frame's packets over time for clients on the local network, as is always done
+            for remote clients. When disabled, a frame leaves the host at line rate, which removes a few
+            milliseconds of sender delay per frame on wired networks.
+            @note{Enable it if a Wi-Fi client on your LAN reports packet loss.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            lan_video_pacing = enabled
+            @endcode</td>
+    </tr>
+</table>
+
 ### [qp](https://localhost:47990/config/#qp)
 
 <table>
@@ -1823,13 +1879,13 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Default</td>
         <td colspan="2">@code{}
-            2
+            8
             @endcode</td>
     </tr>
     <tr>
         <td>Example</td>
         <td colspan="2">@code{}
-            min_threads = 2
+            min_threads = 8
             @endcode</td>
     </tr>
 </table>
@@ -2033,13 +2089,13 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Default</td>
         <td colspan="2">@code{}
-            1
+            5
             @endcode</td>
     </tr>
     <tr>
         <td>Example</td>
         <td colspan="2">@code{}
-            nvenc_preset = 1
+            nvenc_preset = 5
             @endcode</td>
     </tr>
     <tr>
@@ -2158,7 +2214,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Default</td>
         <td colspan="2">@code{}
-            0
+            100
             @endcode</td>
     </tr>
     <tr>
@@ -2168,7 +2224,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>Example</td>
         <td colspan="2">@code{}
-            nvenc_vbv_increase = 0
+            nvenc_vbv_increase = 100
             @endcode</td>
     </tr>
 </table>

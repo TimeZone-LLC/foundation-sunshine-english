@@ -16,6 +16,7 @@ extern "C" {
 #include <thread>
 #include <unordered_map>
 
+#include "blank_output.h"
 #include "config.h"
 #include "globals.h"
 #include "input.h"
@@ -217,6 +218,9 @@ namespace input {
     switch (keyCode) {
       case 0x4E /* VKEY_N */:
         display_cursor = !display_cursor;
+        return 1;
+      case 0x42 /* VKEY_B */:
+        BOOST_LOG(info) << "Blank output "sv << (blank_output::toggle() ? "enabled"sv : "disabled"sv) << " via host shortcut"sv;
         return 1;
       case 0x56 /* VKEY_V */:
         if (!display_device::vdd_utils::get_vdd_status().is_usable()) {

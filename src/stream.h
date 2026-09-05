@@ -45,6 +45,8 @@ namespace stream {
 
     int packetsize;
     int minRequiredFecPackets;
+    int fecPercentage;  ///< Parity percentage chosen for this peer (LAN or WAN value)
+    bool paceVideo;  ///< Spread each frame's packets over time (WAN) or send at line rate (LAN)
     int mlFeatureFlags;
     int controlProtocolType;
     int audioQosType;

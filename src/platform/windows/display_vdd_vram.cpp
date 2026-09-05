@@ -8,6 +8,8 @@
 #include "misc.h"
 
 #include <chrono>
+#include <cstdlib>
+#include <optional>
 #include <utility>
 
 #include "src/config.h"
@@ -18,9 +20,54 @@ namespace platf::dxgi {
 
   namespace {
     constexpr UINT64 vdd_borrowed_encoder_key = 2;
-    constexpr UINT64 vdd_borrow_max_inflight_frames = 2;
-    constexpr auto vdd_borrow_drop_cooldown = std::chrono::seconds(2);
+    constexpr UINT64 vdd_borrow_default_max_inflight_frames = 2;
+    constexpr auto vdd_borrow_default_drop_cooldown = std::chrono::seconds(2);
     constexpr auto vdd_borrow_telemetry_interval = std::chrono::seconds(5);
+
+    /**
+     * @brief Parse an unsigned integer environment override within a range.
+     * @return The parsed value, or no value when unset or invalid (a warning is logged for invalid input).
+     */
+    std::optional<unsigned long long>
+    env_override_in_range(const char *name, unsigned long long min_value, unsigned long long max_value) {
+      const char *raw_value = std::getenv(name);
+      if (!raw_value || !*raw_value) {
+        return std::nullopt;
+      }
+      char *end = nullptr;
+      const auto parsed = std::strtoull(raw_value, &end, 10);
+      if (end == raw_value || *end != '\0' || parsed < min_value || parsed > max_value) {
+        BOOST_LOG(warning) << "[vdd] ignoring invalid "sv << name << " value: "sv << raw_value;
+        return std::nullopt;
+      }
+      BOOST_LOG(info) << "[vdd] "sv << name << " = "sv << parsed;
+      return parsed;
+    }
+
+    /**
+     * @brief Borrowed frames the encoder may hold before the capture falls back to copying.
+     * @details `SUNSHINE_VDD_BORROW_MAX_INFLIGHT` (1-8) overrides the default so the value can be
+     *          tuned against the borrow telemetry without a rebuild.
+     */
+    UINT64
+    vdd_borrow_max_inflight_frames() {
+      static const UINT64 value = env_override_in_range("SUNSHINE_VDD_BORROW_MAX_INFLIGHT", 1, 8)
+                                    .value_or(vdd_borrow_default_max_inflight_frames);
+      return value;
+    }
+
+    /**
+     * @brief How long a producer drop keeps the capture on the copy path.
+     * @details `SUNSHINE_VDD_BORROW_COOLDOWN_MS` (0-60000) overrides the default.
+     */
+    std::chrono::milliseconds
+    vdd_borrow_drop_cooldown() {
+      static const std::chrono::milliseconds value {
+        env_override_in_range("SUNSHINE_VDD_BORROW_COOLDOWN_MS", 0, 60000)
+          .value_or(std::chrono::duration_cast<std::chrono::milliseconds>(vdd_borrow_default_drop_cooldown).count())
+      };
+      return value;
+    }
   }  // namespace
 
   void
@@ -56,7 +103,7 @@ namespace platf::dxgi {
                      << " deferred="sv << vdd_borrow_deferred_images.size()
                      << " deferred_frames="sv << vdd_borrow_deferred_frames
                      << " returned_deferred="sv << vdd_borrow_returned_deferred_frames
-                     << " inflight="sv << vdd_borrow_inflight_frames->load(std::memory_order_relaxed) << "/"sv << vdd_borrow_max_inflight_frames
+                     << " inflight="sv << vdd_borrow_inflight_frames->load(std::memory_order_relaxed) << "/"sv << vdd_borrow_max_inflight_frames()
                      << " inflight_limit_frames="sv << vdd_borrow_inflight_limit_frames;
   }
 
@@ -267,7 +314,7 @@ namespace platf::dxgi {
       const auto delta =
         producer_dropped_consumer_held - vdd_last_dropped_consumer_held;
       const bool was_in_cooldown = now < vdd_borrow_cooldown_until;
-      const auto next_cooldown_until = now + vdd_borrow_drop_cooldown;
+      const auto next_cooldown_until = now + vdd_borrow_drop_cooldown();
       if (vdd_borrow_cooldown_until < next_cooldown_until) {
         vdd_borrow_cooldown_until = next_cooldown_until;
       }
@@ -276,7 +323,7 @@ namespace platf::dxgi {
         BOOST_LOG(info) << "[vdd] borrowed texture cooldown: producer held-drop +"sv
                         << delta << ", falling back to copy path for "sv
                         << std::chrono::duration_cast<std::chrono::milliseconds>(
-                             vdd_borrow_drop_cooldown
+                             vdd_borrow_drop_cooldown()
                            ).count()
                         << "ms"sv;
       }
@@ -288,7 +335,7 @@ namespace platf::dxgi {
     auto enter_borrow_cooldown = [&](const char *reason) {
       const auto cooldown_now = std::chrono::steady_clock::now();
       const bool was_in_cooldown = cooldown_now < vdd_borrow_cooldown_until;
-      const auto next_cooldown_until = cooldown_now + vdd_borrow_drop_cooldown;
+      const auto next_cooldown_until = cooldown_now + vdd_borrow_drop_cooldown();
       if (vdd_borrow_cooldown_until < next_cooldown_until) {
         vdd_borrow_cooldown_until = next_cooldown_until;
       }
@@ -297,7 +344,7 @@ namespace platf::dxgi {
         BOOST_LOG(info) << "[vdd] borrowed texture cooldown: "sv << reason
                         << ", falling back to copy path for "sv
                         << std::chrono::duration_cast<std::chrono::milliseconds>(
-                             vdd_borrow_drop_cooldown
+                             vdd_borrow_drop_cooldown()
                            ).count()
                         << "ms"sv;
       }
@@ -388,7 +435,7 @@ namespace platf::dxgi {
         return borrow_fallback();
       }
       if (vdd_borrow_inflight_frames->load(std::memory_order_relaxed) >=
-          vdd_borrow_max_inflight_frames) {
+          vdd_borrow_max_inflight_frames()) {
         ++vdd_borrow_inflight_limit_frames;
         return borrow_fallback();
       }

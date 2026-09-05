@@ -114,6 +114,24 @@ namespace net {
   encryption_mode_for_address(boost::asio::ip::address address);
 
   /**
+   * @brief Pick the video FEC percentage for a peer address.
+   * @details Local and LAN peers use `lan_fec_percentage`, every other peer `fec_percentage`.
+   * @param address The peer address.
+   * @return The percentage of parity packets to add per frame.
+   */
+  int
+  fec_percentage_for_address(boost::asio::ip::address address);
+
+  /**
+   * @brief Whether video sends to a peer are paced within each frame.
+   * @details WAN peers are always paced; LAN and local peers follow `lan_video_pacing`.
+   * @param address The peer address.
+   * @return True when the sender must spread a frame's packets over time.
+   */
+  bool
+  video_pacing_for_address(boost::asio::ip::address address);
+
+  /**
    * @brief Returns a string for use as the instance name for mDNS.
    * @param hostname The hostname to use for instance name generation.
    * @return Hostname-based instance name or "Sunshine" if hostname is invalid.

@@ -156,6 +156,29 @@ const effectivePort = computed(() => +config.value?.port ?? defaultMoonlightPort
       <div class="form-text">{{ $t('config.fec_percentage_desc') }}</div>
     </div>
 
+    <!-- LAN Forward Error Correction -->
+    <div class="mb-3">
+      <label for="lan_fec_percentage" class="form-label">{{ $t('config.lan_fec_percentage') }}</label>
+      <input
+        id="lan_fec_percentage"
+        v-model="config.lan_fec_percentage"
+        class="form-control"
+        type="text"
+        placeholder="5"
+      />
+      <div class="form-text">{{ $t('config.lan_fec_percentage_desc') }}</div>
+    </div>
+
+    <!-- LAN video pacing -->
+    <div class="mb-3">
+      <label for="lan_video_pacing" class="form-label">{{ $t('config.lan_video_pacing') }}</label>
+      <select id="lan_video_pacing" class="form-select" v-model="config.lan_video_pacing">
+        <option value="disabled">{{ $t('_common.disabled_def') }}</option>
+        <option value="enabled">{{ $t('_common.enabled') }}</option>
+      </select>
+      <div class="form-text">{{ $t('config.lan_video_pacing_desc') }}</div>
+    </div>
+
     <!-- CLOSE VERIFY SAFE -->
     <div class="mb-3">
       <label for="close_verify_safe" class="form-label">{{ $t('config.close_verify_safe') }}</label>

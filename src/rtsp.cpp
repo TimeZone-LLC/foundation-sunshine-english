@@ -1494,6 +1494,8 @@ namespace rtsp_stream {
       config.controlProtocolType = getArg("x-nv-general.useReliableUdp"sv);
       config.packetsize = getArg("x-nv-video[0].packetSize"sv);
       config.minRequiredFecPackets = getArg("x-nv-vqos[0].fec.minRequiredFecPackets"sv);
+      config.fecPercentage = net::fec_percentage_for_address(sock.remote_endpoint().address());
+      config.paceVideo = net::video_pacing_for_address(sock.remote_endpoint().address());
       config.mlFeatureFlags = getArg("x-ml-general.featureFlags"sv);
       config.audioQosType = getArg("x-nv-aqos.qosTrafficType"sv);
       config.videoQosType = getArg("x-nv-vqos[0].qosTrafficType"sv);

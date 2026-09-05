@@ -95,6 +95,8 @@ const DEFAULT_TABS = [
       ping_timeout: 10000,
       pair_max_attempts: 10,
       fec_percentage: 20,
+      lan_fec_percentage: 5,
+      lan_video_pacing: 'disabled',
     },
   },
   {
@@ -133,11 +135,11 @@ const DEFAULT_TABS = [
         id: 'nv',
         name: 'NVIDIA NVENC Encoder',
         options: {
-          nvenc_preset: 1,
+          nvenc_preset: 5,
           nvenc_twopass: 'quarter_res',
           nvenc_spatial_aq: 'disabled',
           nvenc_temporal_aq: 'disabled',
-          nvenc_vbv_increase: 0,
+          nvenc_vbv_increase: 100,
           nvenc_lookahead_depth: 0,
           nvenc_lookahead_level: 'disabled',
           nvenc_temporal_filter: 'disabled',
@@ -197,7 +199,7 @@ const DEFAULT_TABS = [
         options: {
           sw_preset: 'superfast',
           sw_tune: 'zerolatency',
-          min_threads: 2,
+          min_threads: 8,
         },
       },
     ],

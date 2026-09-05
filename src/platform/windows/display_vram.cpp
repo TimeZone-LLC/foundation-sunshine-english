@@ -2274,15 +2274,12 @@ namespace platf::dxgi {
         return;
       }
 
-      // Automatic mode uses the compute path where it has a clear payoff:
-      // scaling, or fusing HDR conversion with luminance-analysis sampling.
+      // Automatic mode takes the compute path whenever the format allows it: one dispatch that
+      // writes straight into the encoder surface beats the two render-target draws even at native
+      // resolution, and it is the only path that fuses HDR luminance sampling. `off` opts out.
       const auto &cfg = config::video.capture_compute_shader;
       if (cfg == "off") {
         cs_fallback_reason = "disabled";
-        return;
-      }
-      if (cfg == "auto" && !is_scaled && !(is_p010 && hdr_analysis_enabled)) {
-        cs_fallback_reason = "not_beneficial";
         return;
       }
 
