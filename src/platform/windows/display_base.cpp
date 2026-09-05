@@ -6,6 +6,7 @@
 #include <cmath>
 #include <initguid.h>
 #include <iterator>
+#include <cstdlib>
 #include <thread>
 
 #include <boost/algorithm/string/join.hpp>
@@ -317,6 +318,28 @@ namespace platf::dxgi {
     release_frame();
   }
 
+  /**
+   * @brief Pause between short desktop-duplication polls while a pacing group restarts.
+   * @details The pause hands the D3D device lock to the encoder thread. `SUNSHINE_DDA_RESYNC_SLEEP_US`
+   *          (0-5000) overrides the 1000 us default; 0 yields the CPU without sleeping.
+   */
+  static std::chrono::microseconds
+  dda_resync_sleep() {
+    static const std::chrono::microseconds value = []() {
+      if (const char *raw_value = std::getenv("SUNSHINE_DDA_RESYNC_SLEEP_US"); raw_value && *raw_value) {
+        char *end = nullptr;
+        const auto parsed = std::strtoul(raw_value, &end, 10);
+        if (end != raw_value && *end == '\0' && parsed <= 5000) {
+          BOOST_LOG(info) << "[Display] SUNSHINE_DDA_RESYNC_SLEEP_US = "sv << parsed;
+          return std::chrono::microseconds(parsed);
+        }
+        BOOST_LOG(warning) << "[Display] ignoring invalid SUNSHINE_DDA_RESYNC_SLEEP_US value: "sv << raw_value;
+      }
+      return std::chrono::microseconds(1000);
+    }();
+    return value;
+  }
+
   capture_e
   display_base_t::capture(const push_captured_image_cb_t &push_captured_image_cb, const pull_free_image_cb_t &pull_free_image_cb, bool *cursor) {
     auto adjust_client_frame_rate = [&]() -> DXGI_RATIONAL {
@@ -504,9 +527,11 @@ namespace platf::dxgi {
           // This gives encoding thread a chance to acquire the device lock
           release_snapshot();
 
-          // Small sleep to yield CPU and allow encoding thread to run
+          // Small sleep to yield CPU and allow encoding thread to run. The default 1 ms is
+          // overridable with SUNSHINE_DDA_RESYNC_SLEEP_US so the trade-off against frame
+          // pickup delay can be measured per host.
           if (attempt < max_attempts - 1) {
-            std::this_thread::sleep_for(1ms);
+            std::this_thread::sleep_for(dda_resync_sleep());
           }
         }
 

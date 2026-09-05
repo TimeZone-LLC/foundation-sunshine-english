@@ -275,7 +275,9 @@ namespace safe {
       }
 
       if (_queue.size() == _max_elements) {
-        _queue.clear();
+        // Make room for the newest element by dropping only the oldest one. Clearing the whole
+        // queue would throw away every buffered frame whenever the consumer stalls briefly.
+        _queue.erase(std::begin(_queue));
       }
 
       _queue.emplace_back(std::forward<Args>(args)...);

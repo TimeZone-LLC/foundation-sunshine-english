@@ -159,6 +159,8 @@ namespace config {
     std::string file_apps;
 
     int fec_percentage;
+    int lan_fec_percentage;  // FEC percentage for peers on the local network; wired links rarely drop packets
+    bool lan_video_pacing;  // Pace video sends within a frame for LAN peers; off lets a frame leave at line rate
 
     // Video encryption settings for LAN and WAN streams
     int lan_encryption_mode;

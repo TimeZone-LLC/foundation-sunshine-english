@@ -191,6 +191,68 @@ target_compile_options(input_activity_unit_tests PRIVATE $<$<COMPILE_LANGUAGE:CX
 set_target_properties(input_activity_unit_tests PROPERTIES CXX_STANDARD 23)
 add_test(NAME input_activity_unit_tests COMMAND input_activity_unit_tests)
 
+add_executable(blank_output_unit_tests
+        ${CMAKE_SOURCE_DIR}/tests/unit/test_blank_output.cpp
+        ${CMAKE_SOURCE_DIR}/src/blank_output.cpp)
+target_include_directories(blank_output_unit_tests PRIVATE "${CMAKE_SOURCE_DIR}")
+target_link_libraries(blank_output_unit_tests gtest_main)
+target_compile_options(blank_output_unit_tests PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${SUNSHINE_COMPILE_OPTIONS}>)
+set_target_properties(blank_output_unit_tests PROPERTIES CXX_STANDARD 23)
+if (WIN32)
+    set_target_properties(blank_output_unit_tests PROPERTIES LINK_SEARCH_START_STATIC 1)
+endif ()
+add_test(NAME blank_output_unit_tests COMMAND blank_output_unit_tests)
+
+add_executable(fec_policy_unit_tests
+        ${CMAKE_SOURCE_DIR}/tests/unit/test_fec_policy.cpp
+        ${CMAKE_SOURCE_DIR}/src/fec_policy.cpp)
+target_include_directories(fec_policy_unit_tests PRIVATE "${CMAKE_SOURCE_DIR}")
+target_link_libraries(fec_policy_unit_tests gtest_main)
+target_compile_options(fec_policy_unit_tests PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${SUNSHINE_COMPILE_OPTIONS}>)
+set_target_properties(fec_policy_unit_tests PROPERTIES CXX_STANDARD 23)
+if (WIN32)
+    set_target_properties(fec_policy_unit_tests PROPERTIES LINK_SEARCH_START_STATIC 1)
+endif ()
+add_test(NAME fec_policy_unit_tests COMMAND fec_policy_unit_tests)
+
+add_executable(fec_coder_cache_unit_tests
+        ${CMAKE_SOURCE_DIR}/tests/unit/test_fec_coder_cache.cpp)
+target_include_directories(fec_coder_cache_unit_tests PRIVATE "${CMAKE_SOURCE_DIR}")
+target_link_libraries(fec_coder_cache_unit_tests gtest_main)
+target_compile_options(fec_coder_cache_unit_tests PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${SUNSHINE_COMPILE_OPTIONS}>)
+set_target_properties(fec_coder_cache_unit_tests PROPERTIES CXX_STANDARD 23)
+if (WIN32)
+    set_target_properties(fec_coder_cache_unit_tests PROPERTIES LINK_SEARCH_START_STATIC 1)
+endif ()
+add_test(NAME fec_coder_cache_unit_tests COMMAND fec_coder_cache_unit_tests)
+
+add_executable(thread_safe_queue_unit_tests
+        ${CMAKE_SOURCE_DIR}/tests/unit/test_thread_safe_queue.cpp)
+target_include_directories(thread_safe_queue_unit_tests PRIVATE "${CMAKE_SOURCE_DIR}")
+target_link_libraries(thread_safe_queue_unit_tests gtest_main)
+target_compile_options(thread_safe_queue_unit_tests PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${SUNSHINE_COMPILE_OPTIONS}>)
+set_target_properties(thread_safe_queue_unit_tests PROPERTIES CXX_STANDARD 23)
+if (WIN32)
+    set_target_properties(thread_safe_queue_unit_tests PROPERTIES LINK_SEARCH_START_STATIC 1)
+endif ()
+add_test(NAME thread_safe_queue_unit_tests COMMAND thread_safe_queue_unit_tests)
+
+set(NVENC_RATE_CONTROL_TEST_HEADERS "${CMAKE_SOURCE_DIR}/third-party/nvenc-headers/1301/include")
+if (EXISTS "${NVENC_RATE_CONTROL_TEST_HEADERS}/ffnvcodec/nvEncodeAPI.h")
+    add_executable(nvenc_rate_control_unit_tests
+            ${CMAKE_SOURCE_DIR}/tests/unit/test_nvenc_rate_control.cpp)
+    target_include_directories(nvenc_rate_control_unit_tests PRIVATE
+            "${CMAKE_SOURCE_DIR}"
+            "${NVENC_RATE_CONTROL_TEST_HEADERS}")
+    target_link_libraries(nvenc_rate_control_unit_tests gtest_main)
+    target_compile_options(nvenc_rate_control_unit_tests PRIVATE $<$<COMPILE_LANGUAGE:CXX>:${SUNSHINE_COMPILE_OPTIONS}>)
+    set_target_properties(nvenc_rate_control_unit_tests PROPERTIES CXX_STANDARD 23)
+    if (WIN32)
+        set_target_properties(nvenc_rate_control_unit_tests PROPERTIES LINK_SEARCH_START_STATIC 1)
+    endif ()
+    add_test(NAME nvenc_rate_control_unit_tests COMMAND nvenc_rate_control_unit_tests)
+endif ()
+
 add_executable(launch_session_manager_unit_tests
         ${CMAKE_SOURCE_DIR}/tests/unit/test_rtsp.cpp
         ${CMAKE_SOURCE_DIR}/src/launch_session_manager.cpp

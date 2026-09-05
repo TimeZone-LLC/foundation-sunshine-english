@@ -399,7 +399,7 @@ namespace config {
     0,  // av1_mode
 
     0,  // max_bitrate
-    2,  // min_threads
+    8,  // min_threads
     {
       "superfast"s,  // preset
       "zerolatency"s,  // tune
@@ -494,6 +494,8 @@ namespace config {
     APPS_JSON_PATH,
 
     20,  // fecPercentage
+    5,  // lan_fec_percentage
+    false,  // lan_video_pacing
 
     ENCRYPTION_MODE_NEVER,  // lan_encryption_mode
     ENCRYPTION_MODE_OPPORTUNISTIC,  // wan_encryption_mode
@@ -1515,6 +1517,8 @@ namespace config {
 #endif
 
     int_between_f(vars, "fec_percentage", stream.fec_percentage, {1, 255});
+    int_between_f(vars, "lan_fec_percentage", stream.lan_fec_percentage, {0, 255});
+    bool_f(vars, "lan_video_pacing", stream.lan_video_pacing);
 
     map_int_int_f(vars, "keybindings"s, input.keybindings);
 

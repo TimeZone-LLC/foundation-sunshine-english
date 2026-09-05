@@ -3,6 +3,7 @@
  * @brief Definitions for abstract platform-agnostic base of standalone NVENC encoder.
  */
 #include "nvenc_base.h"
+#include "nvenc_rate_control.h"
 
 #include "nvenc_utils.h"
 
@@ -398,9 +399,8 @@ namespace nvenc {
     // Enable temporal AQ if supported and lookahead is enabled
     if (config.enable_temporal_aq && lookahead_enabled) {
       if (get_encoder_cap(NV_ENC_CAPS_SUPPORT_TEMPORAL_AQ) != 0) {
-        // Temporal AQ is enabled through enableAQ when lookahead is active
-        // The encoder will use temporal AQ automatically if supported
-        BOOST_LOG(debug) << "NvEnc: Temporal AQ enabled (requires lookahead)";
+        enc_config.rcParams.enableTemporalAQ = 1;
+        BOOST_LOG(info) << "NvEnc: Temporal AQ enabled";
       }
       else {
         BOOST_LOG(warning) << "NvEnc: Temporal AQ requested but not supported by GPU";
@@ -994,24 +994,11 @@ namespace nvenc {
     is_av1 = (saved_init_params.encodeGUID == NV_ENC_CODEC_AV1_GUID);
 #endif
 
-    // 复制当前配置，准备修改
+    // Re-target rate control while keeping the mode's headroom and the VBV depth in frames.
     NV_ENC_CONFIG enc_config = current_enc_config;
-    enc_config.rcParams.averageBitRate = bitrate_kbps * 1000;
-    enc_config.rcParams.maxBitRate = bitrate_kbps * 1000;
-
-    // HEVC需调整VBV缓冲区应对更大码率
-    if (is_hevc) {
-      uint32_t prev_bitrate = current_enc_config.rcParams.averageBitRate;
-      uint32_t old_vbv_size = current_enc_config.rcParams.vbvBufferSize;
-      uint32_t new_vbv_size = old_vbv_size;
-
-      new_vbv_size = static_cast<uint32_t>((static_cast<uint64_t>(bitrate_kbps) * 1000 * old_vbv_size) / prev_bitrate);
-
-      // 防止VBV缓冲区过小
-      if (new_vbv_size < 1000 * 100) new_vbv_size = 1000 * 100;  // 至少100K
-      enc_config.rcParams.vbvBufferSize = new_vbv_size;
-      BOOST_LOG(debug) << "NvEnc: VBV buffer size adjusted to " << new_vbv_size / 1000 << " Kbps";
-    }
+    rate_control::apply_bitrate(enc_config.rcParams, static_cast<std::uint32_t>(bitrate_kbps) * 1000u);
+    BOOST_LOG(debug) << "NvEnc: rate control re-targeted: max " << enc_config.rcParams.maxBitRate / 1000
+                     << " Kbps, VBV " << enc_config.rcParams.vbvBufferSize / 1000 << " Kbit";
 
     // 构造重配置参数
     NV_ENC_RECONFIGURE_PARAMS reconfigure_params = { NV_ENC_RECONFIGURE_PARAMS_VER };
@@ -1030,12 +1017,7 @@ namespace nvenc {
       return;
     }
 
-    // 更新当前配置
-    current_enc_config.rcParams.averageBitRate = bitrate_kbps * 1000;
-    current_enc_config.rcParams.maxBitRate = bitrate_kbps * 1000;
-    if (is_hevc) {
-      current_enc_config.rcParams.vbvBufferSize = enc_config.rcParams.vbvBufferSize;
-    }
+    current_enc_config.rcParams = enc_config.rcParams;
 
     const char *codec_name = is_hevc ? "HEVC" : (is_av1 ? "AV1" : "AVC");
     BOOST_LOG(info) << "NvEnc: " << codec_name << " bitrate successfully adjusted to " << bitrate_kbps << " Kbps";

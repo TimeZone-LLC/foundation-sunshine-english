@@ -70,14 +70,16 @@ namespace nvenc {
    * @brief NVENC encoder configuration.
    */
   struct nvenc_config {
-    // Quality preset from 1 to 7, higher is slower
-    int quality_preset = 1;
+    // Quality preset from 1 to 7, higher is slower. P5 costs an Ada-class GPU well under a millisecond
+    // per 1440p frame and buys a clearly better picture per bit than P1.
+    int quality_preset = 5;
 
     // Use optional preliminary pass for better motion vectors, bitrate distribution and stricter VBV(HRD), uses CUDA cores
     nvenc_two_pass two_pass = nvenc_two_pass::quarter_resolution;
 
-    // Percentage increase of VBV/HRD from the default single frame, allows low-latency variable bitrate
-    int vbv_percentage_increase = 0;
+    // Percentage increase of VBV/HRD from the default single frame, allows low-latency variable bitrate.
+    // Two frames of buffer absorbs scene-change spikes without visible quality dips.
+    int vbv_percentage_increase = 100;
 
     // Improves fades compression, uses CUDA cores
     bool weighted_prediction = false;

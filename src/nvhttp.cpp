@@ -51,6 +51,7 @@
 #include "nvhttp/abr_api.h"
 #include "nvhttp/ai_api.h"
 #include "nvhttp/apps.h"
+#include "nvhttp/blank_output_api.h"
 #include "nvhttp/clipboard_api.h"
 #include "nvhttp/display_control.h"
 #include "nvhttp/display_scale.h"
@@ -1145,6 +1146,7 @@ namespace nvhttp {
     https_server.resource["^/display-scale-options$"]["GET"] = display_scale::get_options;
     https_server.resource["^/display-scale$"]["POST"] = display_scale::set;
     https_server.resource["^/rotate-display$"]["GET"] = display_control::rotate;
+    https_server.resource["^/blank-output$"]["GET"] = blank_output_api::handle;
     https_server.resource["^/launch$"]["GET"] = [&host_audio](auto resp, auto req) { launch(host_audio, resp, req); };
     https_server.resource["^/resume$"]["GET"] = [&host_audio](auto resp, auto req) { resume(host_audio, resp, req); };
     https_server.resource["^/cancel$"]["GET"] = cancel;

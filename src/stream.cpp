@@ -30,6 +30,9 @@
 #include <boost/thread/mutex.hpp>
 
 #include "abr.h"
+#include "blank_output.h"
+#include "fec_coder_cache.h"
+#include "fec_policy.h"
 
 extern "C" {
 // clang-format off
@@ -1157,6 +1160,22 @@ namespace stream {
   namespace fec {
     using rs_t = util::safe_ptr<reed_solomon, [](reed_solomon *rs) { reed_solomon_release(rs); }>;
 
+    struct rs_factory_t {
+      reed_solomon *
+      operator()(int data_shards, int parity_shards) const {
+        return reed_solomon_new(data_shards, parity_shards);
+      }
+    };
+
+    struct rs_release_t {
+      void
+      operator()(reed_solomon *rs) const {
+        reed_solomon_release(rs);
+      }
+    };
+
+    using rs_cache_t = coder_cache_t<reed_solomon, rs_factory_t, rs_release_t>;
+
     struct fec_t {
       size_t data_shards;
       size_t nr_shards;
@@ -1246,10 +1265,12 @@ namespace stream {
           shards_p[data_shards + x] = (uint8_t *) &shards[(parity_shard_offset + x) * blocksize];
         }
 
-        // packets = parity_shards + data_shards
-        rs_t rs { reed_solomon_new(data_shards, parity_shards) };
+        // packets = parity_shards + data_shards. Frame sizes repeat, so the coder for this
+        // shard layout is kept on the sender thread instead of being rebuilt every block.
+        thread_local rs_cache_t rs_cache;
+        auto *rs = rs_cache.get(static_cast<int>(data_shards), static_cast<int>(parity_shards));
 
-        reed_solomon_encode(rs.get(), shards_p.begin(), nr_shards, blocksize);
+        reed_solomon_encode(rs, shards_p.begin(), nr_shards, blocksize);
       }
 
       return {
@@ -3308,8 +3329,6 @@ namespace stream {
         perf::record_pipeline_sample(session->launch_session_id, sample, frame_dequeue_time);
       }
 
-      auto fecPercentage = config::stream.fec_percentage;
-
       // Insert space for packet headers
       auto blocksize = session->config.packetsize + MAX_RTP_HEADER_SIZE;
       auto payload_blocksize = blocksize - sizeof(video_packet_raw_t);
@@ -3317,6 +3336,10 @@ namespace stream {
         std::string_view { (char *) &frame_header, sizeof(frame_header) }, payload);
 
       payload = std::string_view { (char *) payload_new.data(), payload_new.size() };
+
+      // Parity is sized per peer (LAN or WAN) and skipped for frames too small to be worth it.
+      const auto data_packets = (payload.size() + blocksize - 1) / blocksize;
+      auto fecPercentage = fec_policy::percentage_for_frame(session->config.fecPercentage, data_packets, session->config.minRequiredFecPackets);
 
       // There are 2 bits for FEC block count for a maximum of 4 FEC blocks
       constexpr auto MAX_FEC_BLOCKS = 4;
@@ -3387,6 +3410,10 @@ namespace stream {
 
         // Don't ignore the last ratecontrol group of the previous frame
         auto ratecontrol_frame_start = std::max(ratecontrol_next_frame_start, std::chrono::steady_clock::now());
+
+        // LAN peers get the whole frame at line rate; the sleeps below only exist to protect
+        // WAN paths and Wi-Fi last hops from bursts.
+        const bool pace_video = session->config.paceVideo;
 
         size_t ratecontrol_frame_packets_sent = 0;
         size_t ratecontrol_group_packets_sent = 0;
@@ -3486,8 +3513,9 @@ namespace stream {
               // Do pacing within the frame.
               // Also trigger pacing before the first send_batch() of the frame
               // to account for the last send_batch() of the previous frame.
-              if (ratecontrol_group_packets_sent >= ratecontrol_packets_in_1ms ||
-                  ratecontrol_frame_packets_sent == 0) {
+              if (pace_video &&
+                  (ratecontrol_group_packets_sent >= ratecontrol_packets_in_1ms ||
+                   ratecontrol_frame_packets_sent == 0)) {
                 auto due = ratecontrol_frame_start +
                            std::chrono::duration_cast<std::chrono::nanoseconds>(1ms) *
                              ratecontrol_frame_packets_sent / ratecontrol_packets_in_1ms;
@@ -3753,6 +3781,13 @@ namespace stream {
       return -1;
     }
 
+    try {
+      ctx.audio_sock.set_option(boost::asio::socket_base::send_buffer_size(256 * 1024));
+    }
+    catch (...) {
+      BOOST_LOG(error) << "Failed to set audio socket send buffer size (SO_SENDBUF)";
+    }
+
     ctx.audio_sock.bind(udp::endpoint(bind_addr, audio_port), ec);
     if (ec) {
       BOOST_LOG(fatal) << "Couldn't bind Audio server to port ["sv << audio_port << "]: "sv << ec.message();
@@ -3774,6 +3809,9 @@ namespace stream {
 
   void
   end_broadcast(broadcast_ctx_t &ctx) {
+    // The last session is gone. Never carry a blanked picture into the next stream.
+    blank_output::reset();
+
     auto broadcast_shutdown_event = mail::man->event<bool>(mail::broadcast_shutdown);
 
     broadcast_shutdown_event->raise(true);

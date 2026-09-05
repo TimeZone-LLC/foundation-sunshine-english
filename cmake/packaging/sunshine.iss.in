@@ -42,8 +42,13 @@ SolidCompression=yes
 SetupIconFile={#MyIconFile}
 UninstallDisplayIcon={app}\{#MyAppExeName}
 WizardStyle=modern hidebevels
+; The wizard bitmaps are optional: a checkout without them still packages.
+#if FileExists(MyWelcomeBmp)
 WizardImageFile={#MyWelcomeBmp}
+#endif
+#if FileExists(MySmallBmp)
 WizardSmallImageFile={#MySmallBmp}
+#endif
 WizardImageAlphaFormat=defined
 WizardSizePercent=120
 ; 版本信息 (VersionInfoVersion requires X.X.X.X format, use AppVersion for display)
