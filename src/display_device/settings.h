@@ -229,6 +229,16 @@ namespace display_device {
     has_persistent_data() const;
 
     /**
+     * @brief Check if a persistence file from a previous run is still on disk.
+     * @details `has_persistent_data()` only reports the in-memory copy, which is always empty in a
+     *          fresh process. A leftover file means an earlier run modified the display state and
+     *          never reverted it (crash, kill, power loss, service restart), so a restore is owed.
+     * @returns True if the persistence file exists, false otherwise.
+     */
+    bool
+    has_persistent_data_on_disk() const;
+
+    /**
      * @brief Check if VDD is in the initial topology.
      * @returns True if VDD is in the initial topology, false otherwise.
      */

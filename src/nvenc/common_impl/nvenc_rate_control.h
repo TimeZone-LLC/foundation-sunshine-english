@@ -9,9 +9,14 @@
 #include <algorithm>
 #include <cstdint>
 
-#include <ffnvcodec/nvEncodeAPI.h>
-
+// The NVENC types are declared inside the per-SDK-line namespace when this header is pulled in
+// through the dynamic factory blueprint, and at global scope otherwise. Follow nvenc_base.h.
+#ifdef NVENC_NAMESPACE
+namespace NVENC_NAMESPACE::rate_control {
+#else
+  #include <ffnvcodec/nvEncodeAPI.h>
 namespace nvenc::rate_control {
+#endif
 
   /**
    * @brief Smallest VBV buffer a reconfiguration may leave behind, in bits.
@@ -44,4 +49,4 @@ namespace nvenc::rate_control {
     }
   }
 
-}  // namespace nvenc::rate_control
+}  // namespace nvenc::rate_control / NVENC_NAMESPACE::rate_control

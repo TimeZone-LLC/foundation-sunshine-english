@@ -993,7 +993,10 @@ namespace display_device {
       // never tell us whether a restore is owed. The durable evidence is the persistence file:
       // if it is still on disk, a previous run modified the display state and never reverted it
       // (crash, kill, power loss, sleep, service restart), and that revert has to happen now.
-      const bool leftover_state_owed = settings.has_persistent_data();
+      // has_persistent_data() alone is useless here: the in-memory copy is only populated by
+      // apply_config/revert_settings, so on a fresh process it is always empty and the leftover
+      // file was never even consulted. revert_settings() loads it from disk on demand.
+      const bool leftover_state_owed = settings.has_persistent_data() || settings.has_persistent_data_on_disk();
       BOOST_LOG(info) << "No in-memory session config (current_use_vdd=nullopt); leftover persisted display state: "
                       << (leftover_state_owed ? "yes, a restore is owed" : "no, nothing to restore");
 

@@ -1026,6 +1026,19 @@ namespace display_device {
       // Therefore, we are always sticking with the first initial topology before the first configuration
       // was applied.
       persistent_data_t new_settings { topology_result->pair };
+
+      // The restore baseline was resolved with our persisted pair as input, and it only ever grows
+      // that pair on purpose: carrying a leftover initial topology forward, preferring the richer
+      // topology over one that would take displays away, or re-adding displays that a previous
+      // session of ours disabled. Keeping the narrower persisted copy in that case throws the
+      // correction away - the revert then "restores" the reduced desktop, which is exactly what
+      // left the user without their displays in the first place.
+      if (persistent_data && is_strict_device_subset(persistent_data->topology.initial, new_settings.topology.initial)) {
+        BOOST_LOG(info) << "Widening the persisted display restore baseline from " << to_string(persistent_data->topology.initial)
+                        << " to " << to_string(new_settings.topology.initial) << " (displays will be restored to it when the stream ends).";
+        persistent_data->topology.initial = new_settings.topology.initial;
+      }
+
       persistent_data_t &current_settings { persistent_data ? *persistent_data : new_settings };
       const bool should_skip_new_vdd_only_persistence =
         is_vdd_mode &&
@@ -1260,6 +1273,17 @@ namespace display_device {
   bool
   settings_t::has_persistent_data() const {
     return persistent_data != nullptr;
+  }
+
+  bool
+  settings_t::has_persistent_data_on_disk() const {
+    try {
+      return !filepath.empty() && std::filesystem::exists(filepath);
+    }
+    catch (const std::exception &err) {
+      BOOST_LOG(error) << "Failed to check for persistent display settings on disk: " << err.what();
+      return false;
+    }
   }
 
   bool
