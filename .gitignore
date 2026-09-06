@@ -109,7 +109,6 @@ build.sh
 # Sunshine DualSense .NET build outputs
 tools/sunshine-ds5-sidecar/bin/
 tools/sunshine-ds5-sidecar/obj/
-
 .ccache/
 
 CLAUDE.md
