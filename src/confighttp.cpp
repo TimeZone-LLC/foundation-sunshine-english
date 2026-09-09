@@ -45,6 +45,8 @@
 #include <boost/asio/ssl/context_base.hpp>
 
 #include "config.h"
+#include "hdr_enhanced/api.h"
+#include "hdr_enhanced/config.h"
 #include "confighttp.h"
 #include "clipboard_http.h"
 #include "text_context/http.h"
@@ -1487,6 +1489,13 @@ namespace confighttp {
   }
 
   void
+  write_runtime_error(resp_https_t response, SimpleWeb::StatusCode http_status, int status_code, const std::string &status_message);
+
+  bool
+  require_localhost(resp_https_t response, req_https_t request, const std::string &action);
+
+
+  void
   saveConfig(resp_https_t response, req_https_t request) {
     if (!check_content_type(response, request, "application/json")) return;
     if (!authenticate(response, request)) return;
@@ -1652,6 +1661,32 @@ namespace confighttp {
       outputTree.put("status", "false");
       outputTree.put("error", "invalid controller configuration patch");
     }
+  }
+
+  void
+  getHdrEnhancedConfig(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request) || !require_localhost(response, request, "HDR configuration")) return;
+    hdr_enhanced::api::get_config(response);
+  }
+
+  void
+  saveHdrEnhancedConfig(resp_https_t response, req_https_t request) {
+    if (!check_content_type(response, request, "application/json")) return;
+    if (!authenticate(response, request) || !require_localhost(response, request, "HDR configuration")) return;
+    hdr_enhanced::api::save_config(response, request);
+  }
+
+  void
+  getHdrEnhancedStatus(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request) || !require_localhost(response, request, "HDR status")) return;
+    hdr_enhanced::api::get_status(response);
+  }
+
+  void
+  maintainHdrEnhancedComponent(resp_https_t response, req_https_t request) {
+    if (!check_content_type(response, request, "application/json")) return;
+    if (!authenticate(response, request) || !require_localhost(response, request, "HDR maintenance")) return;
+    hdr_enhanced::api::maintenance(response, request);
   }
 
   void
@@ -2575,6 +2610,7 @@ namespace confighttp {
 
     try {
       const auto statuses = video::get_hdr_pipeline_statuses();
+      const auto enhancement_status = hdr_enhanced::manager().status();
       json response_json {
         { "success", true },
         { "status_code", 200 },
@@ -2586,7 +2622,7 @@ namespace confighttp {
 #endif
         { "configured_analysis_mode", config::video.hdr_luminance_analysis },
         { "configured_conversion_mode", config::video.capture_compute_shader },
-        { "configured_rtx_hdr_mode", config::video.rtx_hdr },
+        { "configured_hdr_backend", enhancement_status.value("selected_backend", std::string {}) },
         { "pipelines", json::array() },
       };
 
@@ -4052,6 +4088,10 @@ namespace confighttp {
     server.resource["^/api/input-only-mode$"]["POST"] = setInputOnlyMode;
     server.resource["^/api/gamepad/config$"]["GET"] = getGamepadConfig;
     server.resource["^/api/gamepad/config$"]["POST"] = saveGamepadConfig;
+    server.resource["^/api/hdr-enhanced/config$"]["GET"] = getHdrEnhancedConfig;
+    server.resource["^/api/hdr-enhanced/config$"]["POST"] = saveHdrEnhancedConfig;
+    server.resource["^/api/hdr-enhanced/status$"]["GET"] = getHdrEnhancedStatus;
+    server.resource["^/api/hdr-enhanced/components/alkaidlab\\.nvidia_rtx_video/maintenance$"]["POST"] = maintainHdrEnhancedComponent;
     server.resource["^/api/webhook/config$"]["GET"] = getWebhookConfig;
     server.resource["^/api/webhook/config$"]["POST"] = saveWebhookConfig;
     server.resource["^/api/webhook/test$"]["POST"] = testWebhook;
@@ -4279,6 +4319,7 @@ namespace confighttp {
     // Wait for any event
     shutdown_event->view();
 
+    hdr_enhanced::api::shutdown();
     server.stop();
     if (loopback_server) {
       loopback_server->stop();
