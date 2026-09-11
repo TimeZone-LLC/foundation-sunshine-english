@@ -30,7 +30,9 @@ namespace {
   constexpr auto min_driver_version = "456.71";
   using get_max_supported_version_fn = std::uint32_t(WINAPI *)(std::uint32_t *);
 
-#ifdef _WIN64
+#if defined(_M_ARM64) || defined(__aarch64__)
+  constexpr auto dll_name = "nvEncodeAPIa64.dll";
+#elif defined(_WIN64)
   constexpr auto dll_name = "nvEncodeAPI64.dll";
 #else
   constexpr auto dll_name = "nvEncodeAPI.dll";
