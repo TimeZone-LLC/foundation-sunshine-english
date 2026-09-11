@@ -22,6 +22,7 @@ extern "C" {
 #include <vector>
 
 // lib includes
+#include <boost/atomic.hpp>
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 
@@ -51,11 +52,20 @@ using namespace std::literals;
 namespace rtsp_stream {
   namespace {
     std::recursive_mutex lifecycle_mutex;
+    boost::atomic_uint32_t launch_preparations { 0 };
   }
 
   std::recursive_mutex &
   session_lifecycle_mutex() {
     return lifecycle_mutex;
+  }
+
+  launch_preparation_guard_t::launch_preparation_guard_t() noexcept {
+    ++launch_preparations;
+  }
+
+  launch_preparation_guard_t::~launch_preparation_guard_t() noexcept {
+    --launch_preparations;
   }
 
   void
@@ -1021,6 +1031,13 @@ namespace rtsp_stream {
   int
   pending_session_count() {
     return server.pending_session_count();
+  }
+
+  bool
+  session_starting_or_active() {
+    return launch_preparations.load() != 0 ||
+           server.pending_session_count() != 0 ||
+           server.session_count() != 0;
   }
 
   void
