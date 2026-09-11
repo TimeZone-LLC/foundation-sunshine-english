@@ -277,6 +277,24 @@ namespace nvhttp {
     launch_session->enable_hdr = util::from_view(get_arg(args, "hdrMode", "0"));
     launch_session->use_vdd = util::from_view(get_arg(args, "useVdd", "0"));
     launch_session->custom_screen_mode = util::from_view(get_arg(args, "customScreenMode", "-1"));
+    // Client-declared controller emulation type (Sunshine protocol extension
+    // carried on the /launch and /resume query string). Values outside the
+    // host vocabulary are ignored with a warning and treated as undeclared.
+    {
+      auto declared_gamepad = get_arg(args, "gamepad", "");
+      if (!declared_gamepad.empty() &&
+          declared_gamepad != "auto"sv && declared_gamepad != "x360"sv &&
+          declared_gamepad != "ds4"sv && declared_gamepad != "ds5"sv) {
+        BOOST_LOG(warning) << "Ignoring unknown client gamepad preference: "sv << declared_gamepad;
+        declared_gamepad.clear();
+      }
+      launch_session->client_gamepad = declared_gamepad;
+      if (!declared_gamepad.empty()) {
+        BOOST_LOG(info) << "Client declared gamepad preference: "sv << declared_gamepad;
+      }
+      // Publish for the input layer (gamepads arrive after the stream starts).
+      platf::set_client_gamepad_pref(launch_session->client_gamepad);
+    }
     const auto hdr_capabilities = hdr::parse_client_display_capabilities(
       find_arg(args, "maxBrightness"),
       find_arg(args, "minBrightness"),

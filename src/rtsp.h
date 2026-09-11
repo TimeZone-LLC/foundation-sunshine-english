@@ -59,6 +59,11 @@ namespace rtsp_stream {
     bool enable_mic { false };
     bool use_vdd;
     int custom_screen_mode;
+    // Client-declared controller emulation type for this session (Sunshine
+    // protocol extension carried on the /launch and /resume query string).
+    // Empty = undeclared: the host-side selection chain applies as before.
+    // One of: auto, x360, ds4, ds5.
+    std::string client_gamepad;
     hdr::client_display_capabilities_t reported_hdr_capabilities;
     hdr::client_display_capabilities_t hdr_capabilities;
     hdr::target_source_e hdr_target_source { hdr::target_source_e::safe_defaults };
