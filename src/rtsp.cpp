@@ -28,6 +28,7 @@ extern "C" {
 #include "clipboard_bridge.h"
 #include "config.h"
 #include "cursor_channel.h"
+#include "display_device/session.h"
 #include "globals.h"
 #include "httpcommon.h"
 #include "input.h"
@@ -46,6 +47,15 @@ using asio::ip::udp;
 using namespace std::literals;
 
 namespace rtsp_stream {
+  namespace {
+    std::recursive_mutex lifecycle_mutex;
+  }
+
+  std::recursive_mutex &
+  session_lifecycle_mutex() {
+    return lifecycle_mutex;
+  }
+
   void
   launch_session_t::set_hdr_target(
     const hdr::client_display_capabilities_t &capabilities,
@@ -654,6 +664,12 @@ namespace rtsp_stream {
 
   class rtsp_server_t {
   public:
+    explicit rtsp_server_t(std::function<void()> restore_display = []() {
+      display_device::session_t::get().restore_state();
+    }):
+        restore_display { std::move(restore_display) } {
+    }
+
     ~rtsp_server_t() {
       clear();
     }
@@ -779,6 +795,7 @@ namespace rtsp_stream {
      */
     launch_ticket_register_e
     session_raise(std::shared_ptr<launch_session_t> launch_session) {
+      std::lock_guard lifecycle_lock { session_lifecycle_mutex() };
       if (!launch_session) {
         return launch_ticket_register_e::global_limit;
       }
@@ -786,6 +803,7 @@ namespace rtsp_stream {
       const auto result = _launch_sessions.register_session(
         std::move(launch_session), config::stream.ping_timeout);
       if (result == launch_ticket_register_e::accepted || result == launch_ticket_register_e::replaced) {
+        display_cleanup_pending = true;
         schedule_pending_prune();
       }
       return result;
@@ -826,9 +844,9 @@ namespace rtsp_stream {
         raised_timer.expires_after(config::stream.ping_timeout);
         raised_timer.async_wait([this](const boost::system::error_code &ec) {
           if (!ec) {
-            const auto pruned = _launch_sessions.prune();
-            if (pruned != 0) {
-              BOOST_LOG(debug) << "Expired "sv << pruned << " pending RTSP launch ticket(s)"sv;
+            clear(false);
+            if (pending_session_count() != 0) {
+              schedule_pending_prune();
             }
           }
           else if (ec != boost::asio::error::operation_aborted) {
@@ -849,6 +867,7 @@ namespace rtsp_stream {
      */
     void
     clear(bool all = true, stream::session::stop_reason_e reason = stream::session::stop_reason_e::host_terminate) {
+      std::lock_guard lifecycle_lock { session_lifecycle_mutex() };
       if (all) {
         _launch_sessions.clear();
       }
@@ -878,11 +897,21 @@ namespace rtsp_stream {
       for (const auto &session : sessions_to_join) {
         stream::session::join(*session);
       }
+
+      // A paused app is not a connected client. Restore after every transport has
+      // drained, including input-only streams and launches that never completed.
+      // A pending reconnect owns the prepared display until it starts or expires.
+      if (display_cleanup_pending && session_count() == 0 && pending_session_count() == 0) {
+        BOOST_LOG(info) << "No connected clients or pending launches; restoring host display state"sv;
+        restore_display();
+        display_cleanup_pending = false;
+      }
     }
 
     void
     terminate_sessions_async(stream::session::stop_reason_e reason, boost::function<void()> completion) {
       boost::asio::post(io_context, [this, reason, completion = std::move(completion)]() mutable {
+        std::lock_guard lifecycle_lock { session_lifecycle_mutex() };
         try {
           clear(true, reason);
         }
@@ -955,6 +984,8 @@ namespace rtsp_stream {
 
   private:
     std::unordered_map<std::string_view, cmd_func_t> _map_cmd_cb;
+    bool display_cleanup_pending { false };
+    std::function<void()> restore_display;
 
     sync_util::sync_t<std::set<std::shared_ptr<stream::session_t>>> _session_slots;
 
@@ -1324,6 +1355,7 @@ namespace rtsp_stream {
 
   void
   cmd_announce(rtsp_server_t *server, tcp::socket &sock, launch_session_t &session, msg_t &&req) {
+    std::lock_guard lifecycle_lock { session_lifecycle_mutex() };
     OPTION_ITEM option {};
 
     // I know these string literals will not be modified
@@ -1799,3 +1831,55 @@ namespace rtsp_stream {
     BOOST_LOG(debug) << log_stream.str();
   }
 }  // namespace rtsp_stream
+
+#ifdef SUNSHINE_TESTS
+#include <gtest/gtest.h>
+
+TEST(RtspDisplayCleanup, ExpiredInputOnlyHandshakeRestoresOnce) {
+  int restores = 0;
+  rtsp_stream::rtsp_server_t host { [&]() { ++restores; } };
+  auto ticket = std::make_shared<rtsp_stream::launch_session_t>();
+  ticket->id = 1;
+  ticket->input_only_mode = true;
+  ASSERT_EQ(host.session_raise(ticket), rtsp_stream::launch_ticket_register_e::accepted);
+
+  host.clear(false);
+  EXPECT_EQ(restores, 0);
+  host._launch_sessions.prune(rtsp_stream::launch_session_manager_t::clock_t::now() + std::chrono::hours(1));
+  host.clear(false);
+  EXPECT_EQ(restores, 1);
+  host.clear(false);
+  EXPECT_EQ(restores, 1);
+}
+
+TEST(RtspDisplayCleanup, PendingReconnectKeepsDisplayUntilLastTicketEnds) {
+  int restores = 0;
+  rtsp_stream::rtsp_server_t host { [&]() { ++restores; } };
+  for (std::uint32_t id : {1u, 2u}) {
+    auto ticket = std::make_shared<rtsp_stream::launch_session_t>();
+    ticket->id = id;
+    ticket->input_only_mode = id == 2;
+    ASSERT_EQ(host.session_raise(ticket), rtsp_stream::launch_ticket_register_e::accepted);
+  }
+  host.session_clear(1);
+  host.clear(false);
+  EXPECT_EQ(restores, 0);
+  host.session_clear(2);
+  host.clear(false);
+  EXPECT_EQ(restores, 1);
+}
+
+TEST(RtspDisplayCleanup, HostStopRestoresPreparedLaunchButIdleHostDoesNothing) {
+  int restores = 0;
+  rtsp_stream::rtsp_server_t host { [&]() { ++restores; } };
+  host.clear();
+  EXPECT_EQ(restores, 0);
+  auto ticket = std::make_shared<rtsp_stream::launch_session_t>();
+  ticket->id = 1;
+  ASSERT_EQ(host.session_raise(ticket), rtsp_stream::launch_ticket_register_e::accepted);
+  host.clear();
+  EXPECT_EQ(restores, 1);
+  host.clear();
+  EXPECT_EQ(restores, 1);
+}
+#endif

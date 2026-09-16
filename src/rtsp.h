@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -22,6 +23,10 @@ namespace stream::session {
 }
 
 namespace rtsp_stream {
+  // Serialize display preparation, stream activation, and final disconnect cleanup.
+  // Recursive because NVHTTP checks session_count(), which drains stopped sessions.
+  std::recursive_mutex &session_lifecycle_mutex();
+
   constexpr auto RTSP_SETUP_PORT = 21;
 
   struct launch_session_t {

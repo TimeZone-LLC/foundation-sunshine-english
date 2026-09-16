@@ -4101,49 +4101,27 @@ namespace stream {
       input::reset(session.input);
       tray_state::remove_session(session.launch_session_id);
 
-      // 对于仅控制流会话，只减少总会话计数，不调用 streaming_will_stop
-      // 只有当所有非控制流会话都结束时才调用 streaming_will_stop
-      if (session.control_only || session.input_only_mode) {
-        --running_sessions;
-        BOOST_LOG(debug) << "Input-only session ended (remaining sessions: "sv << running_sessions.load() << ")"sv;
+      const auto sessions_remaining = --running_sessions;
+      if (session.audio.mic_registered) {
+        const auto was_registered = release_mic_session(*session.broadcast_ref.get(), session.launch_session_id);
+        session.audio.mic_registered = false;
+        BOOST_LOG(debug) << "Microphone registration for session " << session.launch_session_id
+                         << (was_registered ? " released"sv : " was already absent"sv);
       }
-      else {
-        // 非仅控制流会话：减少两个计数器
-        --running_sessions;
 
-        if (session.audio.mic_registered) {
-          const auto was_registered = release_mic_session(*session.broadcast_ref.get(), session.launch_session_id);
-          session.audio.mic_registered = false;
-          BOOST_LOG(debug) << "Microphone registration for session " << session.launch_session_id
-                           << (was_registered ? " released"sv : " was already absent"sv);
-        }
-
-        // If this is the last non-control-only session, invoke the platform callbacks
-        if (unregister_video_session() == 0) {
-          bool restore_display_state { true };
-          if (proc::proc.running()) {
-            tray_state::set_paused(proc::proc.get_last_run_app_name());
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
-            system_tray::update_tray_pausing(proc::proc.get_last_run_app_name());
-#endif
-
-            // TODO: make this configurable per app
-            restore_display_state = false;
-          }
-          else {
-            tray_state::set_idle(proc::proc.get_last_run_app_name());
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
-            system_tray::update_tray_stopped(proc::proc.get_last_run_app_name());
-#endif
-          }
-
-          if (restore_display_state) {
-            display_device::session_t::get().restore_state();
-          }
-
-          platf::streaming_will_stop();
-        }
+      // Only real video sessions acquire the platform streaming optimizations.
+      if (!session.control_only && !session.input_only_mode && unregister_video_session() == 0) {
+        platf::streaming_will_stop();
       }
+
+      if (sessions_remaining == 0) {
+        tray_state::set_idle(proc::proc.get_last_run_app_name());
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
+        system_tray::update_tray_stopped(proc::proc.get_last_run_app_name());
+#endif
+      }
+      // RTSP restores displays after all joined sessions and pending launches
+      // have drained. App lifetime must not suppress that cleanup.
 
       perf::end_session(session.launch_session_id);
 

@@ -591,6 +591,7 @@ namespace nvhttp {
 
   void
   launch(bool &host_audio, resp_https_t response, req_https_t request) {
+    std::lock_guard lifecycle_lock { rtsp_stream::session_lifecycle_mutex() };
     print_req<SunshineHTTPS>(request);
 
     print_request_ip<SunshineHTTPS>(request, "Launch request");
@@ -673,20 +674,30 @@ namespace nvhttp {
                          << ", rule_source=" << fingerprint_match.source << ']';
     }
 
-    if (launch_session->input_only_mode) {
-      BOOST_LOG(info) << "Input-only mode: skipping display preparation and encoder probing for launch"sv;
-    }
-    else if (rtsp_stream::session_count() == 0) {
-      // We want to prepare display only if there are no active sessions at
-      // the moment. This should to be done before probing encoders as it could
-      // change display device's state.
-      // The display should be restored by the fail guard in case something happens.
-      need_to_restore_display_state = true;
+    if (rtsp_stream::session_count() == 0) {
+      if (launch_session->input_only_mode) {
+        BOOST_LOG(info) << "Input-only mode: preparing display state only for launch"sv;
+        // We do not probe encoders in input-only mode to avoid the GPU path.
+        // The display should be restored by the fail guard in case something happens.
+        need_to_restore_display_state = true;
 
-      if (!stream_start::prepare_display_and_probe_encoders(tree, *launch_session, true)) {
-        tree.put("root.gamesession", 0);
+        if (!stream_start::prepare_display_without_encoder_probe(tree, *launch_session, true)) {
+          tree.put("root.gamesession", 0);
+          return;
+        }
+      }
+      else {
+        // We want to prepare display only if there are no active sessions at
+        // the moment. This should to be done before probing encoders as it could
+        // change display device's state.
+        // The display should be restored by the fail guard in case something happens.
+        need_to_restore_display_state = true;
 
-        return;
+        if (!stream_start::prepare_display_and_probe_encoders(tree, *launch_session, true)) {
+          tree.put("root.gamesession", 0);
+
+          return;
+        }
       }
     }
 
@@ -761,6 +772,7 @@ namespace nvhttp {
 
   void
   resume(bool &host_audio, resp_https_t response, req_https_t request) {
+    std::lock_guard lifecycle_lock { rtsp_stream::session_lifecycle_mutex() };
     print_req<SunshineHTTPS>(request);
 
     print_request_ip<SunshineHTTPS>(request, "Resume request");
@@ -849,17 +861,25 @@ namespace nvhttp {
                          << ", rule_source=" << fingerprint_match.source << ']';
     }
 
-    if (launch_session->input_only_mode) {
-      BOOST_LOG(info) << "Input-only mode: skipping display preparation and encoder probing for resume"sv;
-    }
-    else if (no_active_sessions) {
-      // Prepare before publishing the ticket so the handshake expiration
-      // window starts only when the host is ready to accept RTSP.
-      if (!stream_start::prepare_display_and_probe_encoders(tree, *launch_session, false)) {
-        tree.put("root.resume", 0);
-        return;
-      }
+    if (no_active_sessions) {
+      // Roll back partial display changes even if preparation or probing fails.
       need_to_restore_display_state = true;
+      if (launch_session->input_only_mode) {
+        BOOST_LOG(info) << "Input-only mode: preparing display state only for resume"sv;
+        // Do not probe encoders so input-only clients stay on the minimal data path.
+        if (!stream_start::prepare_display_without_encoder_probe(tree, *launch_session, false)) {
+          tree.put("root.resume", 0);
+          return;
+        }
+      }
+      else {
+        // Prepare before publishing the ticket so the handshake expiration
+        // window starts only when the host is ready to accept RTSP.
+        if (!stream_start::prepare_display_and_probe_encoders(tree, *launch_session, false)) {
+          tree.put("root.resume", 0);
+          return;
+        }
+      }
     }
 
     auto encryption_mode = net::encryption_mode_for_address(request->remote_endpoint().address());

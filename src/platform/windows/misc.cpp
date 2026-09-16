@@ -1506,6 +1506,12 @@ namespace platf {
 
   void
   streaming_will_stop() {
+    // Global driver changes belong to the connected stream, not the host process.
+    if (nvprefs_instance.load()) {
+      nvprefs_instance.restore_global_profile();
+      nvprefs_instance.unload();
+    }
+
     // Demote ourselves back to normal priority class
     SetPriorityClass(GetCurrentProcess(), NORMAL_PRIORITY_CLASS);
 

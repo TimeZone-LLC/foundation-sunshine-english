@@ -332,14 +332,13 @@ main(int argc, char *argv[]) {
   }
 
 #ifdef WIN32
-  // Modify relevant NVIDIA control panel settings if the system has corresponding gpu
+  // Recover previous driver changes without applying global streaming settings
+  // while idle. streaming_will_start/stop owns those changes.
   if (nvprefs_instance.load()) {
     // Restore global settings to the undo file left by improper termination of sunshine.exe
     nvprefs_instance.restore_from_and_delete_undo_file_if_exists();
     // Modify application settings for sunshine.exe
     nvprefs_instance.modify_application_profile();
-    // Modify global settings, undo file is produced in the process to restore after improper termination
-    nvprefs_instance.modify_global_profile();
     // Unload dynamic library to survive driver re-installation
     nvprefs_instance.unload();
   }
@@ -619,18 +618,21 @@ main(int argc, char *argv[]) {
 #if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
   system_tray::end_tray();
 #endif
-  try {
-    display_device::session_t::get().restore_state();
-  }
-  catch (...) {
-  }
-  display_device_deinit_guard = nullptr;
-
   readinessThread.join();
 
   httpThread.join();
   configThread.join();
   rtspThread.join();
+
+  // Drain clients and launch handlers before restoring or stopping the display
+  // listener, so shutdown cannot race a late display configuration request.
+  try {
+    display_device::session_t::get().restore_state();
+  }
+  catch (...) {
+    BOOST_LOG(error) << "Display restoration during shutdown failed; retaining saved state for startup recovery"sv;
+  }
+  display_device_deinit_guard = nullptr;
 
   task_pool.stop();
   task_pool.join();

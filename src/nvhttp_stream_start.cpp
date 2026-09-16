@@ -780,4 +780,36 @@ namespace nvhttp::stream_start {
     return false;
   }
 
+  bool
+  prepare_display_without_encoder_probe(
+    pt::ptree &tree,
+    rtsp_stream::launch_session_t &launch_session,
+    bool is_reconfigure) {
+    const auto intent = display_device::resolve_display_intent(config::video, launch_session);
+    if (!validate_display_intent(tree, intent)) {
+      return false;
+    }
+
+    const auto display_result = display_device::session_t::get().configure_display(config::video, launch_session, is_reconfigure);
+    if (!display_result) {
+      set_display_config_error(tree, display_result);
+      return false;
+    }
+
+    if (display_result.result == display_device::session_t::configure_result_t::result_e::deferred_retry) {
+      BOOST_LOG(warning) << "Display-only setup for input-only mode was deferred; continuing with retries in the background.";
+      set_auto_recovery_status(
+        tree,
+        {
+          true,
+          false,
+          "deferred_display_retry",
+          "Display configuration was deferred and will be retried in background."
+        });
+    }
+
+    hdr::adopt_vdd_calibration_if_needed(launch_session);
+    return true;
+  }
+
 }  // namespace nvhttp::stream_start

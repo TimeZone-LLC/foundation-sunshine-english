@@ -1,6 +1,7 @@
 #pragma once
 
 // standard includes
+#include <cstdint>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -314,6 +315,7 @@ namespace display_device {
     boost::optional<bool> current_use_vdd; /**< Whether current session is using VDD mode. */
     pending_vdd_context_t pending_vdd_; /**< 在显示配置成功或清理前保留的 VDD 创建基线。 */
     bool pending_restore_ = false; /**< Flag indicating if there is a pending restore settings operation waiting for unlock. */
+    std::uint64_t restore_generation_ {0}; /**< Reject stale queued callbacks after a reconnect. */
     boost::atomic<int> polling_retry_count_ {0}; /**< Retry counter for polling restore mechanism. */
 
     /**

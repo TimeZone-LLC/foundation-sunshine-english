@@ -57,7 +57,10 @@ namespace display_device {
                 else {
                   next_wake_up_time = boost::none;
 
-                  const auto result { !this->retry_function || this->retry_function() };
+                  // A retry may replace/cancel itself while reverting display state.
+                  // Keep the currently executing callable alive until it returns.
+                  const auto retry = this->retry_function;
+                  const auto result { !retry || retry() };
                   if (!result) {
                     next_wake_up_time = now + this->timeout_duration;
                   }
@@ -186,6 +189,7 @@ namespace display_device {
 
   void
   session_t::cancel_pending_display_retry() {
+    ++restore_generation_;
     pending_restore_ = false;
     SessionEventListener::clear_unlock_task();
     timer->setup_timer(nullptr);
@@ -396,6 +400,8 @@ namespace display_device {
     const rtsp_stream::launch_session_t &session,
     bool is_reconfigure) {
     std::lock_guard lock { mutex };
+    const bool restore_was_pending = pending_restore_;
+    cancel_pending_display_retry();
 
     // 恢复运行中的应用时可能换成另一个客户端。取消旧的延迟恢复任务，
     // 但在完成模式兼容性判断前保留当前 VDD；仅客户端身份变化不要求重建。
@@ -459,7 +465,7 @@ namespace display_device {
         settings.capture_audio_sink();
       }
 
-      if (pending_restore_ && settings.has_persistent_data()) {
+      if (restore_was_pending && settings.has_persistent_data()) {
         BOOST_LOG(info) << (vdd_already_exists ?
                               "A restore is still pending and the VDD is still present, keeping the existing initial topology" :
                               "A restore is still pending, keeping the existing initial topology");
@@ -972,6 +978,9 @@ namespace display_device {
 
   void
   session_t::restore_state_impl(revert_reason_e reason) {
+    // Cancel deferred application before starting restoration. Otherwise a timer
+    // can disable monitors again after the client has already disconnected.
+    cancel_pending_display_retry();
 #ifdef _WIN32
     // Stop exposing the implicit layer before changing HDR state or removing
     // the VDD. The layer itself is pass-through, but registration must remain
@@ -1139,27 +1148,22 @@ namespace display_device {
 
       // 设置待恢复标志
       pending_restore_ = true;
+      start_polling_restore(reason);
+      const auto generation = restore_generation_;
 
       // 添加恢复任务（自动处理锁屏检查和立即执行）
       // SessionEventListener dispatches this task on the next session unlock, console
       // connect, logon, resume from suspend, display change or monitor device change, so a
       // restore that cannot run now (locked console, sleeping machine) is retried instead of
       // being lost.
-      SessionEventListener::add_unlock_task([this, reason]() {
-        // 快速检查是否还需要恢复（最小化锁持有时间）
-        {
-          std::lock_guard lock { mutex };
-          if (!pending_restore_) {
-            BOOST_LOG(info) << "Restore was cancelled, skipping";
-            return;
-          }
+      SessionEventListener::add_unlock_task([this, reason, generation]() {
+        // Keep the check and the display write atomic with respect to reconnects.
+        std::lock_guard lock { mutex };
+        if (!pending_restore_ || generation != restore_generation_) {
+          return;
         }
 
-        // 在锁外执行CCD检查和恢复操作（避免阻塞托盘等其他操作）
         if (settings.is_changing_settings_going_to_fail()) {
-          BOOST_LOG(warning) << "The CCD API is still unavailable, starting the polling retry loop";
-          std::lock_guard lock { mutex };
-          this->start_polling_restore(reason);
           return;
         }
 
@@ -1167,19 +1171,7 @@ namespace display_device {
         auto result = settings.revert_settings(reason, true);
         BOOST_LOG(info) << "Display settings restore " << (result ? "succeeded" : "failed");
 
-        // 恢复完成后清除标志和状态
-        {
-          std::lock_guard lock { mutex };
-          if (!result && settings.has_persistent_data()) {
-            // The displays are still owed a restore. Dropping the pending flag here would
-            // abandon them on the streaming topology until the next Sunshine start, so keep
-            // the restore armed and let the polling loop (which waits out a locked session)
-            // pick it up on the next unlock or resume.
-            BOOST_LOG(info) << "The display state is still not restored, keeping the restore armed";
-            this->start_polling_restore(reason);
-            return;
-          }
-          pending_restore_ = false;
+        if (result) {
           stop_timer_and_clear_vdd_state();
         }
       });
@@ -1189,11 +1181,10 @@ namespace display_device {
   void
   session_t::start_polling_restore(revert_reason_e reason) {
     polling_retry_count_.store(0, boost::memory_order_relaxed);  // 重置计数器
-    const int max_retries = 20;
 
     // `locked_polls` only counts the polls that were skipped because of a locked session,
     // so that the log below can be throttled without touching the real retry budget.
-    timer->setup_timer([this, reason, max_retries, locked_polls = 0]() mutable {
+    timer->setup_timer([this, reason, locked_polls = 0]() mutable {
       // 检查是否还需要恢复
       if (!pending_restore_) {
         BOOST_LOG(debug) << "Restore was cancelled, skipping";
@@ -1217,19 +1208,22 @@ namespace display_device {
 
       if (settings.is_changing_settings_going_to_fail()) {
         const int current_count = polling_retry_count_.fetch_add(1, boost::memory_order_relaxed) + 1;
-        if (current_count >= max_retries) {
-          BOOST_LOG(warning) << "Maximum retry count reached, giving up on restoring the display settings";
-          pending_restore_ = false;
-          clear_vdd_state();
-          return true;
+        if (current_count == 1 || current_count % 12 == 0) {
+          BOOST_LOG(warning) << "Waiting for Windows display access; the display restore remains pending";
         }
-        BOOST_LOG(warning) << "Timer: still waiting for the CCD API to recover... (Count: " << current_count << "/" << max_retries << ")";
         return false;
       }
 
       // VDD生命周期已由restore_state_impl决定，跳过revert_settings中的VDD销毁
       auto result = settings.revert_settings(reason, true);
-      BOOST_LOG(info) << "Polled display settings restore " << (result ? "succeeded" : "failed") << ", not retrying again";
+      if (!result) {
+        const int current_count = polling_retry_count_.fetch_add(1, boost::memory_order_relaxed) + 1;
+        if (current_count == 1 || current_count % 12 == 0) {
+          BOOST_LOG(warning) << "Display restoration failed; retaining the saved state and retrying";
+        }
+        return false;
+      }
+      BOOST_LOG(info) << "Display settings were restored by the retry timer";
       pending_restore_ = false;
       clear_vdd_state();
       return true;
