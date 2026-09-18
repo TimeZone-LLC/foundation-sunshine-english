@@ -207,7 +207,8 @@ jobs:
           BRANCH: ${{ github.head_ref || github.ref_name }}
           BUILD_VERSION: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
           COMMIT: ${{ needs.setup_release.outputs.release_commit }}
-          GITHUB_TOKEN: ${{ secrets.DRIVER_DOWNLOAD_TOKEN }}
+          # Never expose the private driver credential to fork-controlled CMake code.
+          GITHUB_TOKEN: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && secrets.DRIVER_DOWNLOAD_TOKEN || '' }}
           # ccache.exe is a native binary, so it reads the Windows-style path
           # straight out of the environment even under the msys2 shell.
           CCACHE_DIR: ${{ github.workspace }}\.ccache
