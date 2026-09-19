@@ -2170,7 +2170,7 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
     <tr>
         <td>5</td>
-        <td>P5</td>
+        <td>P5 (default)</td>
     </tr>
     <tr>
         <td>6</td>
@@ -2219,6 +2219,35 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>full_res</td>
         <td>Two passes, first pass at full resolution (slower)</td>
+    </tr>
+</table>
+
+### [nvenc_frame_budget_guard](https://localhost:47990/config/#nvenc_frame_budget_guard)
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Automatically lowers the performance preset when its estimated encode time would not fit within a fixed
+            fraction of the frame interval (for example, 4K 120fps can clamp the default P5 down on a single-NVENC
+            GPU). This keeps encoding from falling behind the stream regardless of the configured preset.
+            Estimates are calibrated on recent high-end GPUs with a conservative margin.
+            @note{This option only applies when using NVENC [encoder](#encoderhttpslocalhost47990configencoder).}
+            @note{The effective preset of the latest session is reported in the @code{active_nvenc_frame_budget}@endcode
+            field of the config API, and clamping is logged at warning level.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            enabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            nvenc_frame_budget_guard = disabled
+            @endcode</td>
     </tr>
 </table>
 

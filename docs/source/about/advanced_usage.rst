@@ -1240,18 +1240,50 @@ min_fps_factor <https://localhost:47990/config/#min_fps_factor>`__
    2          P2
    3          P3
    4          P4
-   5          P5
+   5          P5 (default)
    6          P6
    7          P7 (slowest)
    ========== ===========
 
 **Default**
-   ``1``
+   ``5``
 
 **Example**
    .. code-block:: text
 
-      nvenc_preset = 1
+      nvenc_preset = 5
+
+`nvenc_frame_budget_guard <https://localhost:47990/config/#nvenc_frame_budget_guard>`__
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Description**
+   Automatically lowers the performance preset when its estimated encode time would not fit within a fixed fraction of the frame interval (for example, 4K 120fps can clamp the default P5 down on a single-NVENC GPU).
+   This keeps encoding from falling behind the stream regardless of the configured preset.
+   Estimates are calibrated on recent high-end GPUs with a conservative margin.
+
+   .. note:: This option only applies when using NVENC `encoder`_.
+
+   .. note:: The effective preset of the latest session is reported in the ``active_nvenc_frame_budget`` field of the config API, and clamping is logged at warning level.
+
+**Choices**
+
+.. table::
+   :widths: auto
+
+   ========== ===========
+   Value      Description
+   ========== ===========
+   enabled    Clamp the preset to the frame budget (recommended)
+   disabled   Never change the configured preset
+   ========== ===========
+
+**Default**
+   ``enabled``
+
+**Example**
+   .. code-block:: text
+
+      nvenc_frame_budget_guard = disabled
 
 `nvenc_twopass <https://localhost:47990/config/#nvenc_twopass>`__
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1301,7 +1333,7 @@ min_fps_factor <https://localhost:47990/config/#min_fps_factor>`__
    ========== ===========
    Value      Description
    ========== ===========
-   disabled   Don't enable Spatial AQ (faster)
+   disabled   Don't enable Spatial AQ (faster, default)
    enabled    Enable Spatial AQ (slower)
    ========== ===========
 
