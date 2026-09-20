@@ -8,6 +8,7 @@
 #   FETCH_GUI             — Enable/disable GUI download (default: ON)
 #   GUI_VERSION           — Release tag to download (e.g. v0.2.9)
 #   GUI_REPO              — GitHub repo (default: qiin2333/sunshine-control-panel)
+#   GUI_DIR               — GUI bundle directory; with FETCH_GUI=OFF, use a locally built bundle
 #
 # Output variables (CACHE FORCE):
 #   GUI_DIR               — Directory containing sunshine-gui.exe
@@ -22,8 +23,7 @@ option(FETCH_GUI "Download pre-built GUI from GitHub Releases" ON)
 
 set(GUI_VERSION "latest" CACHE STRING "Sunshine GUI release tag (or 'latest')")
 set(GUI_REPO "qiin2333/sunshine-control-panel" CACHE STRING "GUI GitHub repository")
-
-set(GUI_DIR "${CMAKE_BINARY_DIR}/_gui" CACHE PATH "GUI binary directory" FORCE)
+set(GUI_DIR "${CMAKE_BINARY_DIR}/_gui" CACHE PATH "GUI binary directory")
 set(_gui_exe_cached FALSE)
 
 if(NOT FETCH_GUI)
