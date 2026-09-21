@@ -27,7 +27,6 @@
 #include <openssl/evp.h>
 
 #include "ds5_sidecar_client.h"
-#include "src/ds5/config.h"
 #include "src/logging.h"
 #include "src/platform/windows/misc.h"
 #include "src/platform/windows/virtual_device_host/protocol.h"
@@ -667,7 +666,7 @@ namespace platf::ds5 {
   sidecar_client_t::~sidecar_client_t() = default;
 
   bool sidecar_client_t::configured() const {
-    return ds5_config::current().enabled && refresh_component_availability();
+    return refresh_component_availability();
   }
 
   bool sidecar_client_t::owns(int global_index) const {
