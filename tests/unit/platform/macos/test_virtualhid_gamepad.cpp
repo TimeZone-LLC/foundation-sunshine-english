@@ -17,6 +17,7 @@
 
 #include "src/config.h"
 #include "src/globals.h"
+#include "src/platform/macos/gamepad_mode.h"
 #include "src/platform/macos/virtualhid_gamepad.h"
 
 using namespace std::chrono_literals;
@@ -47,6 +48,29 @@ namespace {
   };
 
 }  // namespace
+
+TEST(MacGamepadMode, MapsEveryPerAppModeToItsProfile) {
+  constexpr std::array expected {
+    ""sv,
+    "auto"sv,
+    "x360"sv,
+    "ds4"sv,
+    "ds5"sv,
+    "generic"sv,
+    "xone"sv,
+    "xseries"sv,
+    "switch"sv,
+  };
+
+  for (std::size_t mode = 0; mode < expected.size(); ++mode) {
+    EXPECT_EQ(
+      platf::macos::gamepad_preference_from_process_mode(static_cast<int>(mode)),
+      expected[mode]
+    );
+  }
+  EXPECT_TRUE(platf::macos::gamepad_preference_from_process_mode(-1).empty());
+  EXPECT_TRUE(platf::macos::gamepad_preference_from_process_mode(9).empty());
+}
 
 TEST(VirtualGamepadProfiles, ReportsAllProfilesAndExtensionSupport) {
   constexpr std::array expected_names {

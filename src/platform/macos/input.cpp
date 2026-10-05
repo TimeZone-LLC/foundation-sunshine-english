@@ -12,6 +12,7 @@
 
 #include "src/logging.h"
 #include "src/platform/common.h"
+#include "src/platform/macos/gamepad_mode.h"
 #include "src/platform/macos/virtualhid_gamepad.h"
 #include "src/utility.h"
 
@@ -482,25 +483,10 @@ const KeyCodeMap kKeyCodesMap[] = {
 
   void
   set_gamepad_mode(int mode) {
-    gamepad_profile_e profile;
-    switch (mode) {
-      case 1:
-        profile = gamepad_profile_e::automatic;
-        break;
-      case 2:
-        profile = gamepad_profile_e::xbox_360;
-        break;
-      case 3:
-        profile = gamepad_profile_e::dualshock_4;
-        break;
-      case 4:
-        profile = gamepad_profile_e::dualsense;
-        break;
-      case 0:
-      default:
-        profile = gamepad_profile_e::inherit;
-        break;
-    }
+    const auto preference = macos::gamepad_preference_from_process_mode(mode);
+    const auto profile = preference.empty() ?
+                           gamepad_profile_e::inherit :
+                           gamepad_profile_from_preference(preference);
     current_app_gamepad_profile.store(profile, std::memory_order_relaxed);
     BOOST_LOG(info) << "Gamepad mode set to: "sv
                     << (profile == gamepad_profile_e::inherit ? "global"sv : gamepad_profile_name(profile));
