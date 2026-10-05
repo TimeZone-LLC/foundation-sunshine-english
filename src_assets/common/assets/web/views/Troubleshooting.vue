@@ -9,6 +9,8 @@
         </h1>
       </div>
 
+      <PermissionsPanel />
+
       <!-- Row 1: 重新打开新手引导 | 登出 -->
       <div class="row mb-4">
         <div class="col-lg-6 d-flex">
@@ -225,6 +227,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Navbar from '../components/layout/Navbar.vue'
+import PermissionsPanel from '../components/PermissionsPanel.vue'
 import TroubleshootingCard from '../components/TroubleshootingCard.vue'
 import LogsSection from '../components/LogsSection.vue'
 import LogDiagnosisModal from '../components/LogDiagnosisModal.vue'

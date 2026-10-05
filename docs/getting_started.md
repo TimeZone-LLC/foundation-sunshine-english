@@ -401,7 +401,15 @@ systemctl --user enable sunshine
 ```
 
 ### macOS
-The first time you start Sunshine, you will be asked to grant access to screen recording and your microphone.
+On first launch, Foundation Sunshine requests Screen Recording for display capture, Accessibility for keyboard and mouse
+control when those inputs are enabled, and Microphone access for streamed audio. Open **Troubleshooting > Permissions**
+in the Web UI to review this access or open the corresponding System Settings page. Foundation Sunshine restarts once
+after all verifiable required access is granted. On macOS 15 and newer, Bonjour discovery can also trigger the system's
+Local Network prompt; macOS does not provide a passive way for Foundation Sunshine to verify that setting.
+
+If a privacy switch is enabled but the Web UI still reports access as not granted, remove the old Foundation Sunshine
+entry and add the installed app again. Development builds should use a consistent signing identity so macOS can
+recognize the app across updates.
 
 Sunshine can only access microphones on macOS due to system limitations. To stream system audio use
 [Soundflower](https://github.com/mattingalls/Soundflower) or
