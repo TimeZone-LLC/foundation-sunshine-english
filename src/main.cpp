@@ -27,6 +27,7 @@
 #include "logging.h"
 #include "main.h"
 #include "nvhttp.h"
+#include "platform/permissions.h"
 #include "process.h"
 #include "tray/system_tray.h"
 #include "upnp.h"
@@ -40,6 +41,10 @@
 #ifdef _WIN32
   #include "platform/windows/misc.h"
   #include "platform/windows/win_dark_mode.h"
+#endif
+
+#ifdef __APPLE__
+  #include "platform/macos/misc.h"
 #endif
 
 #ifdef _WIN32
@@ -489,6 +494,13 @@ main(int argc, char *argv[]) {
     BOOST_LOG(error) << "Platform failed to initialize"sv;
   }
 
+#ifdef __APPLE__
+  // Remember the pre-request state so a grant made during this launch causes
+  // one clean restart after every verifiable permission in use is available.
+  const bool permission_restart_needed = !platf::required_permissions_granted(platf::get_permission_statuses());
+  platf::request_startup_permissions();
+#endif
+
   auto proc_deinit_guard = proc::init();
   if (!proc_deinit_guard) {
     BOOST_LOG(error) << "Proc failed to initialize"sv;
@@ -633,7 +645,30 @@ main(int argc, char *argv[]) {
   }
 #endif
 
+#ifdef __APPLE__
+  std::jthread permission_watcher;
+  if (permission_restart_needed) {
+    permission_watcher = std::jthread([](std::stop_token stop) {
+      while (!stop.stop_requested()) {
+        if (platf::required_permissions_granted(platf::get_permission_statuses())) {
+          BOOST_LOG(info) << "Required permissions granted; restarting Foundation Sunshine"sv;
+          platf::restart();
+          return;
+        }
+        std::this_thread::sleep_for(2s);
+      }
+    });
+  }
+#endif
+
   mainThreadLoop(shutdown_event);
+
+#ifdef __APPLE__
+  permission_watcher.request_stop();
+  if (permission_watcher.joinable()) {
+    permission_watcher.join();
+  }
+#endif
 
   client_fingerprint_deinit_guard.reset();
 

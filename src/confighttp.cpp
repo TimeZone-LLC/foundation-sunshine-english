@@ -68,6 +68,7 @@
 #include "nvenc/frame_budget.h"
 #include "perf_recorder.h"
 #include "platform/common.h"
+#include "platform/permissions.h"
 #include "platform/run_command.h"
 #include "rtsp.h"
 #include "src/display_device/to_string.h"
@@ -1940,6 +1941,58 @@ namespace confighttp {
     );
   }
 #endif
+
+  void
+  getPermissions(resp_https_t response, req_https_t request) {
+    if (!authenticate(response, request)) return;
+
+    nlohmann::json output {
+      { "permissions", nlohmann::json::array() },
+    };
+    for (const auto &permission : platf::get_permission_statuses()) {
+      output["permissions"].push_back({
+        { "id", permission.id },
+        { "status", permission.status },
+        { "required", permission.required },
+        { "verifiable", permission.verifiable },
+        { "requestable", permission.requestable },
+      });
+    }
+    send_response(std::move(response), output);
+  }
+
+  void
+  requestPermission(resp_https_t response, req_https_t request) {
+    if (!check_content_type(response, request, "application/json")) return;
+    if (!authenticate(response, request)) return;
+
+    auto send_bad_request = [&](std::string_view message) {
+      const nlohmann::json output {
+        { "status", false },
+        { "error", std::string { message } },
+      };
+      SimpleWeb::CaseInsensitiveMultimap headers;
+      headers.emplace("Content-Type", "application/json");
+      response->write(SimpleWeb::StatusCode::client_error_bad_request, output.dump(), headers);
+    };
+
+    try {
+      const auto input = nlohmann::json::parse(request->content.string());
+      if (!input.is_object() || !input.contains("id") || !input["id"].is_string()) {
+        send_bad_request("A permission ID is required");
+        return;
+      }
+
+      if (!platf::request_permission(input["id"].get<std::string>())) {
+        send_bad_request("Unknown or unavailable permission");
+        return;
+      }
+      send_response(std::move(response), nlohmann::json { { "status", true } });
+    }
+    catch (const nlohmann::json::exception &) {
+      send_bad_request("Invalid permission request");
+    }
+  }
 
   void
   restart(resp_https_t response, req_https_t request) {
@@ -4250,6 +4303,8 @@ namespace confighttp {
     server.resource["^/api/logout$"]["POST"] = handleLogout;
     server.resource["^/api/restart$"]["POST"] = restart;
     server.resource["^/api/restart$"]["GET"] = restart;
+    server.resource["^/api/permissions$"]["GET"] = getPermissions;
+    server.resource["^/api/permissions/request$"]["POST"] = requestPermission;
     server.resource["^/api/boom$"]["GET"] = boom;
     server.resource["^/api/reset-display-device-persistence$"]["POST"] = resetDisplayDevicePersistence;
     server.resource["^/api/display/refresh$"]["POST"] = refreshDisplays;
