@@ -119,24 +119,38 @@ def main():
             # EOF handlers reclaim capacity; retry until a valid client fits.
             def recovered():
                 try:
-                    with connect(port) as client:
-                        handshake(client, "wrong")
-                        return json.loads(line(client))["reason"] == "unauthorized"
+                    client = connect(port)
                 except (OSError, ssl.SSLError):
                     return False
+                # Once TLS succeeds, the slot was reclaimed. Do not mask a
+                # reset that loses the protocol error after this point.
+                with client:
+                    handshake(client, "wrong")
+                    return json.loads(line(client))["reason"] == "unauthorized"
             wait_for(recovered)
         print("PASS host: pre-TLS session cap rejects excess connections and recovers")
 
         with server() as (port, log):
-            for supplied_token in ("", "wrong"):
-                with connect(port) as client:
-                    handshake(client, supplied_token)
-                    assert json.loads(line(client))["reason"] == "unauthorized"
+            rejection_cases = (
+                ("", "1-1", "unauthorized"),
+                ("wrong", "1-1", "unauthorized"),
+                (token, "", "invalid busid"),
+                (token, "1/9", "invalid busid"),
+                (token, "1 9", "invalid busid"),
+                (token, "x" * 32, "invalid busid"),
+            )
+            # Repeat beyond max_sessions so every rejected session must finish,
+            # reclaim capacity, and deliver its complete TLS error record.
+            for cycle in range(4):
+                for supplied_token, invalid_busid, expected_reason in rejection_cases:
+                    with connect(port) as client:
+                        handshake(client, supplied_token, busid=invalid_busid)
+                        response = json.loads(line(client))
+                        assert response == {"op": "error", "reason": expected_reason}, \
+                            (cycle, supplied_token, invalid_busid, response)
+                        assert client.recv(1) == b"", \
+                            "structured rejection did not end with a clean TLS shutdown"
             assert "IMPORT_EXCHANGED" not in log.read_text()
-            for invalid_busid in ("", "1/9", "1 9", "x" * 32):
-                with connect(port) as client:
-                    handshake(client, busid=invalid_busid)
-                    assert json.loads(line(client))["reason"] == "invalid busid"
             for busid, tail in (("1-1", b""), ("1-1", b"REPLY\0\r\n"), ("1-9:0", b"")):
                 before = log.read_text().count("DETACHED")
                 attached_before = log.read_text().count("attached busid")

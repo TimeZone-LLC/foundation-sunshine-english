@@ -382,10 +382,21 @@ namespace remote_usb {
         const auto line = std::make_shared<const std::string>(
           (nlohmann::json { { "op", "error" }, { "reason", reason } }).dump() + "\n");
         asio::async_write(stream_, asio::buffer(*line),
-          [self, line](boost::system::error_code, std::size_t) {
-            boost::system::error_code ignored;
-            self->stream_.lowest_layer().shutdown(tcp::socket::shutdown_both, ignored);
-            self->finish();
+          [self, line](boost::system::error_code error, std::size_t) {
+            if (error) {
+              self->finish();
+              return;
+            }
+
+            /* Complete TLS shutdown after the error record has been sent. A
+             * raw TCP close can become an RST on Windows while the peer is
+             * still draining the TLS record, discarding the structured error
+             * we just wrote. The startup deadline remains armed so a peer that
+             * never acknowledges close_notify cannot retain a session slot. */
+            self->stream_.async_shutdown(
+              [self](boost::system::error_code) {
+                self->finish();
+              });
           });
       }
 
