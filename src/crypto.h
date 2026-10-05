@@ -94,9 +94,15 @@ namespace crypto {
     void
     clear();
 
+    /**
+     * @brief Verify that a certificate exactly matches one stored trust anchor.
+     */
     const char *
     verify(x509_t::element_type *cert);
 
+    /**
+     * @brief Verify an exact stored identity using an isolated OpenSSL context.
+     */
     const char *
     verify_safe(x509_t::element_type *cert);
 

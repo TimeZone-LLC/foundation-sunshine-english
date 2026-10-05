@@ -11,6 +11,7 @@
 
 namespace crypto {
   using asn1_string_t = util::safe_ptr<ASN1_STRING, ASN1_STRING_free>;
+  constexpr char UNPAIRED_CERTIFICATE_ERROR[] = "Client certificate identity is not paired";
 
   cert_chain_t::cert_chain_t():
       _certs {}, _cert_ctx { X509_STORE_CTX_new() } {}
@@ -58,7 +59,7 @@ namespace crypto {
   const char *
   cert_chain_t::verify(x509_t::element_type *cert) {
     int err_code = 0;
-    for (auto &[_, x509_store] : _certs) {
+    for (auto &[trusted_cert, x509_store] : _certs) {
       auto fg = util::fail_guard([this]() {
         X509_STORE_CTX_cleanup(_cert_ctx.get());
       });
@@ -74,7 +75,12 @@ namespace crypto {
       auto err = X509_verify_cert(_cert_ctx.get());
 
       if (err == 1) {
-        return nullptr;
+        if (X509_cmp(trusted_cert.get(), cert) == 0) {
+          return nullptr;
+        }
+
+        err_code = X509_V_ERR_CERT_REJECTED;
+        continue;
       }
 
       err_code = X509_STORE_CTX_get_error(_cert_ctx.get());
@@ -84,46 +90,54 @@ namespace crypto {
       }
     }
 
-    return X509_verify_cert_error_string(err_code);
+    return err_code == 0 ? UNPAIRED_CERTIFICATE_ERROR : X509_verify_cert_error_string(err_code);
   }
 
-  const char* cert_chain_t::verify_safe(x509_t::element_type* cert) {
-      if (!cert) {
-          return "Invalid certificate: null pointer";
+  const char *
+  cert_chain_t::verify_safe(x509_t::element_type *cert) {
+    if (!cert) {
+      return "Invalid certificate: null pointer";
+    }
+    if (_certs.empty()) {
+      return UNPAIRED_CERTIFICATE_ERROR;
+    }
+
+    int last_err_code = X509_V_ERR_UNSPECIFIED;
+    for (auto &[trusted_cert, x509_store] : _certs) {
+      auto ctx_deleter = [](X509_STORE_CTX *ctx) {
+        if (ctx) {
+          X509_STORE_CTX_free(ctx);
+        }
+      };
+      std::unique_ptr<X509_STORE_CTX, decltype(ctx_deleter)> ctx(X509_STORE_CTX_new(), ctx_deleter);
+
+      if (!ctx) {
+        last_err_code = X509_V_ERR_OUT_OF_MEM;
+        continue;
       }
-      if (_certs.empty()) {
-          return "No certificate stores available";
+      if (X509_STORE_CTX_init(ctx.get(), x509_store.get(), cert, nullptr) != 1) {
+        last_err_code = X509_V_ERR_STORE_LOOKUP;
+        continue;
       }
-      int last_err_code = X509_V_ERR_UNSPECIFIED;
-      for (auto& [name, x509_store] : _certs) {
-          auto ctx_deleter = [](X509_STORE_CTX* ctx) {
-              if (ctx) {
-                  X509_STORE_CTX_free(ctx);
-              }
-          };
-          std::unique_ptr<X509_STORE_CTX, decltype(ctx_deleter)> ctx(
-              X509_STORE_CTX_new(), ctx_deleter);
-          
-          if (!ctx) {
-              last_err_code = X509_V_ERR_OUT_OF_MEM;
-              continue;
-          }
-          if (X509_STORE_CTX_init(ctx.get(), x509_store.get(), cert, nullptr) != 1) {
-              last_err_code = X509_V_ERR_STORE_LOOKUP;
-              continue;
-          }
-          X509_STORE_CTX_set_verify_cb(ctx.get(), openssl_verify_cb);
-          int verify_result = X509_verify_cert(ctx.get());
-          if (verify_result == 1) {
-              return nullptr;
-          }
-          int err_code = X509_STORE_CTX_get_error(ctx.get());
-          if (err_code != X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT) {
-              return X509_verify_cert_error_string(err_code);
-          }
-          last_err_code = err_code;
+      X509_STORE_CTX_set_verify_cb(ctx.get(), openssl_verify_cb);
+      const int verify_result = X509_verify_cert(ctx.get());
+      if (verify_result == 1) {
+        if (X509_cmp(trusted_cert.get(), cert) == 0) {
+          return nullptr;
+        }
+
+        last_err_code = X509_V_ERR_CERT_REJECTED;
+        continue;
       }
-      return X509_verify_cert_error_string(last_err_code);
+
+      const int err_code = X509_STORE_CTX_get_error(ctx.get());
+      if (err_code != X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT) {
+        return X509_verify_cert_error_string(err_code);
+      }
+      last_err_code = err_code;
+    }
+
+    return last_err_code == X509_V_ERR_UNSPECIFIED ? UNPAIRED_CERTIFICATE_ERROR : X509_verify_cert_error_string(last_err_code);
   }
 
   namespace cipher {

@@ -21,6 +21,7 @@
 #include "src/httpcommon.h"
 #include "src/nvhttp.h"
 #include "src/nvhttp/pairing.h"
+#include "../certificate_test_utils.h"
 
 namespace {
   namespace fs = std::filesystem;
@@ -134,6 +135,23 @@ TEST(CryptoX509, RejectsInvalidOrDifferentCertificates) {
   EXPECT_FALSE(crypto::x509_matches_pem(first_certificate.get(), second_credentials.x509));
   EXPECT_FALSE(crypto::x509_matches_pem(first_certificate.get(), "not a certificate"));
   EXPECT_FALSE(crypto::x509_matches_pem(nullptr, first_credentials.x509));
+}
+
+TEST(CryptoX509, CertificateChainRequiresExactPairedIdentity) {
+  const auto issuer_credentials = test_utils::certificates::generate_ca_credentials();
+  const auto derived_credentials = test_utils::certificates::generate_derived_leaf(issuer_credentials);
+  auto paired_certificate = crypto::x509(issuer_credentials.x509);
+  auto derived_certificate = crypto::x509(derived_credentials.x509);
+  ASSERT_TRUE(paired_certificate);
+  ASSERT_TRUE(derived_certificate);
+
+  crypto::cert_chain_t certificate_chain;
+  certificate_chain.add(crypto::x509(issuer_credentials.x509));
+
+  EXPECT_EQ(certificate_chain.verify(paired_certificate.get()), nullptr);
+  EXPECT_NE(certificate_chain.verify(derived_certificate.get()), nullptr);
+  EXPECT_EQ(certificate_chain.verify_safe(paired_certificate.get()), nullptr);
+  EXPECT_NE(certificate_chain.verify_safe(derived_certificate.get()), nullptr);
 }
 
 TEST(NvhttpPairing, ResolvesUuidForVerifiedPeerCertificate) {
