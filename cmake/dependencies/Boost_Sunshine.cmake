@@ -28,12 +28,11 @@ set(BOOST_COMPONENTS
 # fallback path below, so configuring against a system Boost failed at generate time with
 # "Target ... links to Boost::format but the target was not found".
 
-# algorithm, preprocessor, scope, and uuid are not used by Sunshine, but by libdisplaydevice, added here for convenience
+# algorithm, preprocessor, and uuid are used by Windows dependencies.
 if(WIN32)
     list(APPEND BOOST_COMPONENTS
             algorithm
             preprocessor
-            scope
             uuid
     )
 endif()
