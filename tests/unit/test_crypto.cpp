@@ -150,6 +150,39 @@ TEST(NvhttpPairing, ResolvesUuidForVerifiedPeerCertificate) {
   EXPECT_EQ(nvhttp::pairing::client_uuid_for_cert(certificate.get()), expected_uuid);
 }
 
+TEST(NvhttpPairing, RePairingReplacesEquivalentCertificateIdentity) {
+  const auto credentials = crypto::gen_creds("duplicate-client", 2048);
+  auto certificate = crypto::x509(credentials.x509);
+  ASSERT_TRUE(certificate);
+
+  PairingStateGuard state { credentials.x509, "legacy-client-uuid" };
+  const auto replacement_uuid = nvhttp::pairing::test_support::add_authorized_client(
+    "replacement-client",
+    with_crlf_line_endings(credentials.x509));
+
+  ASSERT_FALSE(replacement_uuid.empty());
+  EXPECT_NE(replacement_uuid, "legacy-client-uuid");
+  const auto clients = nvhttp::get_all_clients();
+  ASSERT_EQ(clients.size(), 1u);
+  EXPECT_EQ(clients.front().at("name").get<std::string>(), "replacement-client");
+  EXPECT_EQ(clients.front().at("uuid").get<std::string>(), replacement_uuid);
+  EXPECT_EQ(nvhttp::pairing::client_uuid_for_cert(certificate.get()), replacement_uuid);
+  EXPECT_TRUE(nvhttp::pairing::test_support::add_authorized_client("invalid", "not a certificate").empty());
+  EXPECT_EQ(nvhttp::get_all_clients().size(), 1u);
+}
+
+TEST(NvhttpPairing, PairingCompletionPublishesOnlyTheFirstFinalResult) {
+  nvhttp::pair_session_t session;
+  ASSERT_FALSE(session.completion->result.has_value());
+
+  nvhttp::pairing::test_support::complete_pairing(session, true);
+  ASSERT_TRUE(session.completion->result.has_value());
+  EXPECT_TRUE(*session.completion->result);
+
+  nvhttp::pairing::test_support::complete_pairing(session, false);
+  EXPECT_TRUE(*session.completion->result);
+}
+
 TEST(NvhttpPairing, ReadsAndWritesStateFromUnicodePath) {
 #ifdef _WIN32
   const auto credentials = crypto::gen_creds("unicode-path-client", 2048);

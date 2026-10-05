@@ -32,4 +32,14 @@ namespace nvhttp::pairing {
   void
   pair_http(resp_http_t response, req_http_t request);
 
+#ifdef SUNSHINE_TESTS
+  namespace test_support {
+    std::string
+    add_authorized_client(const std::string &name, std::string cert);
+
+    void
+    complete_pairing(pair_session_t &session, bool success);
+  }  // namespace test_support
+#endif
+
 }  // namespace nvhttp::pairing

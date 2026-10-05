@@ -39,7 +39,7 @@ using namespace std::literals;
 namespace nvhttp {
 
   void
-  remove_session(const pair_session_t &sess);
+  remove_session(pair_session_t &sess);
 
   bool
   getservercert_checked(pair_session_t &sess, boost::property_tree::ptree &tree, const std::string &pin, const std::string &client_name);
@@ -232,19 +232,53 @@ namespace nvhttp {
     }
 
     void
+    rebuild_client_cert_chain() {
+      cert_chain.clear();
+      for (const auto &client : client_root.named_devices) {
+        if (auto certificate = crypto::x509(client.cert)) {
+          cert_chain.add(std::move(certificate));
+        }
+      }
+    }
+
+    std::string
     add_authorized_client(const std::string &name, std::string &&cert) {
+      auto certificate = crypto::x509(cert);
+      if (!certificate) {
+        return {};
+      }
+
       named_cert_t named_cert;
       named_cert.name = name;
-      named_cert.cert = std::move(cert);
+      named_cert.cert = crypto::pem(certificate);
       named_cert.uuid = uuid_util::uuid_t::generate().string();
+      const auto uuid = named_cert.uuid;
       {
         std::unique_lock<std::shared_mutex> ul(client_state_mutex);
+        std::erase_if(client_root.named_devices, [&certificate](const named_cert_t &existing_client) {
+          auto existing_certificate = crypto::x509(existing_client.cert);
+          return existing_certificate && X509_cmp(existing_certificate.get(), certificate.get()) == 0;
+        });
         client_root.named_devices.emplace_back(std::move(named_cert));
+        rebuild_client_cert_chain();
       }
 
       if (!config::sunshine.flags[config::flag::FRESH_STATE]) {
         save_state();
       }
+      return uuid;
+    }
+
+    void
+    complete_pairing(pair_session_t &sess, const bool success) {
+      {
+        std::lock_guard lock { sess.completion->mutex };
+        if (sess.completion->result.has_value()) {
+          return;
+        }
+        sess.completion->result = success;
+      }
+      sess.completion->condition.notify_all();
     }
 
     template <class T>
@@ -293,6 +327,9 @@ namespace nvhttp {
           last_pair_name = get_arg(args, "clientname", "Named Zako");
 
           BOOST_LOG(verbose) << "Client cert: " << sess.client.cert.substr(0, 100) << "...";
+          if (const auto existing = map_id_sess.find(sess.client.uniqueID); existing != map_id_sess.end()) {
+            complete_pairing(existing->second, false);
+          }
           auto ptr = map_id_sess.insert_or_assign(sess.client.uniqueID, std::move(sess)).first;
 
           ptr->second.async_insert_pin.salt = std::move(get_arg(args, "salt"));
@@ -481,11 +518,8 @@ namespace nvhttp {
 
       {
         std::unique_lock<std::shared_mutex> ul(client_state_mutex);
-        cert_chain.clear();
-        for (auto &named_cert : client.named_devices) {
-          cert_chain.add(crypto::x509(named_cert.cert));
-        }
         client_root = std::move(client);
+        rebuild_client_cert_chain();
       }
     }
 
@@ -523,10 +557,25 @@ namespace nvhttp {
       pair_impl<SimpleWeb::HTTP>(std::move(response), std::move(request));
     }
 
+#ifdef SUNSHINE_TESTS
+    namespace test_support {
+      std::string
+      add_authorized_client(const std::string &name, std::string cert) {
+        return ::nvhttp::add_authorized_client(name, std::move(cert));
+      }
+
+      void
+      complete_pairing(pair_session_t &session, const bool success) {
+        ::nvhttp::complete_pairing(session, success);
+      }
+    }  // namespace test_support
+#endif
+
   }  // namespace pairing
 
   void
-  remove_session(const pair_session_t &sess) {
+  remove_session(pair_session_t &sess) {
+    complete_pairing(sess, false);
     if (pending_pin_unique_id == sess.client.uniqueID) {
       pending_pin_unique_id.clear();
       tray_state::clear_pairing_required();
@@ -687,21 +736,15 @@ namespace nvhttp {
 
     auto hash = crypto::hash(data);
 
-    bool same_hash = hash.size() == sess.clienthash.size() && std::equal(hash.begin(), hash.end(), sess.clienthash.begin());
-    auto verify = crypto::verify256(crypto::x509(client.cert), secret, sign);
+    const bool same_hash = hash.size() == sess.clienthash.size() && std::equal(hash.begin(), hash.end(), sess.clienthash.begin());
+    const bool verify = crypto::verify256(crypto::x509(client.cert), secret, sign);
+    bool paired = false;
     if (same_hash && verify) {
-      tree.put("root.paired", 1);
-
-      {
-        std::unique_lock<std::shared_mutex> ul(client_state_mutex);
-        cert_chain.add(crypto::x509(client.cert));
-      }
-
-      add_authorized_client(client.name, std::move(client.cert));
+      paired = !add_authorized_client(client.name, std::move(client.cert)).empty();
     }
-    else {
-      tree.put("root.paired", 0);
-    }
+
+    tree.put("root.paired", paired ? 1 : 0);
+    complete_pairing(sess, paired);
     remove_session(sess);
     tree.put("root.<xmlattr>.status_code", 200);
   }
@@ -714,16 +757,6 @@ namespace nvhttp {
   bool
   pin(std::string pin, std::string name) {
     pt::ptree tree;
-    std::lock_guard<std::mutex> map_lock(map_id_sess_mutex);
-    if (map_id_sess.empty()) {
-      return false;
-    }
-    auto sess_it = map_id_sess.find(pending_pin_unique_id);
-    if (sess_it == std::end(map_id_sess)) {
-      BOOST_LOG(warning) << "Cannot apply PIN because the pending pairing session is no longer available";
-      return false;
-    }
-
     if (pin.size() != 4) {
       tree.put("root.paired", 0);
       tree.put("root.<xmlattr>.status_code", 400);
@@ -738,30 +771,63 @@ namespace nvhttp {
       return false;
     }
 
-    auto &sess = sess_it->second;
-    sess.client.name = name;
-    if (!getservercert_checked(sess, tree, pin, name)) {
-      return false;
+    std::shared_ptr<pairing_completion_t> completion;
+    std::string session_id;
+    {
+      std::lock_guard<std::mutex> map_lock(map_id_sess_mutex);
+      if (map_id_sess.empty()) {
+        return false;
+      }
+      auto sess_it = map_id_sess.find(pending_pin_unique_id);
+      if (sess_it == std::end(map_id_sess)) {
+        BOOST_LOG(warning) << "Cannot apply PIN because the pending pairing session is no longer available";
+        return false;
+      }
+
+      auto &sess = sess_it->second;
+      sess.client.name = std::move(name);
+      if (!getservercert_checked(sess, tree, pin, sess.client.name)) {
+        return false;
+      }
+
+      std::ostringstream data;
+      pt::write_xml(data, tree);
+
+      auto &async_response = sess.async_insert_pin.response;
+      if (async_response.has_left() && async_response.left()) {
+        async_response.left()->write(data.str());
+      }
+      else if (async_response.has_right() && async_response.right()) {
+        async_response.right()->write(data.str());
+      }
+      else {
+        complete_pairing(sess, false);
+        remove_session(sess);
+        return false;
+      }
+
+      async_response = std::decay_t<decltype(async_response.left())>();
+      pending_pin_unique_id.clear();
+      tray_state::clear_pairing_required();
+      completion = sess.completion;
+      session_id = sess.client.uniqueID;
     }
 
-    std::ostringstream data;
-    pt::write_xml(data, tree);
-
-    auto &async_response = sess.async_insert_pin.response;
-    if (async_response.has_left() && async_response.left()) {
-      async_response.left()->write(data.str());
-    }
-    else if (async_response.has_right() && async_response.right()) {
-      async_response.right()->write(data.str());
-    }
-    else {
-      return false;
+    {
+      std::unique_lock completion_lock { completion->mutex };
+      if (completion->condition.wait_for(completion_lock, config::stream.ping_timeout, [&completion]() {
+            return completion->result.has_value();
+          })) {
+        return *completion->result;
+      }
     }
 
-    async_response = std::decay_t<decltype(async_response.left())>();
-    pending_pin_unique_id.clear();
-    tray_state::clear_pairing_required();
-    return true;
+    std::lock_guard<std::mutex> map_lock(map_id_sess_mutex);
+    if (const auto sess_it = map_id_sess.find(session_id);
+        sess_it != map_id_sess.end() && sess_it->second.completion == completion) {
+      remove_session(sess_it->second);
+    }
+    return false;
   }
 
   nlohmann::json

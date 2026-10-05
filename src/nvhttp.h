@@ -6,6 +6,10 @@
 #pragma once
 
 // standard includes
+#include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <optional>
 #include <string>
 
 // lib includes
@@ -91,6 +95,15 @@ namespace nvhttp {
     CLIENTPAIRINGSECRET  ///< Sunshine is in the client pairing secret phase
   };
 
+  /**
+   * @brief Final result shared between the pairing protocol and a waiting PIN submission.
+   */
+  struct pairing_completion_t {
+    std::condition_variable condition;
+    std::mutex mutex;
+    std::optional<bool> result;
+  };
+
   struct pair_session_t {
     struct {
       std::string uniqueID = {};
@@ -103,6 +116,7 @@ namespace nvhttp {
 
     std::string serversecret = {};
     std::string serverchallenge = {};
+    std::shared_ptr<pairing_completion_t> completion = std::make_shared<pairing_completion_t>();
 
     struct {
       util::Either<
@@ -122,7 +136,7 @@ namespace nvhttp {
    * @brief removes the temporary pairing session
    * @param sess
    */
-  void remove_session(const pair_session_t &sess);
+  void remove_session(pair_session_t &sess);
 
   /**
    * @brief Pair, phase 1
@@ -179,7 +193,8 @@ namespace nvhttp {
    * @brief Compare the user supplied pin to the Moonlight pin.
    * @param pin The user supplied pin.
    * @param name The user supplied name.
-   * @return `true` if the pin is correct, `false` otherwise.
+   * @return `true` if Moonlight proves the PIN by completing the handshake, `false` otherwise.
+   * @note The handshake wait uses the configured `ping_timeout`.
    * @examples
    * bool pin_status = nvhttp::pin("1234", "laptop");
    * @examples_end
