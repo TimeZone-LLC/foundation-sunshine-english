@@ -220,7 +220,6 @@ namespace nvhttp {
   using resp_http_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTP>::Response>;
   using req_http_t = std::shared_ptr<typename SimpleWeb::ServerBase<SimpleWeb::HTTP>::Request>;
 
-
   // Get the client certificate UUID authenticated on this request's TLS connection.
   std::string
   get_client_cert_uuid_from_request(req_https_t request) {
@@ -459,6 +458,10 @@ namespace nvhttp {
                << ", PATH: " << request->path;
 
     if (verbose_flag) {
+      // Headers stay disabled because authentication and proxy headers may
+      // contain credentials. Query values are limited to protocol fields that
+      // are useful for launch diagnostics and are not client credentials.
+      /*
       // Headers
       if (!request->header.empty()) {
         log_stream << ", HEADERS: ";
@@ -469,18 +472,35 @@ namespace nvhttp {
           first = false;
         }
       }
+      */
 
-      // Query parameters
+      static constexpr std::array safe_query_parameters {
+        "appid"sv,
+        "clientname"sv,
+        "continuousAudio"sv,
+        "corever"sv,
+        "customScreenMode"sv,
+        "display_name"sv,
+        "gamepad"sv,
+        "gcmap"sv,
+        "hdrMode"sv,
+        "localAudioPlayMode"sv,
+        "mode"sv,
+        "sops"sv,
+        "surroundAudioInfo"sv,
+        "surroundParams"sv,
+        "touchKeyboard"sv,
+        "uniqueid"sv,
+        "useVdd"sv,
+      };
       auto query_params = request->parse_query_string();
-      if (!query_params.empty()) {
-        log_stream << ", PARAMS: ";
-        bool first = true;
-        for (auto &[name, val] : query_params) {
-          if (!first) log_stream << "&";
-          log_stream << name << "=" << val;
-          first = false;
-        }
-      }
+      http_util::append_allowed_request_log_fields(
+        log_stream,
+        ", PARAMS: "sv,
+        query_params,
+        safe_query_parameters,
+        "&"sv
+      );
     }
     BOOST_LOG(debug) << log_stream.str();
   }
@@ -494,7 +514,8 @@ namespace nvhttp {
   template <class T>
   void
   print_request_warning_ip(std::shared_ptr<typename SimpleWeb::ServerBase<T>::Request> request, const std::string &message) {
-    BOOST_LOG(warning) << message << " [" << request->query_string << "] from IP: " << request->remote_endpoint().address().to_string() << ", Port: " << request->remote_endpoint().port();
+    // Query strings may contain launch keys, so warnings only include routing context.
+    BOOST_LOG(warning) << message << " from IP: " << request->remote_endpoint().address().to_string() << ", Port: " << request->remote_endpoint().port();
   }
 
   template <class T>

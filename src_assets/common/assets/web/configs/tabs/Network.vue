@@ -81,7 +81,13 @@ const effectivePort = computed(() => +config.value?.port ?? defaultMoonlightPort
           <!-- Web UI -->
           <td>{{ $t('config.port_tcp') }}</td>
           <td>{{+effectivePort + 1}}</td>
-          <td>{{ $t('config.port_web_ui') }}</td>
+          <td>
+            <div>{{ $t('config.port_web_ui') }}</div>
+            <div class="alert alert-warning mt-2" role="alert">
+              <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>
+              {{ $t('config.port_web_ui_proxy_warning') }}
+            </div>
+          </td>
         </tr>
         <tr>
           <!-- RTSP -->
