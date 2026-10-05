@@ -124,6 +124,12 @@ namespace input {
     static std::function<void(const testing::keyboard_event_t &)> sink;
     return sink;
   }
+
+  std::function<void(std::shared_ptr<input_t>)> &
+  input_task_sink() {
+    static std::function<void(std::shared_ptr<input_t>)> sink;
+    return sink;
+  }
 #endif
 
   static task_pool_util::TaskPool::task_id_t key_press_repeat_id {};
@@ -228,6 +234,7 @@ namespace input {
 
     std::list<std::vector<uint8_t>> input_queue;
     std::mutex input_queue_lock;
+    bool input_task_scheduled {};
 
     thread_pool_util::ThreadPool::task_id_t mouse_left_button_timeout;
 
@@ -2020,12 +2027,27 @@ namespace input {
     }
   }
 
-  /**
-   * @brief Called on a thread pool thread to process an input message.
-   * @param input The input context pointer.
-   */
   void
-  passthrough_next_message(std::shared_ptr<input_t> input) {
+  passthrough_queued_messages(std::shared_ptr<input_t> input);
+
+  void
+  schedule_input_packet_task(const std::shared_ptr<input_t> &input) {
+#ifdef SUNSHINE_TESTS
+    if (const auto &sink = input_task_sink(); sink) {
+      sink(input);
+      return;
+    }
+#endif
+    task_pool.push(passthrough_queued_messages, input);
+  }
+
+  /**
+   * @brief Process one queued input message for a stream.
+   * @param input The retained input context pointer.
+   * @return True when a queued entry was consumed, or false when the queue is empty.
+   */
+  bool
+  passthrough_next_message(std::shared_ptr<input_t> &input) {
     // 'entry' backs the 'payload' pointer, so they must remain in scope together
     std::vector<uint8_t> entry;
     PNV_INPUT_HEADER payload;
@@ -2038,7 +2060,8 @@ namespace input {
 
       // If all entries have already been processed, nothing to do
       if (input->input_queue.empty()) {
-        return;
+        input->input_task_scheduled = false;
+        return false;
       }
 
       // Pop off the first entry, which we will send
@@ -2047,7 +2070,7 @@ namespace input {
       input->input_queue.pop_front();
 
       if (!input->activity_tracker.evaluate(payload, entry.size()).has_value()) {
-        return;
+        return true;
       }
 
       // Try to batch with remaining items on the queue
@@ -2141,6 +2164,32 @@ namespace input {
     if (should_raise_input_activity) {
       input->input_activity_event->raise(std::chrono::steady_clock::now());
     }
+
+    return true;
+  }
+
+  void
+  passthrough_queued_messages(std::shared_ptr<input_t> input) {
+    // Bound each turn so sustained input cannot monopolize the shared worker pool.
+    constexpr std::size_t packets_per_task = 32;
+    for (std::size_t processed = 0; processed < packets_per_task; ++processed) {
+      if (!passthrough_next_message(input)) {
+        return;
+      }
+    }
+
+    bool has_more;
+    {
+      std::lock_guard lock {input->input_queue_lock};
+      has_more = !input->input_queue.empty();
+      if (!has_more) {
+        input->input_task_scheduled = false;
+      }
+    }
+
+    if (has_more) {
+      schedule_input_packet_task(input);
+    }
   }
 
   /**
@@ -2150,11 +2199,19 @@ namespace input {
    */
   void
   passthrough(std::shared_ptr<input_t> &input, std::vector<std::uint8_t> &&input_data) {
+    bool schedule_task = false;
     {
-      std::lock_guard<std::mutex> lg(input->input_queue_lock);
+      std::lock_guard lock {input->input_queue_lock};
       input->input_queue.push_back(std::move(input_data));
+      if (!input->input_task_scheduled) {
+        input->input_task_scheduled = true;
+        schedule_task = true;
+      }
     }
-    task_pool.push(passthrough_next_message, input);
+
+    if (schedule_task) {
+      schedule_input_packet_task(input);
+    }
   }
 
   void
@@ -2246,6 +2303,26 @@ namespace input {
         mail->event<std::chrono::steady_clock::time_point>(mail::input_activity),
         0,
         std::string {});
+    }
+
+    void
+    set_input_task_sink(std::function<void(std::shared_ptr<input_t>)> sink) {
+      input_task_sink() = std::move(sink);
+    }
+
+    void
+    process_queued_messages(std::shared_ptr<input_t> input) {
+      ::input::passthrough_queued_messages(std::move(input));
+    }
+
+    std::size_t
+    queued_input_packet_count(const std::shared_ptr<input_t> &input) {
+      if (!input) {
+        return 0;
+      }
+
+      std::lock_guard lock {input->input_queue_lock};
+      return input->input_queue.size();
     }
 
     void

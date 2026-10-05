@@ -86,6 +86,26 @@ namespace input {
     std::shared_ptr<input_t>
     make_input();
 
+    /**
+     * @brief Redirect queued-input scheduling to a test callback.
+     * @param sink Callback receiving the retained stream, or empty to restore the worker pool.
+     */
+    void
+    set_input_task_sink(std::function<void(std::shared_ptr<input_t>)> sink);
+
+    /**
+     * @brief Process a bounded queued-input batch on the calling thread.
+     * @param input Retained stream input state.
+     */
+    void
+    process_queued_messages(std::shared_ptr<input_t> input);
+
+    /**
+     * @brief Return the number of packets waiting in a stream input queue.
+     */
+    std::size_t
+    queued_input_packet_count(const std::shared_ptr<input_t> &input);
+
     void
     set_keyboard_sink(std::function<void(const keyboard_event_t &)> sink);
 
