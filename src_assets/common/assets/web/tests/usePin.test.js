@@ -151,3 +151,89 @@ test('refreshClients merges runtime HDR status and initializes automatic default
     globalThis.fetch = originalFetch
   }
 })
+
+test('loads and explicitly selects pending pairing requests', async () => {
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = async (url) => {
+    assert.equal(url, '/api/pin')
+    return jsonResponse({
+      pairings: [
+        { id: 'a'.repeat(32), name: 'Living room', address: '192.0.2.10' },
+        { id: 'b'.repeat(32), name: 'Laptop', address: '192.0.2.20' },
+      ],
+    })
+  }
+
+  try {
+    const pin = usePin()
+    assert.equal(await pin.refreshPendingPairings(), true)
+    assert.equal(pin.selectedPairingId.value, 'a'.repeat(32))
+    assert.equal(pin.pairingDeviceName.value, 'Living room')
+
+    pin.selectPairing('b'.repeat(32))
+    assert.equal(pin.selectedPairingId.value, 'b'.repeat(32))
+    assert.equal(pin.pairingDeviceName.value, 'Laptop')
+    assert.equal(pin.selectedPairing.value.address, '192.0.2.20')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('approves only the selected pairing request', async () => {
+  const originalFetch = globalThis.fetch
+  const requests = []
+  globalThis.fetch = async (url, options = {}) => {
+    requests.push({ url, options })
+    if (url === '/api/pin' && options.method === 'POST') return jsonResponse({ status: true })
+    if (url === '/api/pin') return jsonResponse({ pairings: [] })
+    if (url === '/api/clients/list') return jsonResponse({ status: true, named_certs: [] })
+    throw new Error(`Unexpected URL: ${url}`)
+  }
+
+  try {
+    const pin = usePin()
+    pin.pendingPairings.value = [
+      { id: 'a'.repeat(32), name: 'First', address: '192.0.2.10' },
+      { id: 'b'.repeat(32), name: 'Second', address: '192.0.2.20' },
+    ]
+    pin.selectPairing('b'.repeat(32))
+    pin.pairingPin.value = '1234'
+
+    assert.equal(await pin.approvePairing(), true)
+    const approval = requests.find((request) => request.options.method === 'POST')
+    assert.deepEqual(JSON.parse(approval.options.body), {
+      pairing_id: 'b'.repeat(32),
+      pin: '1234',
+      name: 'Second',
+    })
+    assert.equal(pin.pairingPin.value, '')
+    assert.equal(pin.pairingStatus.value, 'success')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test('cancels only the selected pairing request', async () => {
+  const originalFetch = globalThis.fetch
+  let cancellation
+  globalThis.fetch = async (url, options = {}) => {
+    if (options.method === 'DELETE') {
+      cancellation = { url, options }
+      return jsonResponse({ status: true })
+    }
+    return jsonResponse({ pairings: [] })
+  }
+
+  try {
+    const pin = usePin()
+    pin.pendingPairings.value = [{ id: 'c'.repeat(32), name: 'Tablet', address: '192.0.2.30' }]
+    pin.selectPairing('c'.repeat(32))
+
+    assert.equal(await pin.cancelPairingRequest(), true)
+    assert.equal(cancellation.url, '/api/pin')
+    assert.deepEqual(JSON.parse(cancellation.options.body), { pairing_id: 'c'.repeat(32) })
+    assert.equal(pin.pairingStatus.value, 'cancelled')
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})

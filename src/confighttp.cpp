@@ -2235,46 +2235,92 @@ namespace confighttp {
   }
 
   void
-  savePin(resp_https_t response, req_https_t request) {
-    if (!check_content_type(response, request, "application/json")) return;
-    if (!authenticate(response, request)) return;
+  send_pairing_bad_request(resp_https_t response, const std::string &message) {
+    const nlohmann::json body {
+      { "status", false },
+      { "error", message },
+    };
+    SimpleWeb::CaseInsensitiveMultimap headers;
+    headers.emplace("Content-Type", "application/json");
+    headers.emplace("X-Frame-Options", "DENY");
+    headers.emplace("Content-Security-Policy", "frame-ancestors 'none';");
+    response->write(SimpleWeb::StatusCode::client_error_bad_request, body.dump(), headers);
+  }
 
+  void
+  getPendingPairings(resp_https_t response, req_https_t request) {
+    // authenticate() also enforces the Web UI's same-origin browser policy.
+    if (!authenticate(response, request)) return;
     print_req(request);
 
-    std::stringstream ss;
-    ss << request->content.rdbuf();
+    nlohmann::json output {
+      { "pairings", nlohmann::json::array() },
+    };
+    for (const auto &pairing : nvhttp::get_pending_pairings()) {
+      output["pairings"].push_back({
+        { "id", pairing.id },
+        { "name", pairing.name },
+        { "address", pairing.address },
+      });
+    }
+    send_response(std::move(response), output);
+  }
 
-    pt::ptree inputTree, outputTree;
-
-    auto g = util::fail_guard([&]() {
-      std::ostringstream data;
-      pt::write_json(data, outputTree);
-      response->write(data.str());
-    });
+  void
+  cancelPairing(resp_https_t response, req_https_t request) {
+    // authenticate() provides both credential and same-origin CSRF checks.
+    if (!authenticate(response, request)) return;
+    if (!check_content_type(response, request, "application/json")) return;
+    print_req(request);
 
     try {
-      pt::read_json(ss, inputTree);
-      std::string pin = inputTree.get<std::string>("pin");
-      std::string name = inputTree.get<std::string>("name");
-
-      // Validate PIN: must be numeric digits only, 4-8 characters
-      if (pin.size() < 4 || pin.size() > 8 || !std::all_of(pin.begin(), pin.end(), ::isdigit)) {
-        outputTree.put("status", false);
-        outputTree.put("error", "PIN must be 4-8 digits");
+      const auto input = nlohmann::json::parse(request->content.string());
+      const auto pairing_id = input.value("pairing_id", "");
+      if (!nvhttp::is_valid_pairing_id(pairing_id)) {
+        send_pairing_bad_request(std::move(response), "pairing_id must contain exactly 32 hexadecimal characters");
         return;
       }
-      // Validate client name
-      if (name.empty() || name.size() > 256) {
-        outputTree.put("status", false);
-        outputTree.put("error", "Client name must be 1-256 characters");
+      send_response(std::move(response), nlohmann::json { { "status", nvhttp::cancel_pairing(pairing_id) } });
+    }
+    catch (const std::exception &exception) {
+      BOOST_LOG(warning) << "CancelPairing: "sv << exception.what();
+      send_pairing_bad_request(std::move(response), "Invalid pairing cancellation request");
+    }
+  }
+
+  void
+  savePin(resp_https_t response, req_https_t request) {
+    // authenticate() provides both credential and same-origin CSRF checks.
+    if (!authenticate(response, request)) return;
+    if (!check_content_type(response, request, "application/json")) return;
+    print_req(request);
+
+    std::string name;
+    bool pin_result = false;
+    try {
+      const auto input = nlohmann::json::parse(request->content.string());
+      const auto pairing_id = input.value("pairing_id", "");
+      const auto pin = input.value("pin", "");
+      name = input.value("name", "");
+
+      if (!nvhttp::is_valid_pairing_id(pairing_id)) {
+        send_pairing_bad_request(std::move(response), "pairing_id must contain exactly 32 hexadecimal characters");
+        return;
+      }
+      if (!nvhttp::is_valid_pairing_pin(pin)) {
+        send_pairing_bad_request(std::move(response), "PIN must contain exactly 4 numeric digits");
+        return;
+      }
+      if (!nvhttp::is_valid_pairing_name(name)) {
+        send_pairing_bad_request(std::move(response), "Client name must contain between 1 and 128 bytes");
         return;
       }
 
-      bool pin_result = nvhttp::pin(pin, name);
-      outputTree.put("status", pin_result);
+      pin_result = nvhttp::pin(pairing_id, pin, name);
+      send_response(response, nlohmann::json { { "status", pin_result } });
 
       try {
-        webhook::send_event_async(webhook::event_t{
+        webhook::send_event_async(webhook::event_t {
           .type = pin_result ? webhook::event_type_t::CONFIG_PIN_SUCCESS : webhook::event_type_t::CONFIG_PIN_FAILED,
           .timestamp = webhook::get_current_timestamp(),
           .client_name = name,
@@ -2286,24 +2332,23 @@ namespace confighttp {
         BOOST_LOG(error) << "Webhook pairing event construction failed"sv;
       }
     }
-    catch (std::exception &e) {
-      BOOST_LOG(warning) << "SavePin: "sv << e.what();
-      outputTree.put("status", false);
-      outputTree.put("error", e.what());
+    catch (const std::exception &exception) {
+      BOOST_LOG(warning) << "SavePin: "sv << exception.what();
+      send_pairing_bad_request(response, "Invalid pairing approval request");
 
       try {
-        webhook::send_event_async(webhook::event_t{
+        webhook::send_event_async(webhook::event_t {
           .type = webhook::event_type_t::CONFIG_PIN_FAILED,
           .timestamp = webhook::get_current_timestamp(),
+          .client_name = name,
           .client_ip = net::addr_to_normalized_string(request->remote_endpoint().address()),
           .server_ip = net::addr_to_normalized_string(request->local_endpoint().address()),
-          .extra_data = {{"error", "invalid_request"}}
+          .extra_data = { { "error", "invalid_request" } }
         });
       }
       catch (...) {
         BOOST_LOG(error) << "Webhook pairing failure event construction failed"sv;
       }
-      return;
     }
   }
 
@@ -4272,6 +4317,8 @@ namespace confighttp {
     server.resource["^/password/?$"]["GET"] = getPasswordPage;
     server.resource["^/welcome/?$"]["GET"] = getWelcomePage;
     server.resource["^/troubleshooting/?$"]["GET"] = getTroubleshootingPage;
+    server.resource["^/api/pin$"]["DELETE"] = cancelPairing;
+    server.resource["^/api/pin$"]["GET"] = getPendingPairings;
     server.resource["^/api/pin$"]["POST"] = savePin;
     server.resource["^/api/qr-pair$"]["POST"] = generateQrPairInfo;
     server.resource["^/api/qr-pair/cancel$"]["POST"] = cancelQrPair;

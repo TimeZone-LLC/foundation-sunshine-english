@@ -6,11 +6,15 @@
 #pragma once
 
 // standard includes
+#include <chrono>
+#include <cstddef>
 #include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
 // lib includes
 #include <boost/property_tree/ptree.hpp>
@@ -52,6 +56,18 @@ namespace nvhttp {
    * @brief The HTTPS port, as a difference from the config port.
    */
   constexpr auto PORT_HTTPS = -5;
+
+  /** Maximum number of pairing sessions retained at one time. */
+  constexpr std::size_t MAX_PENDING_PAIRING_SESSIONS = 32;
+
+  /** Number of hexadecimal characters in a Web UI pairing request identifier. */
+  constexpr std::size_t PAIRING_ID_SIZE = 32;
+
+  /** Maximum number of bytes accepted for a paired-client display name. */
+  constexpr std::size_t MAX_PAIRING_CLIENT_NAME_SIZE = 128;
+
+  /** Lifetime of an incomplete pairing session. */
+  constexpr auto PAIRING_SESSION_TIMEOUT = std::chrono::minutes { 5 };
 
   /**
    * @brief Start the nvhttp server.
@@ -124,13 +140,55 @@ namespace nvhttp {
         std::shared_ptr<typename SimpleWeb::ServerBase<SunshineHTTPS>::Response>>
         response;
       std::string salt = {};
+      std::string id = {};
+      std::string device_name = {};
+      std::string address = {};
+      std::chrono::steady_clock::time_point expires_at = std::chrono::steady_clock::time_point::max();
+      bool awaiting_approval = false;
     } async_insert_pin;
 
     /**
      * @brief used as a security measure to prevent out of order calls
      */
     PAIR_PHASE last_phase = PAIR_PHASE::NONE;
+    bool failed = false;
   };
+
+  /** Operator-visible context for a pairing request awaiting PIN approval. */
+  struct pending_pairing_t {
+    std::string id;
+    std::string name;
+    std::string address;
+  };
+
+  /** Result of inserting a pairing session into the bounded registry. */
+  enum class pair_session_insert_e {
+    ADDED,
+    ALREADY_EXISTS,
+    FULL,
+    ENTROPY_FAILURE
+  };
+
+  bool
+  is_valid_pairing_id(std::string_view pairing_id);
+
+  bool
+  is_valid_pairing_pin(std::string_view pin);
+
+  bool
+  is_valid_pairing_name(std::string_view name);
+
+  pair_session_insert_e
+  insert_pair_session(pair_session_t sess, std::string &pairing_id);
+
+  void
+  expire_pair_sessions(std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now());
+
+  std::vector<pending_pairing_t>
+  get_pending_pairings();
+
+  bool
+  cancel_pairing(std::string_view pairing_id);
 
   /**
    * @brief removes the temporary pairing session
@@ -190,17 +248,18 @@ namespace nvhttp {
   void clientpairingsecret(pair_session_t &sess, std::shared_ptr<safe::queue_t<crypto::x509_t>> &add_cert, boost::property_tree::ptree &tree, const std::string &client_pairing_secret);
 
   /**
-   * @brief Compare the user supplied pin to the Moonlight pin.
+   * @brief Apply the user supplied PIN to an explicitly selected pairing request.
+   * @param pairing_id Unguessable identifier of the pairing request to approve.
    * @param pin The user supplied pin.
    * @param name The user supplied name.
    * @return `true` if Moonlight proves the PIN by completing the handshake, `false` otherwise.
    * @note The handshake wait uses the configured `ping_timeout`.
    * @examples
-   * bool pin_status = nvhttp::pin("1234", "laptop");
+   * bool pin_status = nvhttp::pin("0123456789abcdef0123456789abcdef", "1234", "laptop");
    * @examples_end
    */
   bool
-  pin(std::string pin, std::string name);
+  pin(std::string_view pairing_id, std::string pin, std::string name);
 
   /**
    * @brief Remove single client.

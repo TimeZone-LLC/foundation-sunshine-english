@@ -70,32 +70,112 @@
         <span>{{ $t('pin.or_manual_pin') }}</span>
       </div>
 
-      <form action="" class="form d-flex flex-column align-items-center" id="form">
-        <div class="card flex-column d-flex p-4 mb-4">
-          <input
-            type="text"
-            pattern="\d*"
-            :placeholder="`${$t('navbar.pin')}`"
-            autofocus
-            id="pin-input"
-            class="form-control mt-2"
-            required
-          />
-          <input
-            type="text"
-            v-model="pairingDeviceName"
-            :placeholder="`${$t('pin.device_name')}`"
-            id="name-input"
-            class="form-control my-4"
-            required
-          />
-          <button class="btn btn-primary">{{ $t('pin.send') }}</button>
+      <section class="card manual-pairing-card mb-4" aria-labelledby="manual-pairing-title">
+        <div class="card-body">
+          <div class="pairing-section-heading">
+            <div>
+              <h2 id="manual-pairing-title" class="h5 mb-1">{{ $t('pin.pending_requests') }}</h2>
+              <p class="text-muted mb-0">{{ $t('pin.pending_requests_desc') }}</p>
+            </div>
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              :disabled="pendingPairingsLoading || pairingBusy"
+              @click="refreshPendingPairings()"
+            >
+              {{ $t('pin.refresh_requests') }}
+            </button>
+          </div>
+
+          <div v-if="pendingPairingsLoading" class="pairing-empty" role="status">
+            {{ $t('pin.loading_requests') }}
+          </div>
+          <div v-else-if="pendingPairings.length === 0" class="pairing-empty">
+            {{ $t('pin.no_pending_requests') }}
+          </div>
+          <div v-else class="pairing-request-list" role="list" :aria-label="$t('pin.pending_requests')">
+            <button
+              v-for="pairing in pendingPairings"
+              :key="pairing.id"
+              type="button"
+              class="pairing-request"
+              :class="{ 'is-selected': pairing.id === selectedPairingId }"
+              :aria-pressed="pairing.id === selectedPairingId"
+              role="listitem"
+              @click="selectPairing(pairing.id)"
+            >
+              <span class="pairing-request-token">{{ pairing.id.slice(0, 8) }}</span>
+              <span class="pairing-request-details">
+                <strong>{{ pairing.name || $t('pin.unknown_client') }}</strong>
+                <span>{{ pairing.address || $t('pin.unknown_address') }}</span>
+              </span>
+            </button>
+          </div>
+
+          <form class="pairing-approval-form" @submit.prevent="approvePairing">
+            <label for="pin-input" class="form-label">{{ $t('navbar.pin') }}</label>
+            <input
+              id="pin-input"
+              v-model="pairingPin"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              pattern="[0-9]{4}"
+              maxlength="4"
+              class="form-control font-monospace"
+              :disabled="!selectedPairing || pairingBusy"
+              required
+            />
+
+            <label for="name-input" class="form-label">{{ $t('pin.device_name') }}</label>
+            <input
+              id="name-input"
+              v-model="pairingDeviceName"
+              type="text"
+              maxlength="128"
+              class="form-control"
+              :disabled="!selectedPairing || pairingBusy"
+              required
+            />
+
+            <div class="pairing-actions">
+              <button type="submit" class="btn btn-primary" :disabled="!selectedPairing || pairingBusy">
+                {{ $t('pin.approve_request') }}
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                :disabled="!selectedPairing || pairingBusy"
+                @click="cancelPairingRequest"
+              >
+                {{ $t('pin.cancel_request') }}
+              </button>
+            </div>
+          </form>
+
+          <div class="alert alert-warning mt-3 mb-0">
+            <b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}
+          </div>
+          <div v-if="pairingStatus === 'success'" class="alert alert-success mt-3 mb-0" role="status">
+            {{ $t('pin.pairing_success') }}
+          </div>
+          <div v-else-if="pairingStatus === 'cancelled'" class="alert alert-secondary mt-3 mb-0" role="status">
+            {{ $t('pin.pairing_cancelled') }}
+          </div>
+          <div v-else-if="pairingStatus === 'invalid'" class="alert alert-danger mt-3 mb-0" role="alert">
+            {{ $t('pin.pairing_invalid') }}
+          </div>
+          <div v-else-if="pairingStatus === 'failed'" class="alert alert-danger mt-3 mb-0" role="alert">
+            {{ $t('pin.pairing_failed') }}
+          </div>
+          <div v-else-if="pairingStatus === 'missing'" class="alert alert-danger mt-3 mb-0" role="alert">
+            {{ $t('pin.pairing_missing') }}
+          </div>
+          <div v-else-if="pairingStatus === 'network'" class="alert alert-danger mt-3 mb-0" role="alert">
+            {{ $t('pin.pairing_network_error') }}
+          </div>
         </div>
-        <div class="alert alert-warning">
-          <b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}
-        </div>
-        <div id="status"></div>
-      </form>
+      </section>
 
       <!-- Unpair all Clients -->
       <div class="card my-4">
@@ -362,7 +442,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, nextTick, watch } from 'vue'
+import { onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Tooltip } from 'bootstrap'
 import Navbar from '../components/layout/Navbar.vue'
@@ -373,6 +453,13 @@ const { t } = useI18n()
 
 const {
   pairingDeviceName,
+  pairingPin,
+  pendingPairings,
+  selectedPairing,
+  selectedPairingId,
+  pairingStatus,
+  pairingBusy,
+  pendingPairingsLoading,
   unpairAllPressed,
   unpairAllStatus,
   showApplyMessage,
@@ -390,7 +477,10 @@ const {
   startEdit,
   cancelEdit,
   hasUnsavedChanges,
-  initPinForm,
+  selectPairing,
+  refreshPendingPairings,
+  approvePairing,
+  cancelPairingRequest,
   clickedApplyBanner,
   loadConfig,
   loadColorProfiles,
@@ -409,6 +499,7 @@ const {
 } = useQrPair()
 
 const clientToDelete = ref(null)
+let pairingRefreshTimer
 
 const handleDelete = (client) => {
   if (editingStates[client.uuid]) return
@@ -451,12 +542,19 @@ const initTooltips = () => {
 
 onMounted(async () => {
   await loadConfig()
+  await refreshPendingPairings()
   await refreshClients()
   await loadColorProfiles()
 
-  initPinForm(() => setTimeout(refreshClients, 0))
+  pairingRefreshTimer = window.setInterval(() => {
+    if (!pairingBusy.value) refreshPendingPairings({ silent: true })
+  }, 2000)
 
   initTooltips()
+})
+
+onUnmounted(() => {
+  if (pairingRefreshTimer) window.clearInterval(pairingRefreshTimer)
 })
 
 watch(clients, initTooltips, { deep: true })
@@ -478,8 +576,106 @@ watch(clients, initTooltips, { deep: true })
     font-weight: var(--ui-label-weight);
   }
 
-  #form > .card {
-    width: min(100%, 480px);
+  .manual-pairing-card {
+    width: min(100%, 640px);
+    margin-inline: auto;
+  }
+
+  .pairing-section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .pairing-empty {
+    padding: 1rem;
+    color: var(--ui-text-secondary);
+    background: var(--ui-surface-strong);
+    border: 1px solid var(--ui-border);
+    border-top: 0;
+  }
+
+  .pairing-request-list {
+    border: 1px solid var(--ui-border);
+    border-top: 0;
+  }
+
+  .pairing-request {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 0.75rem;
+    padding: 0.625rem;
+    color: var(--ui-text-primary);
+    text-align: left;
+    background: var(--ui-surface);
+    border: 0;
+    border-left: 3px solid transparent;
+    border-bottom: 1px solid var(--ui-border);
+    border-radius: 0;
+    transition: background-color 100ms, color 100ms, border-color 100ms;
+
+    &:last-child {
+      border-bottom: 0;
+    }
+
+    &:hover,
+    &.is-selected {
+      background: var(--ui-surface-strong);
+    }
+
+    &.is-selected {
+      border-left-color: var(--ui-border-strong);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--ui-border-strong);
+      outline-offset: -2px;
+    }
+  }
+
+  .pairing-request-token {
+    flex: 0 0 auto;
+    padding: 0.25rem 0.375rem;
+    color: var(--ui-text-secondary);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1;
+    border: 1px solid var(--ui-border-strong);
+  }
+
+  .pairing-request-details {
+    display: grid;
+    min-width: 0;
+
+    span {
+      overflow: hidden;
+      color: var(--ui-text-secondary);
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+
+  .pairing-approval-form {
+    display: grid;
+    gap: 0.5rem;
+    margin-top: 1rem;
+
+    .form-label:not(:first-child) {
+      margin-top: 0.5rem;
+    }
+  }
+
+  .pairing-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
   }
 
   .table {

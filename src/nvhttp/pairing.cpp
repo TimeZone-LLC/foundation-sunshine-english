@@ -53,6 +53,9 @@ namespace nvhttp {
   void
   clientpairingsecret(pair_session_t &sess, boost::property_tree::ptree &tree, const std::string &client_pairing_secret);
 
+  void
+  fail_pair(pair_session_t &sess, boost::property_tree::ptree &tree, std::string status_msg);
+
   std::string
   consume_preset_pin();
 
@@ -129,11 +132,10 @@ namespace nvhttp {
     static std::unordered_map<std::string, pair_session_t> map_id_sess;
     static client_t client_root;
     static std::string last_pair_name;
-    static std::string pending_pin_unique_id;
+    static std::string notified_pairing_id;
     static std::mutex map_id_sess_mutex;
     static std::shared_mutex client_state_mutex;
     static pair_rate_limiter_t pair_rate_limit;
-    constexpr auto pending_pin_timeout = 5min;
 
     static struct {
       std::string pin;
@@ -281,6 +283,72 @@ namespace nvhttp {
       sess.completion->condition.notify_all();
     }
 
+    bool
+    write_pairing_response(pair_session_t &sess, const pt::ptree &tree) {
+      std::ostringstream data;
+      pt::write_xml(data, tree);
+
+      auto &response = sess.async_insert_pin.response;
+      if (response.has_left() && response.left()) {
+        response.left()->close_connection_after_response = true;
+        response.left()->write(data.str());
+      }
+      else if (response.has_right() && response.right()) {
+        response.right()->close_connection_after_response = true;
+        response.right()->write(data.str());
+      }
+      else {
+        return false;
+      }
+
+      response = std::decay_t<decltype(response.left())>();
+      return true;
+    }
+
+    void
+    update_pairing_notification_unlocked() {
+      const auto next = std::ranges::min_element(map_id_sess, {}, [](const auto &entry) {
+        const auto &session = entry.second;
+        return session.async_insert_pin.awaiting_approval ? session.async_insert_pin.expires_at : std::chrono::steady_clock::time_point::max();
+      });
+
+      if (next == map_id_sess.end() || !next->second.async_insert_pin.awaiting_approval) {
+        if (!notified_pairing_id.empty()) {
+          notified_pairing_id.clear();
+          tray_state::clear_pairing_required();
+        }
+        return;
+      }
+
+      if (notified_pairing_id == next->second.async_insert_pin.id) {
+        return;
+      }
+
+      notified_pairing_id = next->second.async_insert_pin.id;
+      tray_state::set_pairing_required(next->second.async_insert_pin.device_name);
+#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1 && !defined SUNSHINE_TESTS
+      system_tray::update_tray_require_pin(next->second.async_insert_pin.device_name);
+#endif
+    }
+
+    void
+    expire_pair_sessions_unlocked(const std::chrono::steady_clock::time_point now) {
+      for (auto it = map_id_sess.begin(); it != map_id_sess.end();) {
+        if (it->second.async_insert_pin.expires_at > now) {
+          ++it;
+          continue;
+        }
+
+        pt::ptree tree;
+        tree.put("root.paired", 0);
+        tree.put("root.<xmlattr>.status_code", 408);
+        tree.put("root.<xmlattr>.status_message", "Pairing session expired");
+        write_pairing_response(it->second, tree);
+        complete_pairing(it->second, false);
+        it = map_id_sess.erase(it);
+      }
+    }
+
     template <class T>
     void
     pair_impl(std::shared_ptr<typename SimpleWeb::ServerBase<T>::Response> response, std::shared_ptr<typename SimpleWeb::ServerBase<T>::Request> request) {
@@ -307,8 +375,6 @@ namespace nvhttp {
 
       auto uniqID { get_arg(args, "uniqueid") };
 
-      std::lock_guard<std::mutex> map_lock(map_id_sess_mutex);
-
       args_t::const_iterator it;
       if (it = args.find("phrase"); it != std::end(args)) {
         if (it->second == "getservercert"sv) {
@@ -324,92 +390,107 @@ namespace nvhttp {
 
           sess.client.uniqueID = uniqID;
           sess.client.cert = util::from_hex_vec(get_arg(args, "clientcert"), true);
-          last_pair_name = get_arg(args, "clientname", "Named Zako");
+          sess.async_insert_pin.salt = get_arg(args, "salt");
+          sess.async_insert_pin.device_name = get_arg(args, "clientname", "Unnamed client");
+          sess.async_insert_pin.address = net::addr_to_normalized_string(request->remote_endpoint().address());
 
           BOOST_LOG(verbose) << "Client cert: " << sess.client.cert.substr(0, 100) << "...";
-          if (const auto existing = map_id_sess.find(sess.client.uniqueID); existing != map_id_sess.end()) {
-            complete_pairing(existing->second, false);
-          }
-          auto ptr = map_id_sess.insert_or_assign(sess.client.uniqueID, std::move(sess)).first;
+          const auto device_name = sess.async_insert_pin.device_name;
+          const bool pin_stdin = config::sunshine.flags[config::flag::PIN_STDIN];
+          const auto remote_addr = request->remote_endpoint().address();
+          const auto nettype = net::from_address(remote_addr.to_string());
 
-          ptr->second.async_insert_pin.salt = std::move(get_arg(args, "salt"));
-          if (config::sunshine.flags[config::flag::PIN_STDIN]) {
+          std::string pairing_id;
+          switch (insert_pair_session(std::move(sess), pairing_id)) {
+            case pair_session_insert_e::ALREADY_EXISTS:
+              tree.put("root.paired", 0);
+              tree.put("root.<xmlattr>.status_code", 409);
+              tree.put("root.<xmlattr>.status_message", "A pairing session with this uniqueid already exists");
+              return;
+            case pair_session_insert_e::FULL:
+              tree.put("root.paired", 0);
+              tree.put("root.<xmlattr>.status_code", 503);
+              tree.put("root.<xmlattr>.status_message", "Too many pending pairing sessions");
+              return;
+            case pair_session_insert_e::ENTROPY_FAILURE:
+              tree.put("root.paired", 0);
+              tree.put("root.<xmlattr>.status_code", 503);
+              tree.put("root.<xmlattr>.status_message", "Unable to create a secure pairing request");
+              return;
+            case pair_session_insert_e::ADDED:
+              break;
+          }
+
+          if (pin_stdin) {
             std::string pin;
 
             std::cout << "Please insert pin: "sv;
             std::getline(std::cin, pin);
 
-            if (!getservercert_checked(ptr->second, tree, pin, last_pair_name)) {
+            std::lock_guard map_lock { map_id_sess_mutex };
+            expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
+            const auto session = map_id_sess.find(uniqID);
+            if (session == map_id_sess.end() || session->second.async_insert_pin.id != pairing_id) {
+              tree.put("root.paired", 0);
+              tree.put("root.<xmlattr>.status_code", 408);
+              tree.put("root.<xmlattr>.status_message", "Pairing session expired");
+              update_pairing_notification_unlocked();
               return;
             }
+            session->second.client.name = device_name;
+            getservercert_checked(session->second, tree, pin, device_name);
+            if (session->second.failed) {
+              map_id_sess.erase(session);
+            }
+            update_pairing_notification_unlocked();
             return;
           }
-          else {
-            auto remote_addr = request->remote_endpoint().address();
-            auto nettype = net::from_address(remote_addr.to_string());
-            auto preset = (nettype == net::net_e::PC || nettype == net::net_e::LAN) ? consume_preset_pin() : std::string {};
-            if (!preset.empty()) {
-              BOOST_LOG(info) << "Using preset PIN for QR code pairing with " << last_pair_name
-                              << " from " << remote_addr.to_string();
-              ptr->second.client.name = last_pair_name;
-              if (!getservercert_checked(ptr->second, tree, preset, last_pair_name)) {
-                return;
-              }
+
+          auto preset = (nettype == net::net_e::PC || nettype == net::net_e::LAN) ? consume_preset_pin() : std::string {};
+          if (!preset.empty()) {
+            BOOST_LOG(info) << "Using preset PIN for QR code pairing with " << device_name
+                            << " from " << remote_addr.to_string();
+            std::lock_guard map_lock { map_id_sess_mutex };
+            expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
+            const auto session = map_id_sess.find(uniqID);
+            if (session == map_id_sess.end() || session->second.async_insert_pin.id != pairing_id) {
+              tree.put("root.paired", 0);
+              tree.put("root.<xmlattr>.status_code", 408);
+              tree.put("root.<xmlattr>.status_message", "Pairing session expired");
+              update_pairing_notification_unlocked();
               return;
             }
-            else {
-              if (!pending_pin_unique_id.empty() && map_id_sess.find(pending_pin_unique_id) != std::end(map_id_sess)) {
-                BOOST_LOG(warning) << "Rejecting pairing request while another client is waiting for PIN entry";
-                tree.put("root.<xmlattr>.status_code", 409);
-                tree.put("root.<xmlattr>.status_message", "Another pairing request is waiting for PIN entry");
-                tree.put("root.paired", 0);
-                remove_session(ptr->second);
-                return;
-              }
-              tray_state::set_pairing_required(last_pair_name);
-#if defined SUNSHINE_TRAY && SUNSHINE_TRAY >= 1
-              system_tray::update_tray_require_pin(last_pair_name);
-#endif
-              pending_pin_unique_id = ptr->second.client.uniqueID;
-              ptr->second.async_insert_pin.response = std::move(response);
-
-              const auto pending_id = pending_pin_unique_id;
-              task_pool.pushDelayed([pending_id]() {
-                std::lock_guard<std::mutex> map_lock(map_id_sess_mutex);
-                if (pending_pin_unique_id != pending_id) {
-                  return;
-                }
-
-                const auto session = map_id_sess.find(pending_id);
-                if (session == std::end(map_id_sess)) {
-                  pending_pin_unique_id.clear();
-                  tray_state::clear_pairing_required();
-                  return;
-                }
-
-                pt::ptree timeout_tree;
-                timeout_tree.put("root.paired", 0);
-                timeout_tree.put("root.<xmlattr>.status_code", 408);
-                timeout_tree.put("root.<xmlattr>.status_message", "Pairing PIN entry timed out");
-                std::ostringstream data;
-                pt::write_xml(data, timeout_tree);
-
-                auto &async_response = session->second.async_insert_pin.response;
-                if (async_response.has_left() && async_response.left()) {
-                  async_response.left()->write(data.str());
-                }
-                else if (async_response.has_right() && async_response.right()) {
-                  async_response.right()->write(data.str());
-                }
-
-                BOOST_LOG(info) << "Pairing request timed out while waiting for PIN entry";
-                remove_session(session->second);
-              }, pending_pin_timeout);
-
-              fg.disable();
-              return;
+            session->second.client.name = device_name;
+            getservercert_checked(session->second, tree, preset, device_name);
+            if (session->second.failed) {
+              map_id_sess.erase(session);
             }
+            update_pairing_notification_unlocked();
+            return;
           }
+
+          {
+            std::lock_guard map_lock { map_id_sess_mutex };
+            const auto session = map_id_sess.find(uniqID);
+            if (session == map_id_sess.end() || session->second.async_insert_pin.id != pairing_id) {
+              tree.put("root.paired", 0);
+              tree.put("root.<xmlattr>.status_code", 408);
+              tree.put("root.<xmlattr>.status_message", "Pairing session expired");
+              update_pairing_notification_unlocked();
+              return;
+            }
+            last_pair_name = device_name;
+            session->second.async_insert_pin.response = response;
+            session->second.async_insert_pin.awaiting_approval = true;
+            update_pairing_notification_unlocked();
+          }
+
+          task_pool.pushDelayed([]() {
+            expire_pair_sessions();
+          }, PAIRING_SESSION_TIMEOUT);
+
+          fg.disable();
+          return;
         }
         else if (it->second == "pairchallenge"sv) {
           tree.put("root.paired", 1);
@@ -418,13 +499,17 @@ namespace nvhttp {
         }
       }
 
+      std::lock_guard map_lock { map_id_sess_mutex };
+      expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
       auto sess_it = map_id_sess.find(uniqID);
       if (sess_it == std::end(map_id_sess)) {
         tree.put("root.<xmlattr>.status_code", 400);
         tree.put("root.<xmlattr>.status_message", "Invalid uniqueid");
+        update_pairing_notification_unlocked();
         return;
       }
 
+      bool pairing_complete = false;
       if (it = args.find("clientchallenge"); it != std::end(args)) {
         auto challenge = util::from_hex_vec(it->second, true);
         clientchallenge(sess_it->second, tree, challenge);
@@ -436,14 +521,143 @@ namespace nvhttp {
       else if (it = args.find("clientpairingsecret"); it != std::end(args)) {
         auto pairingsecret = util::from_hex_vec(it->second, true);
         clientpairingsecret(sess_it->second, tree, pairingsecret);
+        pairing_complete = true;
       }
       else {
-        tree.put("root.<xmlattr>.status_code", 404);
-        tree.put("root.<xmlattr>.status_message", "Invalid pairing request");
+        fail_pair(sess_it->second, tree, "Invalid pairing request");
       }
+
+      if (pairing_complete || sess_it->second.failed) {
+        map_id_sess.erase(sess_it);
+      }
+      update_pairing_notification_unlocked();
     }
 
   }  // namespace
+
+  bool
+  is_valid_pairing_id(const std::string_view pairing_id) {
+    return pairing_id.size() == PAIRING_ID_SIZE && std::ranges::all_of(pairing_id, [](const char character) {
+             return (character >= '0' && character <= '9') ||
+                    (character >= 'a' && character <= 'f') ||
+                    (character >= 'A' && character <= 'F');
+           });
+  }
+
+  bool
+  is_valid_pairing_pin(const std::string_view pin) {
+    return pin.size() == 4 && std::ranges::all_of(pin, [](const char character) {
+             return character >= '0' && character <= '9';
+           });
+  }
+
+  bool
+  is_valid_pairing_name(const std::string_view name) {
+    return !name.empty() && name.size() <= MAX_PAIRING_CLIENT_NAME_SIZE;
+  }
+
+  pair_session_insert_e
+  insert_pair_session(pair_session_t sess, std::string &pairing_id) {
+    std::lock_guard lock { map_id_sess_mutex };
+    expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
+    pairing_id.clear();
+
+    if (map_id_sess.contains(sess.client.uniqueID)) {
+      update_pairing_notification_unlocked();
+      return pair_session_insert_e::ALREADY_EXISTS;
+    }
+    if (map_id_sess.size() >= MAX_PENDING_PAIRING_SESSIONS) {
+      update_pairing_notification_unlocked();
+      return pair_session_insert_e::FULL;
+    }
+
+    constexpr int max_id_attempts = 8;
+    for (int attempt = 0; attempt < max_id_attempts; ++attempt) {
+      const auto random_bytes = crypto::rand(PAIRING_ID_SIZE / 2);
+      if (random_bytes.size() != PAIRING_ID_SIZE / 2) {
+        return pair_session_insert_e::ENTROPY_FAILURE;
+      }
+
+      pairing_id = util::hex_vec(random_bytes, true);
+      const bool collision = std::ranges::any_of(map_id_sess, [&pairing_id](const auto &entry) {
+        return entry.second.async_insert_pin.id == pairing_id;
+      });
+      if (!collision) {
+        sess.async_insert_pin.id = pairing_id;
+        sess.async_insert_pin.expires_at = std::chrono::steady_clock::now() + PAIRING_SESSION_TIMEOUT;
+        map_id_sess.emplace(sess.client.uniqueID, std::move(sess));
+        return pair_session_insert_e::ADDED;
+      }
+    }
+
+    pairing_id.clear();
+    return pair_session_insert_e::ENTROPY_FAILURE;
+  }
+
+  void
+  expire_pair_sessions(const std::chrono::steady_clock::time_point now) {
+    std::lock_guard lock { map_id_sess_mutex };
+    expire_pair_sessions_unlocked(now);
+    update_pairing_notification_unlocked();
+  }
+
+  std::vector<pending_pairing_t>
+  get_pending_pairings() {
+    std::lock_guard lock { map_id_sess_mutex };
+    expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
+
+    std::vector<const pair_session_t *> pending_sessions;
+    pending_sessions.reserve(map_id_sess.size());
+    for (const auto &[_, session] : map_id_sess) {
+      if (session.async_insert_pin.awaiting_approval && session.last_phase == PAIR_PHASE::NONE) {
+        pending_sessions.push_back(&session);
+      }
+    }
+    std::ranges::sort(pending_sessions, {}, [](const pair_session_t *session) {
+      return session->async_insert_pin.expires_at;
+    });
+
+    std::vector<pending_pairing_t> result;
+    result.reserve(pending_sessions.size());
+    for (const auto *session : pending_sessions) {
+      result.push_back({
+        .id = session->async_insert_pin.id,
+        .name = session->async_insert_pin.device_name,
+        .address = session->async_insert_pin.address,
+      });
+    }
+    update_pairing_notification_unlocked();
+    return result;
+  }
+
+  bool
+  cancel_pairing(const std::string_view pairing_id) {
+    if (!is_valid_pairing_id(pairing_id)) {
+      return false;
+    }
+
+    std::lock_guard lock { map_id_sess_mutex };
+    expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
+    const auto session = std::ranges::find_if(map_id_sess, [pairing_id](const auto &entry) {
+      return entry.second.async_insert_pin.awaiting_approval &&
+             entry.second.last_phase == PAIR_PHASE::NONE &&
+             entry.second.async_insert_pin.id == pairing_id;
+    });
+    if (session == map_id_sess.end()) {
+      update_pairing_notification_unlocked();
+      return false;
+    }
+
+    pt::ptree tree;
+    tree.put("root.paired", 0);
+    tree.put("root.<xmlattr>.status_code", 400);
+    tree.put("root.<xmlattr>.status_message", "Pairing request cancelled by operator");
+    write_pairing_response(session->second, tree);
+    complete_pairing(session->second, false);
+    map_id_sess.erase(session);
+    update_pairing_notification_unlocked();
+    return true;
+  }
 
   namespace pairing {
 
@@ -576,19 +790,21 @@ namespace nvhttp {
   void
   remove_session(pair_session_t &sess) {
     complete_pairing(sess, false);
-    if (pending_pin_unique_id == sess.client.uniqueID) {
-      pending_pin_unique_id.clear();
-      tray_state::clear_pairing_required();
+    std::lock_guard lock { map_id_sess_mutex };
+    const auto session = map_id_sess.find(sess.client.uniqueID);
+    if (session != map_id_sess.end() && &session->second == &sess) {
+      map_id_sess.erase(session);
     }
-    map_id_sess.erase(sess.client.uniqueID);
+    update_pairing_notification_unlocked();
   }
 
   void
-  fail_pair(pair_session_t &sess, pt::ptree &tree, const std::string status_msg) {
+  fail_pair(pair_session_t &sess, pt::ptree &tree, std::string status_msg) {
     tree.put("root.paired", 0);
     tree.put("root.<xmlattr>.status_code", 400);
-    tree.put("root.<xmlattr>.status_message", status_msg);
-    remove_session(sess);
+    tree.put("root.<xmlattr>.status_message", std::move(status_msg));
+    sess.failed = true;
+    complete_pairing(sess, false);
   }
 
   bool
@@ -745,7 +961,6 @@ namespace nvhttp {
 
     tree.put("root.paired", paired ? 1 : 0);
     complete_pairing(sess, paired);
-    remove_session(sess);
     tree.put("root.<xmlattr>.status_code", 200);
   }
 
@@ -755,62 +970,43 @@ namespace nvhttp {
   }
 
   bool
-  pin(std::string pin, std::string name) {
-    pt::ptree tree;
-    if (pin.size() != 4) {
-      tree.put("root.paired", 0);
-      tree.put("root.<xmlattr>.status_code", 400);
-      tree.put("root.<xmlattr>.status_message", "Pin must be 4 digits, " + std::to_string(pin.size()) + " provided");
-      return false;
-    }
-
-    if (!std::all_of(pin.begin(), pin.end(), ::isdigit)) {
-      tree.put("root.paired", 0);
-      tree.put("root.<xmlattr>.status_code", 400);
-      tree.put("root.<xmlattr>.status_message", "Pin must be numeric");
+  pin(const std::string_view pairing_id, std::string pin, std::string name) {
+    if (!is_valid_pairing_id(pairing_id) || !is_valid_pairing_pin(pin) || !is_valid_pairing_name(name)) {
       return false;
     }
 
     std::shared_ptr<pairing_completion_t> completion;
     std::string session_id;
     {
-      std::lock_guard<std::mutex> map_lock(map_id_sess_mutex);
-      if (map_id_sess.empty()) {
-        return false;
-      }
-      auto sess_it = map_id_sess.find(pending_pin_unique_id);
-      if (sess_it == std::end(map_id_sess)) {
+      std::lock_guard map_lock { map_id_sess_mutex };
+      expire_pair_sessions_unlocked(std::chrono::steady_clock::now());
+      const auto sess_it = std::ranges::find_if(map_id_sess, [pairing_id](const auto &entry) {
+        return entry.second.async_insert_pin.awaiting_approval &&
+               entry.second.last_phase == PAIR_PHASE::NONE &&
+               entry.second.async_insert_pin.id == pairing_id;
+      });
+      if (sess_it == map_id_sess.end()) {
         BOOST_LOG(warning) << "Cannot apply PIN because the pending pairing session is no longer available";
+        update_pairing_notification_unlocked();
         return false;
       }
 
       auto &sess = sess_it->second;
+      sess.async_insert_pin.awaiting_approval = false;
       sess.client.name = std::move(name);
-      if (!getservercert_checked(sess, tree, pin, sess.client.name)) {
-        return false;
-      }
-
-      std::ostringstream data;
-      pt::write_xml(data, tree);
-
-      auto &async_response = sess.async_insert_pin.response;
-      if (async_response.has_left() && async_response.left()) {
-        async_response.left()->write(data.str());
-      }
-      else if (async_response.has_right() && async_response.right()) {
-        async_response.right()->write(data.str());
-      }
-      else {
+      pt::ptree tree;
+      getservercert_checked(sess, tree, pin, sess.client.name);
+      const bool response_written = write_pairing_response(sess, tree);
+      if (!response_written || sess.failed) {
         complete_pairing(sess, false);
-        remove_session(sess);
+        map_id_sess.erase(sess_it);
+        update_pairing_notification_unlocked();
         return false;
       }
 
-      async_response = std::decay_t<decltype(async_response.left())>();
-      pending_pin_unique_id.clear();
-      tray_state::clear_pairing_required();
       completion = sess.completion;
       session_id = sess.client.uniqueID;
+      update_pairing_notification_unlocked();
     }
 
     {
@@ -822,11 +1018,13 @@ namespace nvhttp {
       }
     }
 
-    std::lock_guard<std::mutex> map_lock(map_id_sess_mutex);
+    std::lock_guard map_lock { map_id_sess_mutex };
     if (const auto sess_it = map_id_sess.find(session_id);
         sess_it != map_id_sess.end() && sess_it->second.completion == completion) {
-      remove_session(sess_it->second);
+      complete_pairing(sess_it->second, false);
+      map_id_sess.erase(sess_it);
     }
+    update_pairing_notification_unlocked();
     return false;
   }
 

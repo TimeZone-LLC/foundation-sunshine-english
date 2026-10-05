@@ -1,4 +1,4 @@
-import { ref, reactive } from 'vue'
+import { computed, ref, reactive } from 'vue'
 import { getBootstrapConfig } from '../config/bootstrapData.js'
 import { apiFetch, apiJson, apiPostJson } from '../utils/apiFetch.js'
 
@@ -27,6 +27,12 @@ const isSuccessfulStatus = (status) => {
  */
 export function usePin() {
   const pairingDeviceName = ref('')
+  const pairingPin = ref('')
+  const pendingPairings = ref([])
+  const selectedPairingId = ref('')
+  const pairingStatus = ref('')
+  const pairingBusy = ref(false)
+  const pendingPairingsLoading = ref(false)
   const unpairAllPressed = ref(false)
   const unpairAllStatus = ref(null)
   const showApplyMessage = ref(false)
@@ -39,6 +45,9 @@ export function usePin() {
   const deleting = ref(new Set())
   const editingStates = reactive({})
   const originalValues = reactive({})
+  const selectedPairing = computed(() =>
+    pendingPairings.value.find((pairing) => pairing.id === selectedPairingId.value) ?? null,
+  )
 
   const initClientEditingState = (client) => {
     if (!editingStates[client.uuid]) {
@@ -241,38 +250,88 @@ export function usePin() {
     return client && original && editableFields.some((field) => client[field] !== original[field])
   }
 
-  const initPinForm = (onSuccess) => {
-    const form = document.querySelector('#form')
-    if (!form) return
+  const selectPairing = (pairingId) => {
+    const pairing = pendingPairings.value.find((entry) => entry.id === pairingId)
+    if (!pairing) return
+    selectedPairingId.value = pairing.id
+    pairingDeviceName.value = pairing.name || pairingDeviceName.value
+    pairingStatus.value = ''
+  }
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault()
-      const pinInput = document.querySelector('#pin-input')
-      const nameInput = document.querySelector('#name-input')
-      const statusDiv = document.querySelector('#status')
+  const refreshPendingPairings = async ({ silent = false } = {}) => {
+    if (!silent) pendingPairingsLoading.value = true
+    try {
+      const data = await apiJson('/api/pin')
+      pendingPairings.value = Array.isArray(data.pairings) ? data.pairings : []
 
-      if (!pinInput || !nameInput || !statusDiv) return
-
-      statusDiv.innerHTML = ''
-
-      try {
-        const data = await apiPostJson('/api/pin', { pin: pinInput.value, name: nameInput.value })
-
-        if (data.status.toString().toLowerCase() === 'true') {
-          statusDiv.innerHTML =
-            '<div class="alert alert-success" role="alert">Success! Please check Moonlight to continue</div>'
-          pinInput.value = ''
-          nameInput.value = ''
-          onSuccess?.()
-        } else {
-          statusDiv.innerHTML =
-            '<div class="alert alert-danger" role="alert">Pairing Failed: Check if the PIN is typed correctly</div>'
-        }
-      } catch (error) {
-        console.error('Pairing failed:', error)
-        statusDiv.innerHTML = '<div class="alert alert-danger" role="alert">Pairing Failed: Network error</div>'
+      const selectionStillExists = pendingPairings.value.some(
+        (pairing) => pairing.id === selectedPairingId.value,
+      )
+      if (!selectionStillExists) {
+        const first = pendingPairings.value[0]
+        selectedPairingId.value = first?.id ?? ''
+        if (first?.name) pairingDeviceName.value = first.name
       }
-    })
+      return true
+    } catch (error) {
+      console.error('Failed to load pairing requests:', error)
+      if (!silent) pairingStatus.value = 'network'
+      return false
+    } finally {
+      if (!silent) pendingPairingsLoading.value = false
+    }
+  }
+
+  const approvePairing = async () => {
+    if (!selectedPairingId.value || !/^\d{4}$/.test(pairingPin.value) || !pairingDeviceName.value) {
+      pairingStatus.value = 'invalid'
+      return false
+    }
+
+    pairingBusy.value = true
+    pairingStatus.value = ''
+    try {
+      const data = await apiPostJson('/api/pin', {
+        pairing_id: selectedPairingId.value,
+        pin: pairingPin.value,
+        name: pairingDeviceName.value,
+      })
+      const success = isSuccessfulStatus(data.status)
+      pairingStatus.value = success ? 'success' : 'failed'
+      if (success) pairingPin.value = ''
+      await refreshPendingPairings({ silent: true })
+      if (success) await refreshClients()
+      return success
+    } catch (error) {
+      console.error('Pairing failed:', error)
+      pairingStatus.value = 'network'
+      return false
+    } finally {
+      pairingBusy.value = false
+    }
+  }
+
+  const cancelPairingRequest = async () => {
+    if (!selectedPairingId.value) return false
+    const pairingId = selectedPairingId.value
+    pairingBusy.value = true
+    pairingStatus.value = ''
+    try {
+      const data = await apiJson('/api/pin', {
+        method: 'DELETE',
+        body: { pairing_id: pairingId },
+      })
+      const success = isSuccessfulStatus(data.status)
+      pairingStatus.value = success ? 'cancelled' : 'missing'
+      await refreshPendingPairings({ silent: true })
+      return success
+    } catch (error) {
+      console.error('Failed to cancel pairing request:', error)
+      pairingStatus.value = 'network'
+      return false
+    } finally {
+      pairingBusy.value = false
+    }
   }
 
   const clickedApplyBanner = async () => {
@@ -319,6 +378,13 @@ export function usePin() {
 
   return {
     pairingDeviceName,
+    pairingPin,
+    pendingPairings,
+    selectedPairing,
+    selectedPairingId,
+    pairingStatus,
+    pairingBusy,
+    pendingPairingsLoading,
     unpairAllPressed,
     unpairAllStatus,
     showApplyMessage,
@@ -340,7 +406,10 @@ export function usePin() {
     cancelEdit,
     hasUnsavedChanges,
     serialize,
-    initPinForm,
+    selectPairing,
+    refreshPendingPairings,
+    approvePairing,
+    cancelPairingRequest,
     clickedApplyBanner,
     loadConfig,
     loadColorProfiles,
