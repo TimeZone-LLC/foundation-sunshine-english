@@ -1,42 +1,65 @@
-# 原生侧载组件合同
+# Native sideloaded component contract
 
-## 所有权
+## Ownership
 
-Panel 负责用户操作、文件导入、必要的提权安装、恢复和状态展示。Core 负责其业务组件的可信版本、
-加载、使用权和关闭。Panel 不执行 Core 的厂商运行库，也不把安装成功等同于功能运行成功。
+The control panel owns user operations, file import, privileged installation when required,
+recovery, and status display. Core owns the trusted versions, loading, usage rights, and
+shutdown of its functional components. The control panel does not execute Core vendor
+runtimes, and a successful installation does not imply that the feature ran successfully.
 
-项目适配层属于宿主实现，不是用户侧载的文件。厂商代码通过明确的接口接入；不同编译器之间
-只传递 C ABI 数据和不透明句柄，分配、销毁和异常处理留在同一侧。
+Project adapter layers are part of the host implementation, not user-sideloaded files. Vendor
+code is integrated through explicit interfaces. Only C ABI data and opaque handles cross
+compiler boundaries; allocation, destruction, and exception handling remain on the same side.
 
-## 文件与版本
+## Files and versions
 
-组件 ID、文件角色、目标文件名及允许来源由代码注册。宿主的构建输入确定其支持的运行库摘要，
-并将摘要编入宿主二进制。Panel 从实际运行的宿主查询支持版本，不能用本地安装记录扩展信任。
+Code registers component IDs, file roles, target filenames, and permitted sources. The host's
+build inputs determine which runtime digests it supports, and those digests are compiled into
+the host binary. The control panel queries supported versions from the running host; local
+installation records cannot expand that trust set.
 
-配置和事务记录可以使用 JSON；它们记录选择与安装结果，不是代码执行许可清单。
-厂商文件身份与适配层构建身份分开：同一厂商文件仍受新宿主支持时，不因重编译宿主而要求重新导入。
+Configuration and transaction journals may use JSON. They record selections and installation
+results; they are not allowlists for code execution. Vendor-file identity is separate from the
+adapter build identity: rebuilding the host does not require a vendor file to be imported again
+while the new host still supports it.
 
-## 安装与运行
+## Installation and runtime
 
-1. Panel 查询宿主能力和支持的文件摘要，预检用户选定文件。
-2. 向宿主取得维护操作；使用中的组件不能被覆盖或移除。
-3. 需要写入受保护目录时，经 UAC 启动安装助手，重新查询宿主并校验暂存文件。
-4. 提交文件和宿主配置，最后结束维护。响应丢失时，查询实际配置决定恢复方向。
-5. 业务启用后，由宿主在加载前再次校验适配组件和厂商文件，并持有覆盖实例生命周期的文件和模块引用。
-6. 最后一个使用者退出后关闭可安全关闭的厂商共享状态；不支持安全卸载的运行库保留到宿主退出。
+1. The control panel queries host capabilities and supported file digests, then preflights the
+   files selected by the user.
+2. It obtains a maintenance operation from the host. A component in use cannot be replaced or
+   removed.
+3. When a protected directory must be written, it starts the installation helper through UAC;
+   the helper queries the host again and validates the staged files.
+4. It commits the files and host configuration, then ends maintenance. If the response is lost,
+   it queries the effective configuration to decide which way recovery must proceed.
+5. After the feature is enabled, the host validates the adapter component and vendor files again
+   before loading, and retains file and module references for the lifetime of the instance.
+6. After the final user exits, the host shuts down vendor shared state only when that operation
+   is safe. Runtimes that cannot be unloaded safely remain loaded until the host exits.
 
-摘要检查、安装探测和管理 API 请求不得进入逐帧处理路径。未启用的组件不初始化厂商运行库。
-共享库全局状态不能由单个会话擅自关闭。关闭管理页面也不等同于关闭 Core 的业务会话。
+Digest checks, installation probes, and management API requests must not enter per-frame
+processing paths. Disabled components do not initialize vendor runtimes. A single session must
+not shut down shared library global state. Closing the management page is not equivalent to
+ending a Core feature session.
 
-DLSS NR 的 NGX 运行库在会话结束后仍留在 Sunshine 进程内，不能安全地强制卸载。删除时如果
-Windows 拒绝移除被映射的 DLL，Panel 将删除意图写入 Core 的维护记录；Core 下次启动时，
-在校验或加载增强组件前删除该运行库和清单，再清除配置版本及维护记录。任何步骤失败都保留
-记录并禁止再次使用该组件，用户可在管理界面重试。另一种组件的配置和文件不受影响。
+The DLSS NR NGX runtime remains mapped in the Sunshine process after a session ends and cannot
+be forcibly unloaded safely. If Windows refuses to remove the mapped DLL, the control panel
+writes the removal intent to Core's maintenance journal. On its next start, Core deletes the
+runtime and manifest before validating or loading enhancement components, then clears the
+configured version and maintenance journal. A failure at any step preserves the journal and
+prevents the component from being used again until the user retries from the management UI.
+Configuration and files for other components are unaffected.
 
-## 构建与分发
+## Build and distribution
 
-宿主的编译方式不改变以上所有权。SDK、适配层及宿主工具链必须一起通过实际链接和生命周期验证。
-安装包包含宿主启动所需的依赖。可选适配组件可以依赖由用户单独安装的系统运行库；缺失时必须由管理界面明确提示，并且不能影响宿主启动。侧载文件是否分发，遵循该组件声明的来源及许可要求。
-签名等修改文件的操作必须先于该文件的最终摘要固化。
+The host's compilation method does not change this ownership model. The SDK, adapter layer, and
+host toolchain must pass real linking and lifecycle validation together. Installers include the
+dependencies needed for the host to start. Optional adapters may depend on system runtimes that
+the user installs separately; a missing runtime must be reported clearly by the management UI
+and must not prevent the host from starting. Whether sideloaded files may be distributed follows
+the sources and licenses declared by that component. Operations that modify files, such as code
+signing, must happen before their final digests are fixed.
 
-这些检查防止通过单独替换运行库或安装记录放行未知文件，不承诺抵御宿主二进制自身被替换。
+These checks prevent an unknown file from being trusted merely by replacing a runtime or local
+installation record. They do not claim to protect against replacement of the host binary itself.
