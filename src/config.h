@@ -18,6 +18,10 @@
 #include "nvenc/nvenc_config.h"
 
 namespace config {
+  inline constexpr std::string_view GAMEPAD_DRIVER_ALL = "all";
+  inline constexpr std::string_view GAMEPAD_DRIVER_VIRTUALHID = "virtualhid";
+  inline constexpr std::string_view GAMEPAD_DRIVER_VIGEMBUS = "vigembus";
+
   namespace nv {
     /**
      * @brief Convert Sunshine's NVENC quality level to FFmpeg's stable symbolic preset.
@@ -252,6 +256,7 @@ namespace config {
     std::chrono::duration<double> key_repeat_period;
 
     std::string gamepad;
+    std::string gamepad_driver;  ///< Windows virtual gamepad backend policy.
     bool ds4_back_as_touchpad_click;
     bool motion_as_ds4;
     bool touchpad_as_ds4;

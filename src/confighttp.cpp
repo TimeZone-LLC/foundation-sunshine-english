@@ -931,7 +931,10 @@ namespace confighttp {
         if (gamepad && gamepad->empty()) {
           app_node.erase("gamepad");
         }
-        else if (gamepad && *gamepad != "auto"sv && *gamepad != "x360"sv && *gamepad != "ds4"sv && *gamepad != "ds5"sv) {
+        else if (gamepad && *gamepad != "auto"sv && *gamepad != "generic"sv &&
+                 *gamepad != "x360"sv && *gamepad != "xone"sv &&
+                 *gamepad != "xseries"sv && *gamepad != "ds4"sv &&
+                 *gamepad != "ds5"sv && *gamepad != "switch"sv) {
           outputTree.put("status", "false");
           outputTree.put("error", "Invalid per-app gamepad type");
           return false;
@@ -1661,9 +1664,11 @@ namespace confighttp {
     };
     outputTree.put("status", "true");
     outputTree.put("gamepad", get_value("gamepad", "auto"));
+    outputTree.put("gamepad_driver", get_value("gamepad_driver", "vigembus"));
     outputTree.put("motion_as_ds4", get_value("motion_as_ds4", "true"));
     outputTree.put("touchpad_as_ds4", get_value("touchpad_as_ds4", "true"));
     outputTree.put("ds4_back_as_touchpad_click", get_value("ds4_back_as_touchpad_click", "true"));
+    outputTree.put("ds5_inputtino_randomize_mac", get_value("ds5_inputtino_randomize_mac", "true"));
     outputTree.put("enable_dsu_server", get_value("enable_dsu_server", "false"));
     outputTree.put("dsu_server_port", get_value("dsu_server_port", "26760"));
   }
@@ -1685,12 +1690,13 @@ namespace confighttp {
       std::stringstream body;
       body << request->content.rdbuf();
       pt::read_json(body, inputTree);
-      if (inputTree.empty() || inputTree.size() > 6) {
-        throw std::invalid_argument("controller configuration patch must contain 1 to 6 fields");
+      if (inputTree.empty() || inputTree.size() > 8) {
+        throw std::invalid_argument("controller configuration patch must contain 1 to 8 fields");
       }
 
       const std::set<std::string> boolean_fields {
         "ds4_back_as_touchpad_click",
+        "ds5_inputtino_randomize_mac",
         "enable_dsu_server",
         "motion_as_ds4",
         "touchpad_as_ds4",
@@ -1702,8 +1708,17 @@ namespace confighttp {
         }
         const auto value = node.get_value<std::string>();
         if (key == "gamepad") {
-          if (value != "auto"sv && value != "x360"sv && value != "ds4"sv && value != "ds5"sv) {
+          if (value != "auto"sv && value != "generic"sv && value != "x360"sv &&
+              value != "xone"sv && value != "xseries"sv && value != "ds4"sv &&
+              value != "ds5"sv && value != "switch"sv) {
             throw std::invalid_argument("invalid gamepad mode");
+          }
+        }
+        else if (key == "gamepad_driver") {
+          if (value != config::GAMEPAD_DRIVER_ALL &&
+              value != config::GAMEPAD_DRIVER_VIRTUALHID &&
+              value != config::GAMEPAD_DRIVER_VIGEMBUS) {
+            throw std::invalid_argument("invalid gamepad driver policy");
           }
         }
         else if (boolean_fields.contains(key)) {

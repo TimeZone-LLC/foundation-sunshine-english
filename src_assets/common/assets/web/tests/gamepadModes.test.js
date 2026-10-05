@@ -6,10 +6,10 @@ import {
   normalizePerAppGamepadMode,
 } from '../utils/gamepadModes.js'
 
-test('per-app gamepad choices include DualSense', () => {
+test('per-app gamepad choices include every selectable Virtual HID profile', () => {
   assert.deepEqual(
     PER_APP_GAMEPAD_MODES.map(({ value }) => value),
-    ['', 'auto', 'x360', 'ds4', 'ds5'],
+    ['', 'auto', 'generic', 'x360', 'xone', 'xseries', 'ds4', 'ds5', 'switch'],
   )
 })
 

@@ -21,10 +21,12 @@
 #include "keylayout.h"
 #include "misc.h"
 #include "virtual_mouse.h"
+#include "gamepad_driver_policy.h"
 #include "src/config.h"
 #include "src/globals.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
+#include "src/platform/macos/virtualhid_gamepad.h"
 
 // Note: HSYNTHETICPOINTERDEVICE and related functions are now included in
 // modern MinGW-w64 SDK (UCRT64). The declarations below are only needed for
@@ -482,7 +484,7 @@ namespace platf {
 
   // Per-app mouse mode: 0=auto (use global config), 1=force virtual mouse, 2=force SendInput
   static std::atomic<int> current_mouse_mode { 0 };
-  // Per-app gamepad mode: 0=inherit global, 1=auto, 2=Xbox 360, 3=DualShock 4, 4=DualSense
+  // Per-app gamepad mode: 0=inherit global, 1=auto, followed by explicit profiles.
   static std::atomic<int> current_gamepad_mode { 0 };
   // Runtime copy of the persisted global policy. 0 means the startup config is authoritative.
   static std::atomic<int> current_global_gamepad_mode { 0 };
@@ -492,7 +494,19 @@ namespace platf {
     if (preference == "x360"sv) return 2;
     if (preference == "ds4"sv) return 3;
     if (preference == "ds5"sv) return 4;
+    if (preference == "generic"sv) return 5;
+    if (preference == "xone"sv) return 6;
+    if (preference == "xseries"sv) return 7;
+    if (preference == "switch"sv) return 8;
     return 1;
+  }
+
+  static std::string_view
+  gamepad_preference_from_mode(int mode) {
+    constexpr std::array<std::string_view, 9> names {
+      "auto", "auto", "x360", "ds4", "ds5", "generic", "xone", "xseries", "switch"
+    };
+    return mode >= 0 && mode < static_cast<int>(names.size()) ? names[mode] : "auto"sv;
   }
 
   void
@@ -503,11 +517,14 @@ namespace platf {
 
   void
   set_gamepad_mode(int mode) {
-    if (mode < 0 || mode > 4) {
+    if (mode < 0 || mode > 8) {
       mode = 0;
     }
     current_gamepad_mode.store(mode, std::memory_order_relaxed);
-    constexpr std::array<std::string_view, 5> names { "global", "auto", "Xbox 360", "DualShock 4", "DualSense" };
+    constexpr std::array<std::string_view, 9> names {
+      "global", "auto", "Xbox 360", "DualShock 4", "DualSense",
+      "generic HID", "Xbox One", "Xbox Series", "Switch Pro"
+    };
     BOOST_LOG(info) << "Gamepad mode set to: "sv << names[mode];
   }
 
@@ -520,7 +537,10 @@ namespace platf {
       return;
     }
     current_global_gamepad_mode.store(mode, std::memory_order_relaxed);
-    constexpr std::array<std::string_view, 5> names { "startup config", "auto", "Xbox 360", "DualShock 4", "DualSense" };
+    constexpr std::array<std::string_view, 9> names {
+      "startup config", "auto", "Xbox 360", "DualShock 4", "DualSense",
+      "generic HID", "Xbox One", "Xbox Series", "Switch Pro"
+    };
     BOOST_LOG(info) << "Global gamepad mode hot-applied to: "sv << names[mode]
                     << "; active virtual controllers are unchanged"sv;
   }
@@ -538,7 +558,7 @@ namespace platf {
     if (config::input.gamepad == "x360"sv) return 2;
     if (config::input.gamepad == "ds4"sv) return 3;
     if (config::input.gamepad == "ds5"sv) return 4;
-    return 1;
+    return gamepad_mode_from_preference(config::input.gamepad);
   }
 
   static int
@@ -588,6 +608,7 @@ namespace platf {
     }
 
     vigem_t *vigem;
+    std::unique_ptr<virtualhid::virtual_gamepad_backend_t> virtual_gamepads;
     std::unique_ptr<ds5::sidecar_client_t> ds5_sidecar;
     dsu_server_t *dsu_server;
     bool dsu_uninitialized_warning_logged = false;
@@ -606,10 +627,22 @@ namespace platf {
     input_t result { new input_raw_t {} };
     auto &raw = *(input_raw_t *) result.get();
 
-    raw.vigem = new vigem_t {};
-    if (raw.vigem->init()) {
-      delete raw.vigem;
-      raw.vigem = nullptr;
+    raw.vigem = nullptr;
+    const auto driver_policy = windows::gamepad_driver::parse(config::input.gamepad_driver);
+    bool virtualhid_available = false;
+    if (windows::gamepad_driver::prefers_virtualhid(driver_policy)) {
+      raw.virtual_gamepads = std::make_unique<virtualhid::virtual_gamepad_backend_t>();
+      virtualhid_available = virtualhid::runtime_gamepads_available(raw.virtual_gamepads->runtime());
+      if (!virtualhid_available) {
+        BOOST_LOG(warning) << "Virtual HID gamepads were selected, but the local broker or license is unavailable; existing controller backends will be used as fallback"sv;
+      }
+    }
+    if (windows::gamepad_driver::eagerly_initializes_existing_backend(driver_policy, virtualhid_available)) {
+      raw.vigem = new vigem_t {};
+      if (raw.vigem->init()) {
+        delete raw.vigem;
+        raw.vigem = nullptr;
+      }
     }
 
     raw.ds5_sidecar = std::make_unique<ds5::sidecar_client_t>();
@@ -639,6 +672,18 @@ namespace platf {
     raw.fnDestroySyntheticPointerDevice = (decltype(DestroySyntheticPointerDevice) *) GetProcAddress(GetModuleHandleA("user32.dll"), "DestroySyntheticPointerDevice");
 
     return result;
+  }
+
+  static vigem_t *
+  ensure_vigem(input_raw_t &raw) {
+    if (!raw.vigem) {
+      raw.vigem = new vigem_t {};
+      if (raw.vigem->init()) {
+        delete raw.vigem;
+        raw.vigem = nullptr;
+      }
+    }
+    return raw.vigem;
   }
 
   /**
@@ -1978,8 +2023,21 @@ namespace platf {
     // per-app and global host-side selection while client_gamepad_override is on.
     const bool client_declared = !client_gamepad.empty() && config::input.client_gamepad_override;
     auto gamepad_mode = selected_gamepad_mode(client_gamepad);
+    const auto requested_profile = gamepad_preference_from_mode(gamepad_mode);
     const auto per_app_override = !client_declared && current_gamepad_mode.load(std::memory_order_relaxed) != 0;
     const char *selection_source = client_declared ? "client selection" : (per_app_override ? "per-app selection" : "global selection");
+
+    const auto driver_policy = windows::gamepad_driver::parse(config::input.gamepad_driver);
+    if (windows::gamepad_driver::prefers_virtualhid(driver_policy) &&
+        windows::gamepad_driver::virtualhid_supports_profile(requested_profile) &&
+        raw->virtual_gamepads &&
+        virtualhid::runtime_gamepads_available(raw->virtual_gamepads->runtime())) {
+      if (raw->virtual_gamepads->allocate(id, metadata, feedback_queue, requested_profile) == 0) {
+        return 0;
+      }
+      BOOST_LOG(warning) << "Virtual HID could not create gamepad "sv << id.globalIndex
+                         << "; falling back to the established Windows controller backends"sv;
+    }
 
     if (gamepad_mode == 4 && !ds5_available) {
       BOOST_LOG(warning) << "DualSense emulation was requested by "sv << selection_source
@@ -2007,8 +2065,8 @@ namespace platf {
       gamepad_mode = 1;
     }
 
-    if (!raw->vigem) {
-      return 0;
+    if (!ensure_vigem(*raw)) {
+      return -1;
     }
 
     VIGEM_TARGET_TYPE selectedGamepadType;
@@ -2020,6 +2078,18 @@ namespace platf {
     else if (gamepad_mode == 3) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualShock 4 controller ("sv << selection_source << ')';
       selectedGamepadType = DualShock4Wired;
+    }
+    else if (gamepad_mode >= 5) {
+      BOOST_LOG(warning) << "The selected "sv << requested_profile
+                         << " profile requires Virtual HID; using ViGEm automatic selection for this controller"sv;
+      if (metadata.type == LI_CTYPE_PS ||
+          (config::input.motion_as_ds4 && (metadata.capabilities & (LI_CCAP_ACCEL | LI_CCAP_GYRO))) ||
+          (config::input.touchpad_as_ds4 && (metadata.capabilities & LI_CCAP_TOUCHPAD))) {
+        selectedGamepadType = DualShock4Wired;
+      }
+      else {
+        selectedGamepadType = Xbox360Wired;
+      }
     }
     else if (metadata.type == LI_CTYPE_PS) {
       BOOST_LOG(info) << "Gamepad " << id.globalIndex << " will be DualShock 4 controller (auto-selected by client-reported type)"sv;
@@ -2076,6 +2146,11 @@ namespace platf {
   free_gamepad(input_t &input, int nr) {
     auto raw = (input_raw_t *) input.get();
 
+    if (raw->virtual_gamepads && raw->virtual_gamepads->has_gamepad(nr)) {
+      raw->virtual_gamepads->free(nr);
+      return;
+    }
+
     if (raw->ds5_sidecar && raw->ds5_sidecar->owns(nr)) {
       raw->ds5_sidecar->free(nr);
       return;
@@ -2091,7 +2166,8 @@ namespace platf {
   bool
   gamepad_is_ds5(input_t &input, int nr) {
     auto raw = (input_raw_t *) input.get();
-    return raw->ds5_sidecar && raw->ds5_sidecar->owns(nr);
+    return (raw->virtual_gamepads && raw->virtual_gamepads->is_dualsense(nr)) ||
+           (raw->ds5_sidecar && raw->ds5_sidecar->owns(nr));
   }
 
   bool
@@ -2306,6 +2382,11 @@ namespace platf {
   gamepad_update(input_t &input, int nr, const gamepad_state_t &gamepad_state) {
     auto raw = (input_raw_t *) input.get();
 
+    if (raw->virtual_gamepads && raw->virtual_gamepads->has_gamepad(nr)) {
+      raw->virtual_gamepads->update(nr, gamepad_state);
+      return;
+    }
+
     if (raw->ds5_sidecar && raw->ds5_sidecar->owns(nr)) {
       raw->ds5_sidecar->submit_input(nr, gamepad_state);
       return;
@@ -2345,6 +2426,10 @@ namespace platf {
   void
   gamepad_touch(input_t &input, const gamepad_touch_t &touch) {
     auto raw = (input_raw_t *) input.get();
+    if (raw->virtual_gamepads && raw->virtual_gamepads->has_gamepad(touch.id.globalIndex)) {
+      raw->virtual_gamepads->touch(touch);
+      return;
+    }
     if (raw->ds5_sidecar && raw->ds5_sidecar->owns(touch.id.globalIndex)) {
       raw->ds5_sidecar->submit_touch(touch);
       return;
@@ -2464,6 +2549,10 @@ namespace platf {
   void
   gamepad_motion(input_t &input, const gamepad_motion_t &motion) {
     auto raw = (input_raw_t *) input.get();
+    if (raw->virtual_gamepads && raw->virtual_gamepads->has_gamepad(motion.id.globalIndex)) {
+      raw->virtual_gamepads->motion(motion);
+      return;
+    }
     if (raw->ds5_sidecar && raw->ds5_sidecar->owns(motion.id.globalIndex)) {
       raw->ds5_sidecar->submit_motion(motion);
       return;
@@ -2524,6 +2613,10 @@ namespace platf {
   void
   gamepad_battery(input_t &input, const gamepad_battery_t &battery) {
     auto raw = (input_raw_t *) input.get();
+    if (raw->virtual_gamepads && raw->virtual_gamepads->has_gamepad(battery.id.globalIndex)) {
+      raw->virtual_gamepads->battery(battery);
+      return;
+    }
     if (raw->ds5_sidecar && raw->ds5_sidecar->owns(battery.id.globalIndex)) {
       raw->ds5_sidecar->submit_battery(battery);
       return;
@@ -2606,24 +2699,43 @@ namespace platf {
   std::vector<supported_gamepad_t> &
   supported_gamepads(input_t *input) {
     if (!input) {
-      static std::vector gps {
-        supported_gamepad_t { "auto", true, "" },
-        supported_gamepad_t { "x360", false, "" },
-        supported_gamepad_t { "ds4", false, "" },
-        supported_gamepad_t { "ds5", false, "" },
-        supported_gamepad_t { "switch", true, "" },
-      };
+      // Configuration parsing needs the union of every selectable backend.
+      static auto gps = virtualhid::static_supported_gamepads();
 
       return gps;
     }
 
-    auto vigem = ((input_raw_t *) input)->vigem;
-    auto dsu_server = ((input_raw_t *) input)->dsu_server;
+    auto *raw = (input_raw_t *) input->get();
+    auto vigem = raw->vigem;
+    auto dsu_server = raw->dsu_server;
     auto enabled = vigem != nullptr;
     auto switch_enabled = dsu_server != nullptr;
-    auto ds5_available = ((input_raw_t *) input)->ds5_sidecar->configured();
+    auto ds5_available = raw->ds5_sidecar->configured();
     auto reason = enabled ? "" : "gamepads.vigem-not-available";
     auto switch_reason = switch_enabled ? "" : "gamepads.motion-server-not-available";
+
+    const auto driver_policy = windows::gamepad_driver::parse(config::input.gamepad_driver);
+    if (windows::gamepad_driver::prefers_virtualhid(driver_policy)) {
+      thread_local std::vector<supported_gamepad_t> virtual_profiles;
+      virtual_profiles = virtualhid::supported_gamepads(
+        raw->virtual_gamepads ? raw->virtual_gamepads->runtime() : nullptr
+      );
+      const auto virtual_available = raw->virtual_gamepads &&
+                                     virtualhid::runtime_gamepads_available(raw->virtual_gamepads->runtime());
+      if (!virtual_available) {
+        for (auto &profile : virtual_profiles) {
+          if (profile.name == "auto" || profile.name == "x360" || profile.name == "ds4") {
+            profile.is_enabled = enabled;
+            profile.reason_disabled = enabled ? "" : reason;
+          }
+          else if (profile.name == "ds5") {
+            profile.is_enabled = ds5_available;
+            profile.reason_disabled = ds5_available ? "" : "gamepads.ds5-sidecar-not-available";
+          }
+        }
+      }
+      return virtual_profiles;
+    }
 
     // ds4 == ps4
     // This function is queried after runtime configuration changes too. Keep
@@ -2657,14 +2769,27 @@ namespace platf {
     const auto ds5_available = ds5::refresh_component_availability();
     // 能力声明必须与可选 DS5 组件不可用时的创建前回退保持一致。
     const auto gamepad_mode = selected_mode == 4 && !ds5_available ? 1 : selected_mode;
+    const auto driver_policy = windows::gamepad_driver::parse(config::input.gamepad_driver);
+    const auto virtualhid_selected = windows::gamepad_driver::prefers_virtualhid(driver_policy);
+    bool virtualhid_available = false;
+    if (virtualhid_selected) {
+      virtualhid::virtual_gamepad_backend_t probe;
+      virtualhid_available = virtualhid::runtime_gamepads_available(probe.runtime());
+    }
 
-    // 与手柄分配使用同一会话选择；强制模拟 Xbox 360 时不声明触控板能力。
-    if (gamepad_mode != 2) {
+    const auto selected_profile = gamepad_preference_from_mode(gamepad_mode);
+    // Advertise controller touch only when the selected, usable backend can
+    // create a touch-capable profile. Expanded profiles fall back to ViGEm's
+    // automatic controller when Virtual HID is unavailable, so they must not
+    // inherit Virtual HID capabilities in that state.
+    if (virtualhid_available ?
+          virtualhid::profile_supports_controller_touch(selected_profile) :
+          windows::gamepad_driver::existing_backend_supports_controller_touch(selected_profile)) {
       caps |= platform_caps::controller_touch;
     }
 
     const auto ds5_settings = ds5_config::current();
-    if (gamepad_mode == 4 && ds5_settings.audio_haptics && ds5_available) {
+    if (!virtualhid_available && gamepad_mode == 4 && ds5_settings.audio_haptics && ds5_available) {
       caps |= platform_caps::ds5_haptics_pcm;
     }
 

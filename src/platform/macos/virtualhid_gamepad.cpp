@@ -1,6 +1,6 @@
 /**
  * @file src/platform/macos/virtualhid_gamepad.cpp
- * @brief macOS virtual gamepad support backed by libvirtualhid.
+ * @brief Platform virtual gamepad support backed by libvirtualhid.
  */
 
 #include "virtualhid_gamepad.h"
@@ -24,7 +24,7 @@
 
 using namespace std::literals;
 
-namespace platf::macos {
+namespace platf::virtualhid {
 
   struct virtual_gamepad_backend_t::gamepad_context_t {
     std::unique_ptr<lvh::GamepadStateAdapter> adapter;
@@ -366,7 +366,7 @@ namespace platf::macos {
     options.backend = backend;
     runtime_ = lvh::Runtime::create(options);
     if (!runtime_) {
-      BOOST_LOG(warning) << "Unable to create the macOS virtual gamepad runtime"sv;
+      BOOST_LOG(warning) << "Unable to create the virtual gamepad runtime"sv;
     }
   }
 
@@ -382,12 +382,18 @@ namespace platf::macos {
       return -1;
     }
     if (id.globalIndex < 0 || id.globalIndex >= static_cast<int>(gamepads_.size())) {
-      BOOST_LOG(warning) << "Invalid macOS virtual gamepad index: "sv << id.globalIndex;
+      BOOST_LOG(warning) << "Invalid virtual gamepad index: "sv << id.globalIndex;
       return -1;
     }
 
     const auto &selection = select_profile(requested_profile, metadata);
     auto profile = selection.profile();
+    if (profile.gamepad_kind == lvh::GamepadProfileKind::switch_pro) {
+      // Moonlight has no collision-free, negotiated player-indicator feedback
+      // message. Do not advertise a feedback path Sunshine cannot forward.
+      // Rumble, motion, battery, and the Switch home light remain supported.
+      profile.capabilities.supports_player_leds = false;
+    }
     profile.name = std::format("Sunshine {}", profile.name);
     if (requested_profile != "auto"sv) {
       BOOST_LOG(info) << "Gamepad "sv << id.globalIndex << " will be "sv << profile.name << " (manual selection)"sv;
@@ -398,7 +404,7 @@ namespace platf::macos {
     options.metadata = gamepad_metadata(id, metadata, profile);
     auto created = lvh::GamepadStateAdapter::create(*runtime_, options);
     if (!created) {
-      log_failure("create macOS virtual gamepad"sv, created.status);
+      log_failure("create virtual gamepad"sv, created.status);
       return -1;
     }
 
@@ -477,7 +483,7 @@ namespace platf::macos {
     updated_state.gyroscope = cached_state.gyroscope;
     updated_state.battery = cached_state.battery;
     updated_state.touchpad_contacts = cached_state.touchpad_contacts;
-    log_failure("submit macOS virtual gamepad state"sv, gamepad->adapter->set_state(updated_state));
+    log_failure("submit virtual gamepad state"sv, gamepad->adapter->set_state(updated_state));
   }
 
   void virtual_gamepad_backend_t::touch(const gamepad_touch_t &touch) {
@@ -494,7 +500,7 @@ namespace platf::macos {
       for (std::size_t index = 0; index < gamepad->touch_ids.size(); ++index) {
         if (gamepad->touch_ids[index]) {
           log_failure(
-            "release macOS virtual gamepad touch"sv,
+            "release virtual gamepad touch"sv,
             gamepad->adapter->clear_touchpad_contact(index)
           );
           gamepad->touch_ids[index].reset();
@@ -509,7 +515,7 @@ namespace platf::macos {
         return !id.has_value();
       });
       if (slot == gamepad->touch_ids.end()) {
-        BOOST_LOG(warning) << "No free macOS virtual gamepad touch slots"sv;
+        BOOST_LOG(warning) << "No free virtual gamepad touch slots"sv;
         return;
       }
       *slot = touch.pointerId;
@@ -522,7 +528,7 @@ namespace platf::macos {
     const auto index = static_cast<std::size_t>(std::distance(gamepad->touch_ids.begin(), slot));
     if (touch.eventType == LI_TOUCH_EVENT_UP || touch.eventType == LI_TOUCH_EVENT_CANCEL) {
       log_failure(
-        "release macOS virtual gamepad touch"sv,
+        "release virtual gamepad touch"sv,
         gamepad->adapter->clear_touchpad_contact(index)
       );
       slot->reset();
@@ -534,11 +540,13 @@ namespace platf::macos {
 
     lvh::GamepadTouchContact contact;
     contact.id = static_cast<std::uint8_t>(index);
-    contact.active = touch.pressure > 0.5F;
+    // Moonlight uses zero pressure when the client cannot measure it. The
+    // transition type, not pressure, is authoritative for contact lifetime.
+    contact.active = true;
     contact.x = std::clamp(touch.x, 0.0F, 1.0F);
     contact.y = std::clamp(touch.y, 0.0F, 1.0F);
     log_failure(
-      "submit macOS virtual gamepad touch"sv,
+      "submit virtual gamepad touch"sv,
       gamepad->adapter->set_touchpad_contact(index, contact)
     );
   }
@@ -552,13 +560,13 @@ namespace platf::macos {
     switch (motion.motionType) {
       case LI_MOTION_TYPE_ACCEL:
         log_failure(
-          "submit macOS virtual gamepad acceleration"sv,
+          "submit virtual gamepad acceleration"sv,
           adapter->set_acceleration(lvh::Vector3 {motion.x, motion.y, motion.z})
         );
         return;
       case LI_MOTION_TYPE_GYRO:
         log_failure(
-          "submit macOS virtual gamepad gyroscope"sv,
+          "submit virtual gamepad gyroscope"sv,
           adapter->set_gyroscope(lvh::Vector3 {motion.x, motion.y, motion.z})
         );
         return;
@@ -574,7 +582,7 @@ namespace platf::macos {
 
     auto &adapter = gamepads_[battery.id.globalIndex]->adapter;
     if (battery.state == LI_BATTERY_STATE_UNKNOWN || battery.state == LI_BATTERY_STATE_NOT_PRESENT) {
-      log_failure("clear macOS virtual gamepad battery"sv, adapter->clear_battery());
+      log_failure("clear virtual gamepad battery"sv, adapter->clear_battery());
       return;
     }
 
@@ -583,7 +591,7 @@ namespace platf::macos {
     value.percentage = battery.percentage == LI_BATTERY_PERCENTAGE_UNKNOWN ?
                          100 :
                          std::min<std::uint8_t>(battery.percentage, 100);
-    log_failure("submit macOS virtual gamepad battery"sv, adapter->set_battery(value));
+    log_failure("submit virtual gamepad battery"sv, adapter->set_battery(value));
   }
 
   std::vector<supported_gamepad_t> static_supported_gamepads() {
@@ -600,7 +608,14 @@ namespace platf::macos {
     if (!runtime || !runtime->capabilities().supports_gamepad) {
       return false;
     }
+#ifdef _WIN32
+    return !runtime->capabilities().requires_installed_driver ||
+           lvh::get_license_status().license.licensed();
+#else
+    // The macOS backend always creates devices through its licensed broker,
+    // even though the generic capability flag is currently false there.
     return lvh::get_license_status().license.licensed();
+#endif
   }
 
   std::vector<supported_gamepad_t> supported_gamepads(lvh::Runtime *runtime) {
@@ -616,7 +631,7 @@ namespace platf::macos {
     return gamepads;
   }
 
-  bool profile_supports_controller_extensions(std::string_view profile) {
+  bool profile_supports_controller_touch(std::string_view profile) {
     if (profile == "auto"sv) {
       return true;
     }
@@ -625,7 +640,7 @@ namespace platf::macos {
       return false;
     }
     const auto support = lvh::gamepad_profile_support(selected->profile());
-    return support.supports_touchpad || support.supports_motion;
+    return support.supports_touchpad;
   }
 
-}  // namespace platf::macos
+}  // namespace platf::virtualhid

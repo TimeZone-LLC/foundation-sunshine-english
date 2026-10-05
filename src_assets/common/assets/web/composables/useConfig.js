@@ -34,7 +34,9 @@ const DEFAULT_TABS = [
     options: {
       controller: 'enabled',
       gamepad: 'auto',
+      gamepad_driver: 'vigembus',
       ds4_back_as_touchpad_click: 'enabled',
+      ds5_inputtino_randomize_mac: 'enabled',
       motion_as_ds4: 'enabled',
       touchpad_as_ds4: 'enabled',
       back_button_timeout: -1,

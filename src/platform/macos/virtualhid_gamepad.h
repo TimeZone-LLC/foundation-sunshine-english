@@ -1,6 +1,6 @@
 /**
  * @file src/platform/macos/virtualhid_gamepad.h
- * @brief macOS virtual gamepad support backed by libvirtualhid.
+ * @brief Platform virtual gamepad support backed by libvirtualhid.
  */
 #pragma once
 
@@ -12,10 +12,10 @@
 
 #include "src/platform/common.h"
 
-namespace platf::macos {
+namespace platf::virtualhid {
 
   /**
-   * @brief Owns the macOS libvirtualhid runtime and its virtual gamepads.
+   * @brief Owns the libvirtualhid runtime and its virtual gamepads.
    *
    * Keyboard and mouse injection deliberately remain in the existing
    * CoreGraphics backend. This adapter supplies only the gamepad capability
@@ -57,23 +57,23 @@ namespace platf::macos {
   };
 
   /**
-   * @brief Profiles accepted before the macOS runtime has been initialized.
+   * @brief Profiles accepted before the platform runtime has been initialized.
    */
   [[nodiscard]] std::vector<supported_gamepad_t> static_supported_gamepads();
 
   /**
-   * @brief Profiles currently usable through the installed macOS broker.
+   * @brief Profiles currently usable through the installed platform broker.
    */
   [[nodiscard]] std::vector<supported_gamepad_t> supported_gamepads(lvh::Runtime *runtime);
 
   /**
-   * @brief Whether a licensed macOS broker can currently create gamepads.
+   * @brief Whether a licensed platform broker can currently create gamepads.
    */
   [[nodiscard]] bool runtime_gamepads_available(lvh::Runtime *runtime);
 
   /**
    * @brief Whether the configured profile can use Moonlight controller extensions.
    */
-  [[nodiscard]] bool profile_supports_controller_extensions(std::string_view profile);
+  [[nodiscard]] bool profile_supports_controller_touch(std::string_view profile);
 
-}  // namespace platf::macos
+}  // namespace platf::virtualhid

@@ -115,7 +115,7 @@ namespace platf {
     bool mouse_down[3] {};  // mouse button status
     std::chrono::steady_clock::steady_clock::time_point last_mouse_event[3][2];  // timestamp of last mouse events
 
-    macos::virtual_gamepad_backend_t virtual_gamepads;
+    virtualhid::virtual_gamepad_backend_t virtual_gamepads;
   };
 
   // A struct to hold a Windows keycode to Mac virtual keycode mapping.
@@ -740,13 +740,13 @@ const KeyCodeMap kKeyCodesMap[] = {
   std::vector<supported_gamepad_t> &
   supported_gamepads(input_t *input) {
     if (!input || !input->get()) {
-      static auto profiles = macos::static_supported_gamepads();
+      static auto profiles = virtualhid::static_supported_gamepads();
       return profiles;
     }
 
     auto *macos_input = static_cast<macos_input_t *>(input->get());
     thread_local std::vector<supported_gamepad_t> profiles;
-    profiles = macos::supported_gamepads(macos_input->virtual_gamepads.runtime());
+    profiles = virtualhid::supported_gamepads(macos_input->virtual_gamepads.runtime());
     return profiles;
   }
 
@@ -756,13 +756,13 @@ const KeyCodeMap kKeyCodesMap[] = {
    */
   platform_caps::caps_t
   get_capabilities(std::string_view client_gamepad) {
-    macos::virtual_gamepad_backend_t probe;
-    if (!macos::runtime_gamepads_available(probe.runtime())) {
+    virtualhid::virtual_gamepad_backend_t probe;
+    if (!virtualhid::runtime_gamepads_available(probe.runtime())) {
       return 0;
     }
 
     const auto profile = gamepad_profile_name(selected_gamepad_profile(client_gamepad));
-    return macos::profile_supports_controller_extensions(profile) ?
+    return virtualhid::profile_supports_controller_touch(profile) ?
              platform_caps::controller_touch :
              0;
   }

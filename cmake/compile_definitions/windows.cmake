@@ -139,6 +139,19 @@ file(GLOB_RECURSE AMF_SOURCES CONFIGURE_DEPENDS
 # vigem
 include_directories(SYSTEM "${CMAKE_SOURCE_DIR}/third-party/ViGEmClient/include")
 
+# Optional modern gamepad profiles use libvirtualhid's Windows broker. The
+# existing ViGEm and DualSense sidecar paths remain compiled and are the default.
+set(_SUNSHINE_BUILD_TESTS "${BUILD_TESTS}")
+set(BUILD_TESTS OFF)
+set(LIBVIRTUALHID_BUILD_WINDOWS_DRIVER OFF CACHE BOOL "Build libvirtualhid's Windows driver" FORCE)
+set(LIBVIRTUALHID_BUILD_WINDOWS_BROKER OFF CACHE BOOL "Build libvirtualhid's Windows broker" FORCE)
+set(LIBVIRTUALHID_INSTALL OFF CACHE BOOL "Install libvirtualhid independently" FORCE)
+add_subdirectory("${CMAKE_SOURCE_DIR}/third-party/libvirtualhid"
+        "${CMAKE_BINARY_DIR}/third-party/libvirtualhid")
+set(BUILD_TESTS "${_SUNSHINE_BUILD_TESTS}")
+unset(_SUNSHINE_BUILD_TESTS)
+list(APPEND SUNSHINE_EXTERNAL_LIBRARIES libvirtualhid::libvirtualhid)
+
 # sunshine icon
 if(NOT DEFINED SUNSHINE_ICON_PATH)
     set(SUNSHINE_ICON_PATH "${CMAKE_SOURCE_DIR}/sunshine.ico")
@@ -166,6 +179,9 @@ set(PLATFORM_TARGET_FILES
         "${CMAKE_SOURCE_DIR}/src/platform/windows/win_dark_mode.h"
         "${CMAKE_SOURCE_DIR}/src/platform/windows/win_dark_mode.cpp"
         "${CMAKE_SOURCE_DIR}/src/platform/windows/input.cpp"
+        "${CMAKE_SOURCE_DIR}/src/platform/windows/gamepad_driver_policy.h"
+        "${CMAKE_SOURCE_DIR}/src/platform/macos/virtualhid_gamepad.cpp"
+        "${CMAKE_SOURCE_DIR}/src/platform/macos/virtualhid_gamepad.h"
         "${CMAKE_SOURCE_DIR}/src/platform/windows/ds5/ds5_sidecar_client.h"
         "${CMAKE_SOURCE_DIR}/src/platform/windows/ds5/ds5_sidecar_client.cpp"
         "${CMAKE_SOURCE_DIR}/src/touch_keyboard_session.h"

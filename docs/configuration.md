@@ -309,20 +309,24 @@ editing the `conf` file in a text editor. Use the examples as reference.
             @endcode</td>
     </tr>
     <tr>
-        <td rowspan="6">Choices</td>
+        <td rowspan="8">Choices</td>
+        <td>generic</td>
+        <td>Generic HID controller
+            @note{On Windows, this requires the Virtual HID backend.}</td>
+    </tr>
+    <tr>
         <td>ds4</td>
-        <td>DualShock 4 controller (PS4)
-            @note{This option applies to Windows only.}</td>
+        <td>DualShock 4 controller (PS4)</td>
     </tr>
     <tr>
         <td>ds5</td>
         <td>DualSense controller (PS5)
-            @note{On Windows, this option requires the optional DualSense component. If the component is unavailable, Sunshine falls back to automatic gamepad selection. Saved changes apply to newly allocated controllers without restarting Sunshine.}</td>
+            @note{On Windows with the default backend, this uses the optional DualSense component. Virtual HID can provide the profile when explicitly selected. If neither path is available, Sunshine falls back to automatic gamepad selection.}</td>
     </tr>
     <tr>
         <td>switch</td>
         <td>Switch Pro controller
-            @note{This option applies to Linux only.}</td>
+            @note{On Windows, this requires the Virtual HID backend.}</td>
     </tr>
     <tr>
         <td>x360</td>
@@ -332,7 +336,63 @@ editing the `conf` file in a text editor. Use the examples as reference.
     <tr>
         <td>xone</td>
         <td>Xbox One controller
-            @note{This option applies to Linux only.}</td>
+            @note{On Windows, this requires the Virtual HID backend.}</td>
+    </tr>
+    <tr>
+        <td>xseries</td>
+        <td>Xbox Series controller
+            @note{On Windows, this requires the Virtual HID backend.}</td>
+    </tr>
+</table>
+
+### [gamepad_driver](https://localhost:47990/config/#gamepad_driver)
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Selects the Windows virtual gamepad backend. Virtual HID is opt-in and falls back to the established
+            ViGEmBus or DualSense component path if its local broker cannot create the requested controller.
+            Backend changes apply after Sunshine restarts.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            vigembus
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="3">Choices</td>
+        <td>vigembus</td>
+        <td>Preserve the existing ViGEmBus and optional DualSense component behavior.</td>
+    </tr>
+    <tr>
+        <td>virtualhid</td>
+        <td>Prefer Virtual HID and retain the existing backends as a recovery path.</td>
+    </tr>
+    <tr>
+        <td>all</td>
+        <td>Allow all installed backends, preferring Virtual HID for expanded profiles.</td>
+    </tr>
+</table>
+
+### [ds5_inputtino_randomize_mac](https://localhost:47990/config/#ds5_inputtino_randomize_mac)
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Randomizes the stable identity of PlayStation-style Virtual HID controllers. This prevents saved
+            per-controller settings from following a different physical controller when clients reorder devices.
+            Applies to macOS and to Windows when Virtual HID is selected.
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            enabled
+            @endcode</td>
     </tr>
 </table>
 

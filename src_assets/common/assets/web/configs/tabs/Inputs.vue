@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, computed, onMounted, onBeforeUnmount, toRef } from 'vue'
+import { reactive, computed, onMounted, onBeforeUnmount, toRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PlatformLayout from '../../components/layout/PlatformLayout.vue'
 
@@ -17,6 +17,17 @@ const props = defineProps({
 })
 
 const config = toRef(props, 'config')
+const VIGEMBUS_GAMEPADS = new Set(['auto', 'x360', 'ds4', 'ds5'])
+
+watch(
+  [() => config.value.gamepad_driver, () => config.value.gamepad],
+  ([driver, gamepad]) => {
+    if (props.platform === 'windows' && driver === 'vigembus' && !VIGEMBUS_GAMEPADS.has(gamepad)) {
+      config.value.gamepad = 'auto'
+    }
+  },
+  { immediate: true },
+)
 
 /**
  * 创建一个驱动管理器，统一封装状态/加载/操作逻辑，避免 vmouse / vigem 的重复代码。
@@ -172,6 +183,36 @@ onBeforeUnmount(() => {
       <div class="form-text">{{ $t('config.controller_desc') }}</div>
     </div>
 
+    <div class="mb-3" v-if="config.controller === 'enabled' && platform === 'windows'">
+      <label for="gamepad_driver" class="form-label">{{ $t('config.gamepad_driver') }}</label>
+      <select id="gamepad_driver" class="form-select" v-model="config.gamepad_driver">
+        <option value="vigembus">{{ $t('config.gamepad_driver_vigembus') }}</option>
+        <option value="virtualhid">{{ $t('config.gamepad_driver_virtualhid') }}</option>
+        <option value="all">{{ $t('config.gamepad_driver_all') }}</option>
+      </select>
+      <div class="form-text">{{ $t('config.gamepad_driver_desc') }}</div>
+    </div>
+
+    <div
+      class="mb-3"
+      v-if="config.controller === 'enabled' && (platform === 'macos' || (platform === 'windows' && config.gamepad_driver !== 'vigembus')) && (config.gamepad === 'auto' || config.gamepad === 'ds4' || config.gamepad === 'ds5')"
+    >
+      <div class="form-check form-switch">
+        <input
+          id="ds5_inputtino_randomize_mac"
+          class="form-check-input"
+          type="checkbox"
+          v-model="config.ds5_inputtino_randomize_mac"
+          true-value="enabled"
+          false-value="disabled"
+        >
+        <label class="form-check-label" for="ds5_inputtino_randomize_mac">
+          {{ $t('config.virtualhid_randomize_mac') }}
+        </label>
+      </div>
+      <div class="form-text">{{ $t('config.virtualhid_randomize_mac_desc') }}</div>
+    </div>
+
     <!-- Emulated Gamepad Type -->
     <div class="mb-3" v-if="config.controller === 'enabled' && platform !== 'macos'">
       <label for="gamepad" class="form-label">{{ $t('config.gamepad') }}</label>
@@ -186,9 +227,13 @@ onBeforeUnmount(() => {
           </template>
           
           <template #windows>
+            <option v-if="config.gamepad_driver !== 'vigembus'" value="generic">{{ $t('config.gamepad_generic') }}</option>
             <option value="ds5">{{ $t('config.gamepad_ds5') }}</option>
             <option value="ds4">{{ $t('config.gamepad_ds4') }}</option>
             <option value="x360">{{ $t('config.gamepad_x360') }}</option>
+            <option v-if="config.gamepad_driver !== 'vigembus'" value="xone">{{ $t('config.gamepad_xone') }}</option>
+            <option v-if="config.gamepad_driver !== 'vigembus'" value="xseries">{{ $t('config.gamepad_xseries') }}</option>
+            <option v-if="config.gamepad_driver !== 'vigembus'" value="switch">{{ $t('config.gamepad_switch') }}</option>
           </template>
         </PlatformLayout>
       </select>
