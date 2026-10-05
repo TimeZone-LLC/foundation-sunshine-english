@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <condition_variable>
+#include <cstddef>
 #include <memory>
 #include <mutex>
 #include <optional>
@@ -198,9 +199,11 @@ namespace util {
 
     buf.reserve(buf.size() + data_len);
 
-    auto *data = (uint8_t *) &_struct;
+    auto const *data = reinterpret_cast<std::byte const *>(&_struct);
 
-    buf.insert(buf.end(), data, data + data_len);
+    for (size_t x = 0; x < data_len; ++x) {
+      buf.push_back(std::to_integer<uint8_t>(data[x]));
+    }
   }
 
   template <class T>
@@ -278,6 +281,10 @@ namespace util {
 
     std::string hex;
     hex.resize(str_size);
+
+    if (begin == end) {
+      return hex;
+    }
 
     const char _bits[16] {
       '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'

@@ -4,7 +4,9 @@
  */
 #pragma once
 
+#include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <limits>
 
@@ -47,7 +49,7 @@ namespace stat_trackers {
     struct {
       std::chrono::steady_clock::time_point last_callback_time = std::chrono::steady_clock::now();
       T stat_min = std::numeric_limits<T>::max();
-      T stat_max = std::numeric_limits<T>::min();
+      T stat_max = std::numeric_limits<T>::lowest();
       double stat_total = 0;
       uint32_t calls = 0;
     } data;
