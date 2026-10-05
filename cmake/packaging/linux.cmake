@@ -14,6 +14,8 @@ file(CREATE_LINK "${SUNSHINE_SOURCE_ASSETS_DIR}/linux/assets/shaders"
 if(${SUNSHINE_BUILD_APPIMAGE} OR ${SUNSHINE_BUILD_FLATPAK})
     install(FILES "${SUNSHINE_SOURCE_ASSETS_DIR}/linux/misc/60-sunshine.rules"
             DESTINATION "${SUNSHINE_ASSETS_DIR}/udev/rules.d")
+    install(FILES "${SUNSHINE_SOURCE_ASSETS_DIR}/linux/misc/60-sunshine.conf"
+            DESTINATION "${SUNSHINE_ASSETS_DIR}/modules-load.d")
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/sunshine.service"
             DESTINATION "${SUNSHINE_ASSETS_DIR}/systemd/user")
 else()
@@ -27,6 +29,8 @@ else()
     if(SYSTEMD_FOUND)
         install(FILES "${CMAKE_CURRENT_BINARY_DIR}/sunshine.service"
                 DESTINATION "${SYSTEMD_USER_UNIT_INSTALL_DIR}")
+        install(FILES "${SUNSHINE_SOURCE_ASSETS_DIR}/linux/misc/60-sunshine.conf"
+                DESTINATION "${SYSTEMD_MODULES_LOAD_DIR}")
     endif()
 endif()
 
@@ -36,7 +40,7 @@ set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${SUNSHINE_SOURCE_ASSETS_DIR}/linux/misc
 
 # Apply setcap for RPM
 # https://github.com/coreos/rpm-ostree/discussions/5036#discussioncomment-10291071
-set(CPACK_RPM_USER_FILELIST "%caps(cap_sys_admin+p) ${SUNSHINE_EXECUTABLE_PATH}")
+set(CPACK_RPM_USER_FILELIST "%caps(cap_sys_admin,cap_sys_nice+p) ${SUNSHINE_EXECUTABLE_PATH}")
 
 # Dependencies
 set(CPACK_DEB_COMPONENT_INSTALL ON)
@@ -45,10 +49,12 @@ set(CPACK_DEBIAN_PACKAGE_DEPENDS "\
             libcap2, \
             libcurl4, \
             libdrm2, \
+            libgbm1, \
             libevdev2, \
             libnuma1, \
             libopus0, \
             libpulse0, \
+            libpipewire-0.3-0, \
             libva2, \
             libva-drm2, \
             libwayland-client0, \
@@ -60,6 +66,7 @@ set(CPACK_RPM_PACKAGE_REQUIRES "\
             libcap >= 2.22, \
             libcurl >= 7.0, \
             libdrm >= 2.4.97, \
+            mesa-libgbm, \
             libevdev >= 1.5.6, \
             libopusenc >= 0.2.1, \
             libva >= 2.14.0, \
@@ -86,7 +93,7 @@ if(NOT BOOST_USE_STATIC)
 endif()
 
 # This should automatically figure out dependencies, doesn't work with the current config
-set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS OFF)
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
 
 # application icon
 if(NOT ${SUNSHINE_BUILD_FLATPAK})
@@ -124,6 +131,10 @@ endif()
 if(NOT ${SUNSHINE_BUILD_FLATPAK})
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/sunshine.desktop"
             DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+    if(${SUNSHINE_ENABLE_KWIN})
+        install(FILES "${CMAKE_CURRENT_BINARY_DIR}/sunshine.kwin.desktop"
+                DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+    endif()
 else()
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/sunshine.desktop"
             DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications"

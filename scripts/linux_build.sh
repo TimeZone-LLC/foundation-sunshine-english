@@ -3,9 +3,9 @@ set -e
 
 # Default value for arguments
 appimage_build=0
-publisher_name="Third Party Publisher"
-publisher_website=""
-publisher_issue_url="https://app.lizardbyte.dev/support"
+publisher_name="qiin2333"
+publisher_website="https://alkaidlab.com"
+publisher_issue_url="https://github.com/qiin2333/Sunshine/issues"
 skip_cleanup=0
 skip_cuda=0
 skip_libva=0
@@ -100,13 +100,17 @@ function add_debain_based_deps() {
     "libcurl4-openssl-dev"
     "libdrm-dev"  # KMS
     "libevdev-dev"
+    "libgbm-dev"
+    "libglib2.0-dev"  # GIO for XDG Desktop Portal capture
     "libminiupnpc-dev"
     "libnotify-dev"
     "libnuma-dev"
     "libopus-dev"
     "libpulse-dev"
+    "libpipewire-0.3-dev"
     "libssl-dev"
     "libwayland-dev"  # Wayland
+    "libvulkan-dev"
     "libx11-dev"  # X11
     "libxcb-shm0-dev"  # X11
     "libxcb-xfixes0-dev"  # X11
@@ -116,6 +120,8 @@ function add_debain_based_deps() {
     "libxtst-dev"  # X11
     "ninja-build"
     "npm"  # web-ui
+    "glslang-tools"  # Vulkan shader compiler
+    "wayland-protocols"
     "udev"
     "wget"  # necessary for cuda install with `run` file
     "xvfb"  # necessary for headless unit testing
@@ -160,6 +166,7 @@ function add_fedora_deps() {
     "libcurl-devel"
     "libdrm-devel"
     "libevdev-devel"
+    "glib2-devel"
     "libnotify-devel"
     "libX11-devel"  # X11
     "libxcb-devel"  # X11
@@ -170,6 +177,7 @@ function add_fedora_deps() {
     "libXrandr-devel"  # X11
     "libXtst-devel"  # X11
     "mesa-libGL-devel"
+    "mesa-libgbm-devel"
     "miniupnpc-devel"
     "ninja-build"
     "npm"
@@ -177,9 +185,14 @@ function add_fedora_deps() {
     "openssl-devel"
     "opus-devel"
     "pulseaudio-libs-devel"
+    "pipewire-devel"
     "rpm-build"  # if you want to build an RPM binary package
     "wget"  # necessary for cuda install with `run` file
     "which"  # necessary for cuda install with `run` file
+    "glslang"
+    "vulkan-headers"
+    "vulkan-loader-devel"
+    "wayland-protocols-devel"
     "xorg-x11-server-Xvfb"  # necessary for headless unit testing
   )
 
@@ -188,6 +201,44 @@ function add_fedora_deps() {
       "libva-devel"  # VA-API
     )
   fi
+}
+
+function add_arch_deps() {
+  dependencies+=(
+    "base-devel"
+    "cmake"
+    "cuda"
+    "doxygen"
+    "gcc${gcc_version}"
+    "git"
+    "glslang"
+    "graphviz"
+    "libayatana-appindicator"
+    "libcap"
+    "libdrm"
+    "libevdev"
+    "libnotify"
+    "libpulse"
+    "libva"
+    "libx11"
+    "libxfixes"
+    "libxrandr"
+    "libxtst"
+    "mesa"
+    "miniupnpc"
+    "ninja"
+    "nodejs"
+    "npm"
+    "numactl"
+    "openssl"
+    "opus"
+    "pipewire"
+    "vulkan-headers"
+    "vulkan-icd-loader"
+    "wayland"
+    "wayland-protocols"
+    "xorg-server-xvfb"
+  )
 }
 
 function install_cuda() {
@@ -276,6 +327,10 @@ function run_install() {
     "-DSUNSHINE_ENABLE_WAYLAND=ON"
     "-DSUNSHINE_ENABLE_X11=ON"
     "-DSUNSHINE_ENABLE_DRM=ON"
+    "-DSUNSHINE_ENABLE_KWIN=ON"
+    "-DSUNSHINE_ENABLE_PORTAL=ON"
+    "-DSUNSHINE_ENABLE_VULKAN=ON"
+    "-DSUNSHINE_SYSTEM_VULKAN_HEADERS=ON"
   )
 
   if [ "$appimage_build" == 1 ]; then
@@ -303,6 +358,8 @@ function run_install() {
   elif [ "$distro" == "fedora" ]; then
     add_fedora_deps
     dnf group install "Development Tools" -y
+  elif [ "$distro" == "arch" ]; then
+    add_arch_deps
   fi
 
   # Install the dependencies
@@ -429,7 +486,16 @@ function run_install() {
 
 # Determine the OS and call the appropriate function
 cat /etc/os-release
-if grep -q "Debian GNU/Linux 12 (bookworm)" /etc/os-release; then
+if grep -q '^ID=arch$' /etc/os-release; then
+  distro="arch"
+  version=""
+  package_update_command="${sudo_cmd} pacman -Syu --noconfirm"
+  package_install_command="${sudo_cmd} pacman -Sy --needed --noconfirm"
+  cuda_version=""
+  cuda_build=""
+  gcc_version="15"
+  nvm_node=0
+elif grep -q "Debian GNU/Linux 12 (bookworm)" /etc/os-release; then
   distro="debian"
   version="12"
   package_update_command="${sudo_cmd} apt-get update"
@@ -456,6 +522,15 @@ elif grep -q "PLATFORM_ID=\"platform:f40\"" /etc/os-release; then
   cuda_build=
   gcc_version="13"
   nvm_node=0
+elif grep -Eq 'PLATFORM_ID="platform:f(42|43|44|45)"' /etc/os-release; then
+  distro="fedora"
+  version=$(sed -n 's/^VERSION_ID=//p' /etc/os-release | tr -d '"')
+  package_update_command="${sudo_cmd} dnf update -y"
+  package_install_command="${sudo_cmd} dnf install -y"
+  cuda_version=""
+  cuda_build=""
+  gcc_version="15"
+  nvm_node=0
 elif grep -q "Ubuntu 22.04" /etc/os-release; then
   distro="ubuntu"
   version="22.04"
@@ -473,6 +548,15 @@ elif grep -q "Ubuntu 24.04" /etc/os-release; then
   cuda_version="11.8.0"
   cuda_build="520.61.05"
   gcc_version="11"
+  nvm_node=0
+elif grep -Eq 'Ubuntu (25\.04|25\.10|26\.04|26\.10)' /etc/os-release; then
+  distro="ubuntu"
+  version=$(sed -n 's/^VERSION_ID=//p' /etc/os-release | tr -d '"')
+  package_update_command="${sudo_cmd} apt-get update"
+  package_install_command="${sudo_cmd} apt-get install -y"
+  cuda_version=""
+  cuda_build=""
+  gcc_version="14"
   nvm_node=0
 else
   echo "Unsupported Distro or Version"

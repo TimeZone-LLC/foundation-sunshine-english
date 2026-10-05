@@ -31,10 +31,21 @@ elseif(UNIX)
     # configure service
     configure_file(packaging/linux/sunshine.service.in sunshine.service @ONLY)
 
+    # KWin grants direct screencast access to executables declared in a desktop file.
+    if(${SUNSHINE_ENABLE_KWIN})
+        configure_file(packaging/linux/sunshine.kwin.desktop.in sunshine.kwin.desktop @ONLY)
+    endif()
+
     # configure the arch linux pkgbuild
     if(${SUNSHINE_CONFIGURE_PKGBUILD})
         configure_file(packaging/linux/Arch/PKGBUILD PKGBUILD @ONLY)
         configure_file(packaging/linux/Arch/sunshine.install sunshine.install @ONLY)
+    endif()
+
+    if(${SUNSHINE_CONFIGURE_APKBUILD})
+        configure_file(packaging/linux/Alpine/APKBUILD APKBUILD @ONLY)
+        configure_file(packaging/linux/Alpine/sunshine.post-install sunshine.post-install COPYONLY)
+        configure_file(packaging/linux/Alpine/sunshine.post-install sunshine.post-upgrade COPYONLY)
     endif()
 
     # configure the flatpak manifest
