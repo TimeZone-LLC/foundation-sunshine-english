@@ -1041,6 +1041,27 @@ namespace stream {
 
   static auto broadcast_shared = safe::make_shared<broadcast_ctx_t>(start_broadcast, end_broadcast);
 
+  /**
+   * @brief Parse a control message without reading beyond an ENet packet.
+   * @return The message type and payload, or no value when the type is truncated.
+   */
+  std::optional<std::pair<std::uint16_t, std::string_view>>
+  parse_control_packet(const ENetPacket &packet) {
+    if (packet.data == nullptr || packet.dataLength < sizeof(std::uint16_t)) {
+      return std::nullopt;
+    }
+
+    std::uint16_t type;
+    std::memcpy(&type, packet.data, sizeof(type));
+    return std::pair {
+      type,
+      std::string_view {
+        reinterpret_cast<const char *>(packet.data) + sizeof(type),
+        packet.dataLength - sizeof(type),
+      },
+    };
+  }
+
   session_t *
   control_server_t::get_session(const net::peer_t peer, uint32_t connect_data) {
     {
@@ -1153,11 +1174,9 @@ namespace stream {
       switch (event.type) {
         case ENET_EVENT_TYPE_RECEIVE: {
           net::packet_t packet { event.packet };
-
-          auto type = *(std::uint16_t *) packet->data;
-          std::string_view payload { (char *) packet->data + sizeof(type), packet->dataLength - sizeof(type) };
-
-          call(type, session, payload, false);
+          if (const auto message = parse_control_packet(*packet)) {
+            call(message->first, session, message->second, false);
+          }
         } break;
         case ENET_EVENT_TYPE_CONNECT:
           BOOST_LOG(info) << "CLIENT CONNECTED"sv;
