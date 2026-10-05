@@ -17,6 +17,15 @@
 #include "nvenc/nvenc_config.h"
 
 namespace config {
+  namespace nv {
+    /**
+     * @brief Convert Sunshine's NVENC quality level to FFmpeg's stable symbolic preset.
+     * @param quality_preset Validated quality preset in the range 1 through 7.
+     * @return FFmpeg preset name from `p1` through `p7`.
+     */
+    std::string ffmpeg_preset_from_quality(int quality_preset);
+  }  // namespace nv
+
   // track modified config options
   inline std::unordered_map<std::string, std::string> modified_config_settings;
 
@@ -50,10 +59,10 @@ namespace config {
     bool vdd_vulkan_hdr_bridge;
 
     struct {
-      int preset;
+      std::string preset;
       int multipass;
       int h264_coder;
-      int aq;
+      int spatial_aq;
       int vbv_percentage_increase;
     } nv_legacy;
 

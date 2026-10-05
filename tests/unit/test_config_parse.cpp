@@ -3,7 +3,9 @@
 #include <fstream>
 #include <iterator>
 #include <string>
+#include <string_view>
 #include <system_error>
+#include <utility>
 
 #include <gtest/gtest.h>
 
@@ -44,6 +46,29 @@ namespace {
     std::filesystem::path path_;
   };
 }  // namespace
+
+using NvencPresetNameParam = std::pair<int, std::string_view>;
+
+struct NvencPresetNameTest: testing::TestWithParam<NvencPresetNameParam> {};
+
+TEST_P(NvencPresetNameTest, UsesStableSymbolicName) {
+  const auto &[quality_preset, expected] = GetParam();
+  EXPECT_EQ(expected, config::nv::ffmpeg_preset_from_quality(quality_preset));
+}
+
+INSTANTIATE_TEST_SUITE_P(
+  NvencQualityPresets,
+  NvencPresetNameTest,
+  testing::Values(
+    NvencPresetNameParam {1, "p1"},
+    NvencPresetNameParam {2, "p2"},
+    NvencPresetNameParam {3, "p3"},
+    NvencPresetNameParam {4, "p4"},
+    NvencPresetNameParam {5, "p5"},
+    NvencPresetNameParam {6, "p6"},
+    NvencPresetNameParam {7, "p7"}
+  )
+);
 
 TEST(ConfigParse, PreservesHashCharactersInsideJsonStrings) {
   const auto parsed = config::parse_config(
