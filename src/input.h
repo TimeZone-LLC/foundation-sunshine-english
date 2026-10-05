@@ -4,7 +4,12 @@
  */
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <memory>
+#include <span>
+#include <vector>
 
 #include "platform/common.h"
 #include "thread_safe.h"
@@ -105,6 +110,12 @@ namespace input {
      */
     std::size_t
     queued_input_packet_count(const std::shared_ptr<input_t> &input);
+
+    /**
+     * @brief Validate raw protocol input bytes for a unit test.
+     */
+    bool
+    is_valid_input_packet(std::span<const std::uint8_t> packet);
 
     void
     set_keyboard_sink(std::function<void(const keyboard_event_t &)> sink);
