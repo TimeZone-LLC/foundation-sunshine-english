@@ -17,7 +17,22 @@ if(NOT BOOST_USE_STATIC AND NOT FETCH_CONTENT_BOOST_USED)
     ADD_DEFINITIONS(-DBOOST_LOG_DYN_LINK)
 endif()
 
+# macOS gamepads use libvirtualhid's broker client. Keep this dependency
+# platform-local so the existing Windows ViGEm/DualSense and Linux inputtino
+# backends remain unchanged. Sunshine owns the aggregate test target, so do
+# not let libvirtualhid consume its BUILD_TESTS option or require the
+# dependency's test-only nested submodules.
+set(_SUNSHINE_BUILD_TESTS "${BUILD_TESTS}")
+set(BUILD_TESTS OFF)
+set(LIBVIRTUALHID_BUILD_MACOS_BROKER OFF CACHE BOOL "Build the standalone libvirtualhid macOS broker" FORCE)
+set(LIBVIRTUALHID_INSTALL OFF CACHE BOOL "Install libvirtualhid independently" FORCE)
+add_subdirectory("${CMAKE_SOURCE_DIR}/third-party/libvirtualhid"
+        "${CMAKE_BINARY_DIR}/third-party/libvirtualhid")
+set(BUILD_TESTS "${_SUNSHINE_BUILD_TESTS}")
+unset(_SUNSHINE_BUILD_TESTS)
+
 list(APPEND SUNSHINE_EXTERNAL_LIBRARIES
+        libvirtualhid::libvirtualhid
         ${APP_KIT_LIBRARY}
         ${APP_SERVICES_LIBRARY}
         ${AV_FOUNDATION_LIBRARY}
@@ -41,6 +56,8 @@ set(PLATFORM_TARGET_FILES
         "${CMAKE_SOURCE_DIR}/src/platform/macos/display.mm"
         "${CMAKE_SOURCE_DIR}/src/platform/macos/display_device.cpp"
         "${CMAKE_SOURCE_DIR}/src/platform/macos/input.cpp"
+        "${CMAKE_SOURCE_DIR}/src/platform/macos/virtualhid_gamepad.cpp"
+        "${CMAKE_SOURCE_DIR}/src/platform/macos/virtualhid_gamepad.h"
         "${CMAKE_SOURCE_DIR}/src/platform/macos/microphone.mm"
         "${CMAKE_SOURCE_DIR}/src/platform/macos/misc.mm"
         "${CMAKE_SOURCE_DIR}/src/platform/macos/misc.h"

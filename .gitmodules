@@ -89,3 +89,7 @@
 	path = third-party/plasma-wayland-protocols
 	url = https://github.com/KDE/plasma-wayland-protocols.git
 	branch = master
+[submodule "third-party/libvirtualhid"]
+	path = third-party/libvirtualhid
+	url = https://github.com/LizardByte/libvirtualhid.git
+	branch = master

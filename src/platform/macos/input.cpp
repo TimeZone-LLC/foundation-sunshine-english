@@ -5,17 +5,21 @@
 #include "src/input.h"
 
 #import <Carbon/Carbon.h>
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <mach/mach.h>
 
 #include "src/logging.h"
 #include "src/platform/common.h"
+#include "src/platform/macos/virtualhid_gamepad.h"
 #include "src/utility.h"
 
 #include <ApplicationServices/ApplicationServices.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <iostream>
 #include <thread>
+#include <utility>
 
 /**
  * @brief Delay for a double click, in milliseconds.
@@ -25,6 +29,76 @@ constexpr std::chrono::milliseconds MULTICLICK_DELAY_MS(500);
 
 namespace platf {
   using namespace std::literals;
+
+  namespace {
+
+    enum class gamepad_profile_e: std::uint8_t {
+      inherit,
+      automatic,
+      generic,
+      xbox_360,
+      xbox_one,
+      xbox_series,
+      dualshock_4,
+      dualsense,
+      switch_pro,
+    };
+
+    std::atomic<gamepad_profile_e> current_app_gamepad_profile {gamepad_profile_e::inherit};
+    std::atomic<gamepad_profile_e> current_global_gamepad_profile {gamepad_profile_e::inherit};
+
+    gamepad_profile_e gamepad_profile_from_preference(std::string_view preference) {
+      if (preference == "generic"sv) return gamepad_profile_e::generic;
+      if (preference == "x360"sv) return gamepad_profile_e::xbox_360;
+      if (preference == "xone"sv) return gamepad_profile_e::xbox_one;
+      if (preference == "xseries"sv) return gamepad_profile_e::xbox_series;
+      if (preference == "ds4"sv) return gamepad_profile_e::dualshock_4;
+      if (preference == "ds5"sv) return gamepad_profile_e::dualsense;
+      if (preference == "switch"sv) return gamepad_profile_e::switch_pro;
+      return gamepad_profile_e::automatic;
+    }
+
+    std::string_view gamepad_profile_name(gamepad_profile_e profile) {
+      switch (profile) {
+        case gamepad_profile_e::generic:
+          return "generic"sv;
+        case gamepad_profile_e::xbox_360:
+          return "x360"sv;
+        case gamepad_profile_e::xbox_one:
+          return "xone"sv;
+        case gamepad_profile_e::xbox_series:
+          return "xseries"sv;
+        case gamepad_profile_e::dualshock_4:
+          return "ds4"sv;
+        case gamepad_profile_e::dualsense:
+          return "ds5"sv;
+        case gamepad_profile_e::switch_pro:
+          return "switch"sv;
+        case gamepad_profile_e::inherit:
+        case gamepad_profile_e::automatic:
+        default:
+          return "auto"sv;
+      }
+    }
+
+    gamepad_profile_e selected_gamepad_profile(std::string_view client_gamepad) {
+      if (!client_gamepad.empty() && config::input.client_gamepad_override) {
+        return gamepad_profile_from_preference(client_gamepad);
+      }
+
+      const auto app_profile = current_app_gamepad_profile.load(std::memory_order_relaxed);
+      if (app_profile != gamepad_profile_e::inherit) {
+        return app_profile;
+      }
+
+      const auto global_profile = current_global_gamepad_profile.load(std::memory_order_relaxed);
+      if (global_profile != gamepad_profile_e::inherit) {
+        return global_profile;
+      }
+      return gamepad_profile_from_preference(config::input.gamepad);
+    }
+
+  }  // namespace
 
   struct macos_input_t {
   public:
@@ -40,6 +114,8 @@ namespace platf {
     CGEventRef mouse_event {};  // mouse event source
     bool mouse_down[3] {};  // mouse button status
     std::chrono::steady_clock::steady_clock::time_point last_mouse_event[3][2];  // timestamp of last mouse events
+
+    macos::virtual_gamepad_backend_t virtual_gamepads;
   };
 
   // A struct to hold a Windows keycode to Mac virtual keycode mapping.
@@ -299,19 +375,26 @@ const KeyCodeMap kKeyCodesMap[] = {
 
   int
   alloc_gamepad(input_t &input, const gamepad_id_t &id, const gamepad_arrival_t &metadata,
-                feedback_queue_t feedback_queue, std::string_view) {
-    BOOST_LOG(info) << "alloc_gamepad: Gamepad not yet implemented for MacOS."sv;
-    return -1;
+                feedback_queue_t feedback_queue, std::string_view client_gamepad) {
+    auto *macos_input = static_cast<macos_input_t *>(input.get());
+    return macos_input->virtual_gamepads.allocate(
+      id,
+      metadata,
+      std::move(feedback_queue),
+      gamepad_profile_name(selected_gamepad_profile(client_gamepad))
+    );
   }
 
   void
   free_gamepad(input_t &input, int nr) {
-    BOOST_LOG(info) << "free_gamepad: Gamepad not yet implemented for MacOS."sv;
+    auto *macos_input = static_cast<macos_input_t *>(input.get());
+    macos_input->virtual_gamepads.free(nr);
   }
 
   bool
-  gamepad_is_ds5(input_t &, int) {
-    return false;
+  gamepad_is_ds5(input_t &input, int nr) {
+    auto *macos_input = static_cast<macos_input_t *>(input.get());
+    return macos_input->virtual_gamepads.is_dualsense(nr);
   }
 
   bool
@@ -321,7 +404,8 @@ const KeyCodeMap kKeyCodesMap[] = {
 
   void
   gamepad_update(input_t &input, int nr, const gamepad_state_t &gamepad_state) {
-    BOOST_LOG(info) << "gamepad: Gamepad not yet implemented for MacOS."sv;
+    auto *macos_input = static_cast<macos_input_t *>(input.get());
+    macos_input->virtual_gamepads.update(nr, gamepad_state);
   }
 
   // returns current mouse location:
@@ -398,12 +482,38 @@ const KeyCodeMap kKeyCodesMap[] = {
 
   void
   set_gamepad_mode(int mode) {
-    // Per-app virtual gamepad selection is currently Windows-only.
+    gamepad_profile_e profile;
+    switch (mode) {
+      case 1:
+        profile = gamepad_profile_e::automatic;
+        break;
+      case 2:
+        profile = gamepad_profile_e::xbox_360;
+        break;
+      case 3:
+        profile = gamepad_profile_e::dualshock_4;
+        break;
+      case 4:
+        profile = gamepad_profile_e::dualsense;
+        break;
+      case 0:
+      default:
+        profile = gamepad_profile_e::inherit;
+        break;
+    }
+    current_app_gamepad_profile.store(profile, std::memory_order_relaxed);
+    BOOST_LOG(info) << "Gamepad mode set to: "sv
+                    << (profile == gamepad_profile_e::inherit ? "global"sv : gamepad_profile_name(profile));
   }
 
   void
-  set_global_gamepad_mode(std::string_view) {
-    // Runtime gamepad selection is currently implemented by the Windows backend.
+  set_global_gamepad_mode(std::string_view preference) {
+    const auto profile = gamepad_profile_from_preference(preference);
+    const auto previous = current_global_gamepad_profile.exchange(profile, std::memory_order_relaxed);
+    if (previous != profile) {
+      BOOST_LOG(info) << "Global gamepad mode hot-applied to: "sv << gamepad_profile_name(profile)
+                      << "; active virtual controllers are unchanged"sv;
+    }
   }
 
   void
@@ -542,7 +652,8 @@ const KeyCodeMap kKeyCodesMap[] = {
    */
   void
   gamepad_touch(input_t &input, const gamepad_touch_t &touch) {
-    // Unimplemented feature - platform_caps::controller_touch
+    auto *macos_input = static_cast<macos_input_t *>(input.get());
+    macos_input->virtual_gamepads.touch(touch);
   }
 
   /**
@@ -552,7 +663,8 @@ const KeyCodeMap kKeyCodesMap[] = {
    */
   void
   gamepad_motion(input_t &input, const gamepad_motion_t &motion) {
-    // Unimplemented
+    auto *macos_input = static_cast<macos_input_t *>(input.get());
+    macos_input->virtual_gamepads.motion(motion);
   }
 
   /**
@@ -562,7 +674,8 @@ const KeyCodeMap kKeyCodesMap[] = {
    */
   void
   gamepad_battery(input_t &input, const gamepad_battery_t &battery) {
-    // Unimplemented
+    auto *macos_input = static_cast<macos_input_t *>(input.get());
+    macos_input->virtual_gamepads.battery(battery);
   }
 
   input_t
@@ -626,11 +739,15 @@ const KeyCodeMap kKeyCodesMap[] = {
 
   std::vector<supported_gamepad_t> &
   supported_gamepads(input_t *input) {
-    static std::vector gamepads {
-      supported_gamepad_t { "", false, "gamepads.macos_not_implemented" }
-    };
+    if (!input || !input->get()) {
+      static auto profiles = macos::static_supported_gamepads();
+      return profiles;
+    }
 
-    return gamepads;
+    auto *macos_input = static_cast<macos_input_t *>(input->get());
+    thread_local std::vector<supported_gamepad_t> profiles;
+    profiles = macos::supported_gamepads(macos_input->virtual_gamepads.runtime());
+    return profiles;
   }
 
   /**
@@ -638,7 +755,15 @@ const KeyCodeMap kKeyCodesMap[] = {
    * @return Capability flags.
    */
   platform_caps::caps_t
-  get_capabilities(std::string_view) {
-    return 0;
+  get_capabilities(std::string_view client_gamepad) {
+    macos::virtual_gamepad_backend_t probe;
+    if (!macos::runtime_gamepads_available(probe.runtime())) {
+      return 0;
+    }
+
+    const auto profile = gamepad_profile_name(selected_gamepad_profile(client_gamepad));
+    return macos::profile_supports_controller_extensions(profile) ?
+             platform_caps::controller_touch :
+             0;
   }
 }  // namespace platf
