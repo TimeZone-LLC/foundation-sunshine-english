@@ -15,6 +15,7 @@
 #include <mutex>
 #include <optional>
 #include <thread>
+#include <utility>
 
 #include <boost/pointer_cast.hpp>
 
@@ -251,6 +252,38 @@ namespace video {
       initial_encoder_bitrate_kbps,
       encoder_bitrate_from_total_bitrate(max_total_bitrate_kbps, fec_percentage)
     );
+  }
+
+  config_t
+  resolve_dynamic_range(const encoder_t &encoder, config_t config) {
+    if (!config.dynamicRange) {
+      return config;
+    }
+
+    const auto &codec = encoder.codec_from_config(config);
+    const bool supported = config.chromaSamplingType == 1 ?
+                             codec[encoder_t::DYNAMIC_RANGE] && codec[encoder_t::YUV444] :
+                             codec[encoder_t::DYNAMIC_RANGE];
+    if (supported) {
+      return config;
+    }
+
+    const auto mode = config.chromaSamplingType == 1 ? "YUV 4:4:4 dynamic range"sv : "dynamic range"sv;
+    BOOST_LOG(warning) << codec.name << ": "sv << mode << " not supported, falling back to SDR"sv;
+    config.dynamicRange = 0;
+    config.dynamic_hdr_format = 0;
+
+    // An SDR stream cannot carry an SDR-to-HDR filter's output. Neural
+    // enhancement remains valid because it preserves the source signal.
+    if (config.pre_encode_filter == platf::pre_encode_filter_e::external_sdr_to_hdr) {
+      config.pre_encode_filter = platf::pre_encode_filter_e::none;
+      config.enhancement_backend.reset();
+    }
+    const bool neural_enhancement =
+      config.pre_encode_filter == platf::pre_encode_filter_e::external_neural_enhancement;
+    config.frame_pipeline_policy = platf::resolve_frame_pipeline_policy(0, false, neural_enhancement);
+    config.frame_pipeline_policy_resolved = true;
+    return config;
   }
 
   std::chrono::duration<double, std::milli>
@@ -4376,6 +4409,8 @@ namespace video {
     config_t config,
     void *channel_data,
     std::optional<safe::mail_raw_t::event_t<dynamic_param_t>> dynamic_param_events) {
+    config = resolve_dynamic_range(*chosen_encoder, std::move(config));
+
     auto idr_events = mail->event<bool>(mail::idr);
 
     idr_events->raise(true);

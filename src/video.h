@@ -623,6 +623,13 @@ namespace video {
   std::string
   active_encoder_name();
 
+  /**
+   * @brief Resolve a client-requested dynamic range against probed encoder capabilities.
+   * @return Effective configuration, downgraded to a consistent SDR pipeline when HDR is unsupported.
+   */
+  config_t
+  resolve_dynamic_range(const encoder_t &encoder, config_t config);
+
   void
   capture(
     safe::mail_t mail,

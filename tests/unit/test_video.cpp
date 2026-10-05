@@ -143,6 +143,48 @@ TEST(VideoBitrate, CapsInitialEncoderBitrateUsingTotalBitrateLimit) {
   EXPECT_EQ(video::cap_initial_encoder_bitrate(40000, 50000, 10), 40000);
 }
 
+TEST(VideoDynamicRange, FallsBackToAConsistentSdrPipelineWhenUnsupported) {
+  video::encoder_t encoder {"test", {}, {}, {}, {}, 0};
+  encoder.h264.name = "h264_test";
+  encoder.hevc.name = "hevc_test";
+  encoder.av1.name = "av1_test";
+  encoder.hevc[video::encoder_t::DYNAMIC_RANGE] = false;
+
+  video::config_t requested {};
+  requested.videoFormat = 1;
+  requested.dynamicRange = 1;
+  requested.dynamic_hdr_format = 4;
+  requested.pre_encode_filter = platf::pre_encode_filter_e::external_sdr_to_hdr;
+  requested.frame_pipeline_policy = platf::resolve_frame_pipeline_policy(1, true);
+  requested.frame_pipeline_policy_resolved = true;
+
+  const auto effective = video::resolve_dynamic_range(encoder, requested);
+
+  EXPECT_EQ(effective.dynamicRange, 0);
+  EXPECT_EQ(effective.dynamic_hdr_format, 0);
+  EXPECT_EQ(effective.pre_encode_filter, platf::pre_encode_filter_e::none);
+  EXPECT_EQ(effective.frame_pipeline_policy.output.transfer, platf::wire_transfer_e::sdr);
+  EXPECT_EQ(requested.dynamicRange, 1);
+}
+
+TEST(VideoDynamicRange, PreservesSupportedHdrAndRejectsUnsupportedHdr444) {
+  video::encoder_t encoder {"test", {}, {}, {}, {}, 0};
+  encoder.hevc.name = "hevc_test";
+  encoder.hevc[video::encoder_t::DYNAMIC_RANGE] = true;
+
+  video::config_t requested {};
+  requested.videoFormat = 1;
+  requested.dynamicRange = 2;
+
+  EXPECT_EQ(video::resolve_dynamic_range(encoder, requested).dynamicRange, 2);
+
+  requested.chromaSamplingType = 1;
+  EXPECT_EQ(video::resolve_dynamic_range(encoder, requested).dynamicRange, 0);
+
+  encoder.hevc[video::encoder_t::YUV444] = true;
+  EXPECT_EQ(video::resolve_dynamic_range(encoder, requested).dynamicRange, 2);
+}
+
 TEST(HdrPipelineStatus, LiveNrRequestsAreScopedAndSurviveStaleStatusPublication) {
   video::hdr_pipeline_status_t status;
   status.nr_toggle_supported = true;
