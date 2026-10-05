@@ -33,10 +33,6 @@ namespace system_tray_i18n {
   const std::string KEY_IMPORT_CONFIG = "import_config";
   const std::string KEY_EXPORT_CONFIG = "export_config";
   const std::string KEY_RESET_TO_DEFAULT = "reset_to_default";
-  const std::string KEY_STAR_PROJECT = "star_project";
-  const std::string KEY_VISIT_PROJECT = "visit_project";
-  const std::string KEY_VISIT_PROJECT_SUNSHINE = "visit_project_sunshine";
-  const std::string KEY_VISIT_PROJECT_MOONLIGHT = "visit_project_moonlight";
   const std::string KEY_ADVANCED_SETTINGS = "advanced_settings";
   const std::string KEY_CLOSE_APP = "clear_cache";
   const std::string KEY_CLOSE_APP_CONFIRM_TITLE = "clear_cache_confirm_title";
@@ -81,8 +77,8 @@ namespace system_tray_i18n {
 
   // English strings. This product ships English-only; there is no other table.
   const std::map<std::string, std::string> DEFAULT_STRINGS = {
-    { KEY_QUIT_TITLE, "Wait! Don't Leave Me! T_T" },
-    { KEY_QUIT_MESSAGE, "Nooo! You can't just quit like that!\nAre you really REALLY sure you want to leave?\nI'll miss you... but okay, if you must...\n\n(This will also close the Sunshine GUI application.)" },
+    { KEY_QUIT_TITLE, "Quit Sunshine" },
+    { KEY_QUIT_MESSAGE, "Stop Sunshine and close the desktop control panel?" },
     { KEY_OPEN_SUNSHINE, "Open GUI" },
     { KEY_VDD_BASE_DISPLAY, "Foundation Display" },
     { KEY_VDD_CREATE, "Create Virtual Display" },
@@ -103,10 +99,6 @@ namespace system_tray_i18n {
     { KEY_IMPORT_CONFIG, "Import Config" },
     { KEY_EXPORT_CONFIG, "Export Config" },
     { KEY_RESET_TO_DEFAULT, "Reset Config" },
-    { KEY_STAR_PROJECT, "Visit Website" },
-    { KEY_VISIT_PROJECT, "Visit Project" },
-    { KEY_VISIT_PROJECT_SUNSHINE, "Sunshine" },
-    { KEY_VISIT_PROJECT_MOONLIGHT, "Moonlight" },
     { KEY_ADVANCED_SETTINGS, "Advanced Settings" },
     { KEY_CLOSE_APP, "Clear Cache" },
     { KEY_CLOSE_APP_CONFIRM_TITLE, "Clear Cache" },

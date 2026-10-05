@@ -28,10 +28,6 @@ namespace system_tray_i18n {
   extern const std::string KEY_IMPORT_CONFIG;
   extern const std::string KEY_EXPORT_CONFIG;
   extern const std::string KEY_RESET_TO_DEFAULT;
-  extern const std::string KEY_STAR_PROJECT;
-  extern const std::string KEY_VISIT_PROJECT;
-  extern const std::string KEY_VISIT_PROJECT_SUNSHINE;
-  extern const std::string KEY_VISIT_PROJECT_MOONLIGHT;
   extern const std::string KEY_ADVANCED_SETTINGS;
   extern const std::string KEY_CLOSE_APP;
   extern const std::string KEY_CLOSE_APP_CONFIRM_TITLE;

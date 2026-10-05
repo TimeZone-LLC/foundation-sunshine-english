@@ -95,10 +95,6 @@ namespace system_tray {
   static std::string s_import_config;
   static std::string s_export_config;
   static std::string s_reset_to_default;
-  static std::string s_star_project;
-  static std::string s_visit_project;
-  static std::string s_visit_project_sunshine;
-  static std::string s_visit_project_moonlight;
   static std::string s_advanced_settings;
   static std::string s_close_app;
   static std::string s_reset_display_device_config;
@@ -110,7 +106,6 @@ namespace system_tray {
   // 用于存储子菜单的静态数组
   static struct tray_menu vdd_submenu[5];
   static struct tray_menu advanced_settings_submenu[7];
-  static struct tray_menu visit_project_submenu[3];
 
   // 更新高级设置菜单项的文本
   static void update_advanced_settings_menu_text() {
@@ -137,12 +132,6 @@ namespace system_tray {
     tray.notification_cb = NULL;
   }
 
-  // 更新访问项目地址子菜单项的文本
-  static void tray_visit_project_submenu_text() {
-    visit_project_submenu[0].text = s_visit_project_sunshine.c_str();
-    visit_project_submenu[1].text = s_visit_project_moonlight.c_str();
-  }
-
   // 初始化本地化字符串
   void
   init_localized_strings() {
@@ -155,10 +144,6 @@ namespace system_tray {
     s_import_config = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_IMPORT_CONFIG);
     s_export_config = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_EXPORT_CONFIG);
     s_reset_to_default = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_RESET_TO_DEFAULT);
-    s_star_project = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_STAR_PROJECT);
-    s_visit_project = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_VISIT_PROJECT);
-    s_visit_project_sunshine = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_VISIT_PROJECT_SUNSHINE);
-    s_visit_project_moonlight = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_VISIT_PROJECT_MOONLIGHT);
     s_advanced_settings = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_ADVANCED_SETTINGS);
     s_close_app = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_CLOSE_APP);
     s_reset_display_device_config = system_tray_i18n::get_localized_string(system_tray_i18n::KEY_RESET_DISPLAY_DEVICE_CONFIG);
@@ -174,23 +159,17 @@ namespace system_tray {
     update_vdd_submenu_text();  // 更新 VDD 子菜单文本
   #ifdef _WIN32
     // Windows layout of tray_menus:
-    // 0 open, 1 sep, 2 vdd, 3 advanced, 4 sep, 5 star, 6 visit, 7 sep, 8 restart, 9 quit
+    // 0 open, 1 sep, 2 vdd, 3 advanced, 4 sep, 5 restart, 6 quit
     tray_menus[2].text = s_vdd_base_display.c_str();
     tray_menus[3].text = s_advanced_settings.c_str();
     update_advanced_settings_menu_text();
-    tray_menus[5].text = s_star_project.c_str();
-    tray_menus[6].text = s_visit_project.c_str();
-    tray_visit_project_submenu_text();
-    tray_menus[8].text = s_restart.c_str();
-    tray_menus[9].text = s_quit.c_str();
+    tray_menus[5].text = s_restart.c_str();
+    tray_menus[6].text = s_quit.c_str();
   #else
     // Non-Windows layout of tray_menus (no vdd/advanced entries):
-    // 0 open, 1 sep, 2 sep, 3 star, 4 visit, 5 sep, 6 restart, 7 quit
-    tray_menus[3].text = s_star_project.c_str();
-    tray_menus[4].text = s_visit_project.c_str();
-    tray_visit_project_submenu_text();
-    tray_menus[6].text = s_restart.c_str();
-    tray_menus[7].text = s_quit.c_str();
+    // 0 open, 1 sep, 2 restart, 3 quit
+    tray_menus[2].text = s_restart.c_str();
+    tray_menus[3].text = s_quit.c_str();
   #endif
   }
 
@@ -465,19 +444,6 @@ namespace system_tray {
     lifetime::exit_sunshine(0, true);
   #endif
   };
-
-  auto tray_star_project_cb = [](struct tray_menu *item) {
-    platf::open_url_in_browser("https://www.alkaidlab.com/");
-  };
-
-  auto tray_visit_project_sunshine_cb = [](struct tray_menu *item) {
-    platf::open_url_in_browser("https://github.com/AlkaidLab/foundation-sunshine");
-  };
-
-  auto tray_visit_project_moonlight_cb = [](struct tray_menu *item) {
-    platf::open_url_in_browser("https://github.com/qiin2333/moonlight-vplus");
-  };
-
 
   // 文件对话框打开标志
   static bool file_dialog_open = false;
@@ -1061,14 +1027,11 @@ namespace system_tray {
   // 菜单数组定义
   struct tray_menu tray_menus[] = {
     { .text = "Open Sunshine", .cb = tray_open_ui_cb },
-    { .text = "-" },
   #ifdef _WIN32
+    { .text = "-" },
     { .text = "Foundation Display", .submenu = vdd_submenu },
     { .text = "Advanced Settings", .submenu = advanced_settings_submenu },
   #endif
-    { .text = "-" },
-    { .text = "Star Project", .cb = tray_star_project_cb },
-    { .text = "Visit Project", .submenu = visit_project_submenu },
     { .text = "-" },
     { .text = "Restart", .cb = tray_restart_cb },
     { .text = "Quit", .cb = tray_quit_cb },
@@ -1183,11 +1146,6 @@ namespace system_tray {
     advanced_settings_submenu[6] = { .text = nullptr };
   #endif
 
-    // 初始化访问项目地址子菜单
-    visit_project_submenu[0] = { .text = s_visit_project_sunshine.c_str(), .cb = tray_visit_project_sunshine_cb };
-    visit_project_submenu[1] = { .text = s_visit_project_moonlight.c_str(), .cb = tray_visit_project_moonlight_cb };
-    visit_project_submenu[2] = { .text = nullptr };
-
     if (tray_init(&tray) < 0) {
       BOOST_LOG(warning) << "Failed to create system tray"sv;
       return 1;
@@ -1202,8 +1160,6 @@ namespace system_tray {
     // 初始化时更新高级设置菜单文本
     update_advanced_settings_menu_text();
   #endif
-    // 初始化时更新访问项目地址子菜单文本
-    tray_visit_project_submenu_text();
     tray_update(&tray);
 
     tray_initialized = true;

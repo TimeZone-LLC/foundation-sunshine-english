@@ -675,7 +675,6 @@ namespace config {
     file_handler::path_to_utf8(platf::appdata() / "sunshine.log"),  // log file
     false,  // restore_log - 默认不恢复日志文件
     50,  // max_log_size_mb - 默认50MB，超过自动轮转
-    false,  // notify_pre_releases
     true,  // system_tray
     {},  // prep commands
   };
@@ -1719,8 +1718,6 @@ namespace config {
     bool_f(vars, "virtual_mouse", input.virtual_mouse);
     bool_f(vars, "amf_draw_mouse_cursor", input.amf_draw_mouse_cursor);
     bool_f(vars, "clipboard_sync", input.clipboard_sync);
-
-    bool_f(vars, "notify_pre_releases", sunshine.notify_pre_releases);
 
     bool_f(vars, "system_tray", sunshine.system_tray);
 

@@ -328,9 +328,6 @@ main(int argc, char *argv[]) {
   BOOST_LOG(info) << "Running with " << platf::windows_version();
 #endif
 
-  // Log publisher metadata
-  log_publisher_data();
-
   // Log modified_config_settings as JSON
   if (!config::modified_config_settings.empty()) {
     std::ostringstream config_json;

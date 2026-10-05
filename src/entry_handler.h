@@ -108,12 +108,6 @@ namespace lifetime {
   get_argv();
 }  // namespace lifetime
 
-/**
- * @brief Log the publisher metadata provided from CMake.
- */
-void
-log_publisher_data();
-
 #ifdef _WIN32
 /**
  * @brief Check if NVIDIA's GameStream software is running.
