@@ -468,6 +468,7 @@ namespace config {
       std::nullopt,  // rate control (hevc): driver/AMF default, matching FFmpeg amfenc
       std::nullopt,  // rate control (av1): driver/AMF default, matching FFmpeg amfenc
       std::nullopt,  // enforce_hrd: unset by default, matching FFmpeg amfenc
+      std::nullopt,  // max_au_size: unset by default
       std::nullopt,  // quality (h264): driver default, matching FFmpeg amfenc
       std::nullopt,  // quality (hevc): driver default, matching FFmpeg amfenc
       std::nullopt,  // quality (av1): driver default, matching FFmpeg amfenc
@@ -1335,6 +1336,13 @@ namespace config {
       auto tmp = std::string { value };
       return to_bool(tmp) ? 1 : 0;
     });
+    {
+      auto max_au_size = video.amd.amd_max_au_size;
+      int_f(vars, "amd_max_au_size", max_au_size);
+      if (!max_au_size || amd::is_valid_max_au_size(*max_au_size)) {
+        video.amd.amd_max_au_size = max_au_size;
+      }
+    }
     int_between_f(vars, "amd_qvbr_quality", video.amd.amd_qvbr_quality, { 1, 51 });
     int_between_f(vars, "amd_ltr_frames", video.amd.amd_ltr_frames, { 0, 4 });
     int_between_f(vars, "amd_slices_per_frame", video.amd.amd_slices_per_frame, { 0, 4 });

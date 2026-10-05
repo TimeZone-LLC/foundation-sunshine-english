@@ -2996,6 +2996,33 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+### [amd_max_au_size](https://localhost:47990/config/#amd_max_au_size)
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Maximum H.264 or HEVC access-unit (frame) size for AMD rate control, in bits. This is a
+            last-resort cap for encoded frames that would otherwise exceed Sunshine's four-block FEC
+            capacity and be sent without FEC protection.
+            @note{AV1 does not expose an equivalent AMF option. The FEC ceiling depends on the negotiated
+            packet size and [fec_percentage](#fec_percentage), not the average bitrate or frame rate.}
+            @warning{Setting this unnecessarily low can reduce image quality, especially for keyframes.
+            Leave it empty unless oversized frames are actually causing FEC to be skipped.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">Empty (AMD driver default)</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            amd_max_au_size = 6400000
+            @endcode</td>
+    </tr>
+</table>
+
 ### [amd_quality](https://localhost:47990/config/#amd_quality)
 
 <table>

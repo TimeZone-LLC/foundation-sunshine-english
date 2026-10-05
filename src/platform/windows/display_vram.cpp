@@ -3255,6 +3255,7 @@ namespace platf::dxgi {
       amf_cfg.preanalysis = config::video.amd.amd_preanalysis;
       amf_cfg.vbaq = config::video.amd.amd_vbaq;
       amf_cfg.enforce_hrd = config::video.amd.amd_enforce_hrd;
+      amf_cfg.max_au_size = config::video.amd.amd_max_au_size;
       amf_cfg.h264_cabac = (config::video.amd.amd_coder != 2);  // 2 = CAVLC
       if (config::video.amd.amd_coder != 0) {  // 0 = auto / AMF_VIDEO_ENCODER_UNDEFINED
         amf_cfg.h264_coding_mode = config::video.amd.amd_coder;

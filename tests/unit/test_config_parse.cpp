@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -69,6 +70,14 @@ INSTANTIATE_TEST_SUITE_P(
     NvencPresetNameParam {7, "p7"}
   )
 );
+
+TEST(AmdMaxAuSizeConfig, AcceptsOnlyTheSupportedRange) {
+  EXPECT_FALSE(config::amd::is_valid_max_au_size(-2));
+  EXPECT_TRUE(config::amd::is_valid_max_au_size(-1));
+  EXPECT_TRUE(config::amd::is_valid_max_au_size(0));
+  EXPECT_TRUE(config::amd::is_valid_max_au_size(6'400'000));
+  EXPECT_TRUE(config::amd::is_valid_max_au_size(std::numeric_limits<int>::max()));
+}
 
 TEST(ConfigParse, PreservesHashCharactersInsideJsonStrings) {
   const auto parsed = config::parse_config(

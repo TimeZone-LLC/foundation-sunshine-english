@@ -26,6 +26,16 @@ namespace config {
     std::string ffmpeg_preset_from_quality(int quality_preset);
   }  // namespace nv
 
+  namespace amd {
+    /**
+     * @brief Check an AMF maximum access-unit-size value before applying it.
+     * @return True for the driver-default sentinel (-1) and non-negative bit limits.
+     */
+    constexpr bool is_valid_max_au_size(const int value) noexcept {
+      return value >= -1;
+    }
+  }  // namespace amd
+
   // track modified config options
   inline std::unordered_map<std::string, std::string> modified_config_settings;
 
@@ -80,6 +90,7 @@ namespace config {
       std::optional<int> amd_rc_hevc;
       std::optional<int> amd_rc_av1;
       std::optional<int> amd_enforce_hrd;
+      std::optional<int> amd_max_au_size;  ///< H.264/HEVC maximum access-unit size in bits; unset or -1 uses the driver default.
       std::optional<int> amd_quality_h264;
       std::optional<int> amd_quality_hevc;
       std::optional<int> amd_quality_av1;

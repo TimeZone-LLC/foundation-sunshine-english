@@ -64,6 +64,10 @@ namespace amf {
     // Enforce HRD
     std::optional<int> enforce_hrd;
 
+    // Maximum H.264/HEVC access-unit size in bits. Unset or -1 keeps the
+    // driver default. AV1 does not expose an equivalent AMF property.
+    std::optional<int> max_au_size;
+
     // Number of LTR frames for RFI (0 = disabled, matches FFmpeg amfenc behavior).
     // When enabled, static screen regions may retain encoder artifacts from the
     // baseline LTR frame until motion forces a refresh; only opt in when the

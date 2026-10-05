@@ -68,6 +68,21 @@ const config = ref(props.config)
               <div class="form-text">{{ $t('config.amd_enforce_hrd_desc') }}</div>
             </div>
 
+            <!-- AMF maximum access-unit size -->
+            <div class="mb-3">
+              <label for="amd_max_au_size" class="form-label">{{ $t('config.amd_max_au_size') }}</label>
+              <input
+                id="amd_max_au_size"
+                v-model="config.amd_max_au_size"
+                class="form-control"
+                type="number"
+                min="-1"
+                max="2147483647"
+                placeholder="-1"
+              />
+              <div class="form-text">{{ $t('config.amd_max_au_size_desc') }}</div>
+            </div>
+
             <!-- AMF QVBR Quality Level -->
             <div class="mb-3" v-if="config.amd_rc === 'qvbr'">
               <label for="amd_qvbr_quality" class="form-label">

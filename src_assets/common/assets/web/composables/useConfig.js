@@ -176,6 +176,7 @@ const DEFAULT_TABS = [
           amd_usage: '',
           amd_rc: '',
           amd_enforce_hrd: '',
+          amd_max_au_size: '',
           amd_quality: '',
           amd_preanalysis: '',
           amd_vbaq: '',

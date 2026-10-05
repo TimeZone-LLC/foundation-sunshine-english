@@ -299,6 +299,9 @@ namespace amf {
       }
       encoder->SetProperty(AMF_VIDEO_ENCODER_FRAMERATE, framerate);
       if (config.enforce_hrd) encoder->SetProperty(AMF_VIDEO_ENCODER_ENFORCE_HRD, !!(*config.enforce_hrd));
+      if (config.max_au_size && *config.max_au_size >= 0) {
+        encoder->SetProperty(AMF_VIDEO_ENCODER_MAX_AU_SIZE, (amf_int64) *config.max_au_size);
+      }
       encoder->SetProperty(AMF_VIDEO_ENCODER_IDR_PERIOD, (amf_int64) 0);
       encoder->SetProperty(AMF_VIDEO_ENCODER_DE_BLOCKING_FILTER, true);
       encoder->SetProperty(AMF_VIDEO_ENCODER_CABAC_ENABLE, (amf_int64)(config.h264_cabac ? AMF_VIDEO_ENCODER_CABAC : AMF_VIDEO_ENCODER_CALV));
@@ -384,6 +387,9 @@ namespace amf {
       }
       encoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_FRAMERATE, framerate);
       if (config.enforce_hrd) encoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_ENFORCE_HRD, !!(*config.enforce_hrd));
+      if (config.max_au_size && *config.max_au_size >= 0) {
+        encoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_MAX_AU_SIZE, (amf_int64) *config.max_au_size);
+      }
       encoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_NUM_GOPS_PER_IDR, (amf_int64) 1);
       encoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_GOP_SIZE, (amf_int64) 60);
       encoder->SetProperty(AMF_VIDEO_ENCODER_HEVC_HEADER_INSERTION_MODE, (amf_int64) AMF_VIDEO_ENCODER_HEVC_HEADER_INSERTION_MODE_IDR_ALIGNED);

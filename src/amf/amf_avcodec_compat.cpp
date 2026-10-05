@@ -130,6 +130,9 @@ namespace amf {
       res = set_required_property(encoder, AMF_VIDEO_ENCODER_FRAMERATE, framerate, "H.264 framerate");
       if (res != AMF_OK) return res;
       if (config.enforce_hrd) set_optional_property(encoder, AMF_VIDEO_ENCODER_ENFORCE_HRD, !!(*config.enforce_hrd), "H.264 enforce_hrd");
+      if (config.max_au_size && *config.max_au_size >= 0) {
+        set_optional_property(encoder, AMF_VIDEO_ENCODER_MAX_AU_SIZE, (amf_int64) *config.max_au_size, "H.264 max_au_size");
+      }
       res = set_required_property(encoder, AMF_VIDEO_ENCODER_IDR_PERIOD, (amf_int64) ctx.gop_size, "H.264 idr_period");
       if (res != AMF_OK) return res;
       set_optional_property(encoder, AMF_VIDEO_ENCODER_DE_BLOCKING_FILTER, true, "H.264 deblocking_filter");
@@ -185,6 +188,9 @@ namespace amf {
       res = set_required_property(encoder, AMF_VIDEO_ENCODER_HEVC_FRAMERATE, framerate, "HEVC framerate");
       if (res != AMF_OK) return res;
       if (config.enforce_hrd) set_optional_property(encoder, AMF_VIDEO_ENCODER_HEVC_ENFORCE_HRD, !!(*config.enforce_hrd), "HEVC enforce_hrd");
+      if (config.max_au_size && *config.max_au_size >= 0) {
+        set_optional_property(encoder, AMF_VIDEO_ENCODER_HEVC_MAX_AU_SIZE, (amf_int64) *config.max_au_size, "HEVC max_au_size");
+      }
       res = set_required_property(encoder, AMF_VIDEO_ENCODER_HEVC_NUM_GOPS_PER_IDR, (amf_int64) 1, "HEVC num_gops_per_idr");
       if (res != AMF_OK) return res;
       res = set_required_property(encoder, AMF_VIDEO_ENCODER_HEVC_GOP_SIZE, (amf_int64) ctx.gop_size, "HEVC gop_size");
