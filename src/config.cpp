@@ -528,6 +528,12 @@ namespace config {
       false,  // strict_rc_buffer
     },  // vaapi
 
+    {
+      0,  // tune (driver default)
+      0,  // rate control (driver default)
+      2,  // balanced quality
+    },  // Vulkan
+
     {},  // capture
     {},  // encoder
     {},  // adapter_name
@@ -1410,6 +1416,19 @@ namespace config {
     }
     bool_f(vars, "vaapi_blbrc", (bool &) video.vaapi.blbrc);
     bool_f(vars, "vaapi_strict_rc_buffer", video.vaapi.strict_rc_buffer);
+
+    int_f(vars, "vk_tune", video.vk.tune);
+    int_f(vars, "vk_rc_mode", video.vk.rc_mode);
+    std::string vk_quality;
+    string_f(vars, "vk_quality", vk_quality);
+    static const std::unordered_map<std::string_view, int> vk_quality_map = {
+      { "speed"sv, 1 },
+      { "balanced"sv, 2 },
+      { "quality"sv, 3 },
+    };
+    if (auto it = vk_quality_map.find(vk_quality); it != vk_quality_map.end()) {
+      video.vk.quality = it->second;
+    }
 
     string_f(vars, "capture", video.capture);
     

@@ -9,8 +9,13 @@
 #endif
 
 // standard includes
+#include <array>
+#include <cctype>
+#include <cerrno>
+#include <cstring>
 #include <fstream>
 #include <iostream>
+#include <span>
 
 // lib includes
 #include <arpa/inet.h>
@@ -22,13 +27,22 @@
 #include <ifaddrs.h>
 #include <netinet/udp.h>
 #include <pwd.h>
+#include <sys/capability.h>
+#include <sys/prctl.h>
 #include <unistd.h>
+
+#ifdef SUNSHINE_BUILD_DRM
+  #include <dirent.h>
+  #include <xf86drm.h>
+  #include <xf86drmMode.h>
+#endif
 
 // local includes
 #include "graphics.h"
 #include "misc.h"
 #include "src/config.h"
 #include "src/entry_handler.h"
+#include "src/globals.h"
 #include "src/logging.h"
 #include "src/platform/common.h"
 #include "src/platform/run_command.h"
@@ -90,6 +104,60 @@ namespace dyn {
   }
 }  // namespace dyn
 namespace platf {
+  namespace {
+    constexpr std::array privileged_gui_environment_variables {
+      "GDK_PIXBUF_MODULEDIR",
+      "GDK_PIXBUF_MODULE_FILE",
+      "GIO_EXTRA_MODULES",
+      "GTK3_MODULES",
+      "GTK_EXE_PREFIX",
+      "GTK_IM_MODULE_FILE",
+      "GTK_MODULES",
+      "GTK_PATH",
+      "QML2_IMPORT_PATH",
+      "QML_IMPORT_PATH",
+      "QT_PLUGIN_PATH",
+      "QT_QPA_PLATFORM_PLUGIN_PATH",
+    };
+  }  // namespace
+
+  bool
+  sanitize_process_environment() {
+    for (const auto *variable : privileged_gui_environment_variables) {
+      if (unsetenv(variable) != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  int
+  open_drm_card_fd(const std::filesystem::path &path, int flags) {
+    int fd = open(path.c_str(), flags | O_CLOEXEC);
+    if (fd < 0) {
+      BOOST_LOG(error) << "Couldn't open: "sv << path.string() << ": "sv << std::strerror(errno);
+      return -1;
+    }
+
+#ifdef SUNSHINE_BUILD_DRM
+    auto is_master = [&]() -> int {
+      drm_auth_t auth {};
+      errno = 0;
+      if (drmIoctl(fd, DRM_IOCTL_AUTH_MAGIC, &auth) == 0) return 1;
+      if (errno == EACCES) return 0;
+      if (errno == EINVAL || errno == ENOENT) return 1;
+      BOOST_LOG(warning) << "Couldn't determine DRM master state for "sv << path.string() << ": "sv << std::strerror(errno);
+      return -1;
+    };
+
+    if (int master = is_master(); master > 0) {
+      if (drmDropMaster(fd) != 0) {
+        BOOST_LOG(warning) << "Couldn't drop DRM master for "sv << path.string() << ": "sv << std::strerror(errno);
+      }
+    }
+#endif
+    return fd;
+  }
   using ifaddr_t = util::safe_ptr<ifaddrs, freeifaddrs>;
 
   ifaddr_t
@@ -877,6 +945,12 @@ namespace platf {
 #ifdef SUNSHINE_BUILD_X11
       X11,  ///< X11
 #endif
+#ifdef SUNSHINE_BUILD_KWIN
+      KWIN,  ///< KWin direct ScreenCast
+#endif
+#ifdef SUNSHINE_BUILD_PORTAL
+      PORTAL,  ///< XDG Desktop Portal
+#endif
       MAX_FLAGS  ///< The maximum number of flags
     };
   }  // namespace source
@@ -931,6 +1005,76 @@ namespace platf {
   }
 #endif
 
+#ifdef SUNSHINE_BUILD_PORTAL
+  std::vector<std::string>
+  portal_display_names(bool allow_start_timeout);
+  std::shared_ptr<display_t>
+  portal_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
+
+  enum class portal_probe_e {
+    unreachable,
+    no_token,
+    stale_token,
+    available
+  };
+
+  portal_probe_e
+  probe_portal() {
+    if (!portal::is_portal_service_reachable()) {
+      return portal_probe_e::unreachable;
+    }
+    if (!portal::has_saved_token()) {
+      return portal_probe_e::no_token;
+    }
+    return portal_display_names(true).empty() ? portal_probe_e::stale_token : portal_probe_e::available;
+  }
+
+  bool
+  verify_portal() {
+    switch (probe_portal()) {
+      case portal_probe_e::available:
+        return true;
+      case portal_probe_e::unreachable:
+        BOOST_LOG(debug) << "[portalgrab] XDG Desktop Portal is not reachable"sv;
+        return false;
+      case portal_probe_e::stale_token:
+        BOOST_LOG(warning) << "[portalgrab] Discarding a stale Portal restore token and restarting"sv;
+        portal::clear_saved_token();
+        platf::restart();
+        return false;
+      case portal_probe_e::no_token:
+        BOOST_LOG(warning) << "Portal capture is waiting for desktop permission; trying a fallback capture path"sv;
+        std::call_once(portal::xdg_worker_flag, []() {
+          portal::xdg_worker = std::jthread([]() {
+            try {
+              platf::set_thread_name("xdg_worker");
+              if (!portal_display_names(false).empty()) {
+                platf::restart();
+              }
+            }
+            catch (const std::exception &err) {
+              BOOST_LOG(error) << "[portalgrab] Permission worker failed: "sv << err.what();
+            }
+          });
+        });
+        return false;
+    }
+    return false;
+  }
+#endif
+
+#ifdef SUNSHINE_BUILD_KWIN
+  std::vector<std::string>
+  kwin_display_names();
+  std::shared_ptr<display_t>
+  kwin_display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config);
+
+  bool
+  verify_kwin() {
+    return !kwin_display_names().empty();
+  }
+#endif
+
   std::vector<std::string>
   display_names(mem_type_e hwdevice_type) {
 #ifdef SUNSHINE_BUILD_CUDA
@@ -946,6 +1090,12 @@ namespace platf {
 #ifdef SUNSHINE_BUILD_X11
     if (sources[source::X11]) return x11_display_names();
 #endif
+#ifdef SUNSHINE_BUILD_KWIN
+    if (sources[source::KWIN]) return kwin_display_names();
+#endif
+#ifdef SUNSHINE_BUILD_PORTAL
+    if (sources[source::PORTAL]) return portal_display_names(true);
+#endif
     return {};
   }
 
@@ -955,17 +1105,34 @@ namespace platf {
    */
   bool
   needs_encoder_reenumeration() {
-    // We don't track GPU state, so we will always reenumerate. Fortunately, it is fast on Linux.
+    // Re-probing all FFmpeg encoders on every reconnect retains codec-side
+    // allocations. Only repeat it when the selected render node changes.
+    static std::string last_render_device;
+    auto current_render_device = resolve_render_device();
+    if (current_render_device == last_render_device) {
+      return false;
+    }
+    last_render_device = std::move(current_render_device);
     return true;
   }
 
   std::shared_ptr<display_t>
   display(mem_type_e hwdevice_type, const std::string &display_name, const video::config_t &config) {
+#ifdef SUNSHINE_BUILD_DRM
+    if (sources[source::KMS]) {
+      BOOST_LOG(info) << "Screencasting with KMS"sv;
+      return kms_display(hwdevice_type, display_name, config);
+    }
+#endif
 #ifdef SUNSHINE_BUILD_CUDA
     if (sources[source::NVFBC] && hwdevice_type == mem_type_e::cuda) {
       BOOST_LOG(info) << "Screencasting with NvFBC"sv;
       return nvfbc_display(hwdevice_type, display_name, config);
     }
+#endif
+#ifdef SUNSHINE_BUILD_DRM
+    // No remaining backend needs privileged primary-node access.
+    platf::kms::drop_drm_worker_privileges();
 #endif
 #ifdef SUNSHINE_BUILD_WAYLAND
     if (sources[source::WAYLAND]) {
@@ -973,16 +1140,22 @@ namespace platf {
       return wl_display(hwdevice_type, display_name, config);
     }
 #endif
-#ifdef SUNSHINE_BUILD_DRM
-    if (sources[source::KMS]) {
-      BOOST_LOG(info) << "Screencasting with KMS"sv;
-      return kms_display(hwdevice_type, display_name, config);
-    }
-#endif
 #ifdef SUNSHINE_BUILD_X11
     if (sources[source::X11]) {
       BOOST_LOG(info) << "Screencasting with X11"sv;
       return x11_display(hwdevice_type, display_name, config);
+    }
+#endif
+#ifdef SUNSHINE_BUILD_KWIN
+    if (sources[source::KWIN]) {
+      BOOST_LOG(info) << "Screencasting with KWin ScreenCast"sv;
+      return kwin_display(hwdevice_type, display_name, config);
+    }
+#endif
+#ifdef SUNSHINE_BUILD_PORTAL
+    if (sources[source::PORTAL]) {
+      BOOST_LOG(info) << "Screencasting with XDG Desktop Portal"sv;
+      return portal_display(hwdevice_type, display_name, config);
     }
 #endif
 
@@ -993,7 +1166,20 @@ namespace platf {
   init() {
     // enable low latency mode for AMD
     // https://gitlab.freedesktop.org/mesa/mesa/-/merge_requests/30039
-    set_env("AMD_DEBUG", "lowlatency");
+    set_env("AMD_DEBUG", "lowlatencyenc");
+
+    // RADV's video extensions are still experimental on some Mesa versions.
+    // Only force them when Vulkan was selected explicitly; probing must remain
+    // free to prefer a stable VA-API path.
+    if (config::video.encoder == "vulkan") {
+      set_env("RADV_PERFTEST", "video_encode");
+      std::string experimental = platf::get_env("RADV_EXPERIMENTAL");
+      if (experimental.find("video_encode") == std::string::npos) {
+        if (!experimental.empty()) experimental += ',';
+        experimental += "video_encode";
+        set_env("RADV_EXPERIMENTAL", experimental);
+      }
+    }
 
     // These are allowed to fail.
     gbm::init();
@@ -1014,22 +1200,33 @@ namespace platf {
     }
 #endif
 
+#ifdef SUNSHINE_BUILD_PORTAL
+    bool portal_available = false;
+    std::string selected_capture = config::video.capture;
+    if (selected_capture == "portal") {
+      portal_available = verify_portal();
+      if (!portal_available) selected_capture.clear();
+    }
+#else
+    const std::string &selected_capture = config::video.capture;
+#endif
+
 #ifdef SUNSHINE_BUILD_CUDA
-    if ((config::video.capture.empty() && sources.none()) || config::video.capture == "nvfbc") {
+    if ((selected_capture.empty() && sources.none()) || selected_capture == "nvfbc") {
       if (verify_nvfbc()) {
         sources[source::NVFBC] = true;
       }
     }
 #endif
 #ifdef SUNSHINE_BUILD_WAYLAND
-    if ((config::video.capture.empty() && sources.none()) || config::video.capture == "wlr") {
+    if ((selected_capture.empty() && sources.none()) || selected_capture == "wlr") {
       if (verify_wl()) {
         sources[source::WAYLAND] = true;
       }
     }
 #endif
 #ifdef SUNSHINE_BUILD_DRM
-    if ((config::video.capture.empty() && sources.none()) || config::video.capture == "kms") {
+    if ((selected_capture.empty() && sources.none()) || selected_capture == "kms") {
       if (verify_kms()) {
         sources[source::KMS] = true;
       }
@@ -1038,10 +1235,20 @@ namespace platf {
 #ifdef SUNSHINE_BUILD_X11
     // We enumerate this capture backend regardless of other suitable sources,
     // since it may be needed as a NvFBC fallback for software encoding on X11.
-    if (config::video.capture.empty() || config::video.capture == "x11") {
+    if (selected_capture.empty() || selected_capture == "x11") {
       if (verify_x11()) {
         sources[source::X11] = true;
       }
+    }
+#endif
+#ifdef SUNSHINE_BUILD_KWIN
+    if (((selected_capture.empty() && sources.none()) || selected_capture == "kwin") && verify_kwin()) {
+      sources[source::KWIN] = true;
+    }
+#endif
+#ifdef SUNSHINE_BUILD_PORTAL
+    if (portal_available || (config::video.capture.empty() && sources.none() && verify_portal())) {
+      sources[source::PORTAL] = true;
     }
 #endif
 
@@ -1054,7 +1261,22 @@ namespace platf {
       BOOST_LOG(warning) << "Couldn't load EGL library"sv;
     }
 
+#ifdef SUNSHINE_BUILD_PORTAL
+    class portal_deinit_t: public deinit_t {
+    public:
+      ~portal_deinit_t() override {
+        if (portal::xdg_worker.joinable()) {
+          if (mail::man) {
+            mail::man->event<bool>(mail::shutdown)->raise(true);
+          }
+          portal::xdg_worker.join();
+        }
+      }
+    };
+    return std::make_unique<portal_deinit_t>();
+#else
     return std::make_unique<deinit_t>();
+#endif
   }
 
   class linux_high_precision_timer: public high_precision_timer {
@@ -1072,5 +1294,111 @@ namespace platf {
   std::unique_ptr<high_precision_timer>
   create_high_precision_timer() {
     return std::make_unique<linux_high_precision_timer>();
+  }
+
+  namespace {
+    std::string
+    find_render_node_with_display() {
+#ifdef SUNSHINE_BUILD_DRM
+      auto *directory = opendir("/dev/dri");
+      if (!directory) {
+        return {};
+      }
+
+      std::string result;
+      while (auto *entry = readdir(directory)) {
+        if (std::strncmp(entry->d_name, "card", 4) != 0 || !std::isdigit(static_cast<unsigned char>(entry->d_name[4]))) {
+          continue;
+        }
+
+        const std::string path = std::string("/dev/dri/") + entry->d_name;
+        const int fd = open(path.c_str(), O_RDWR | O_CLOEXEC);
+        if (fd < 0) {
+          continue;
+        }
+
+        if (auto *resources = drmModeGetResources(fd)) {
+          for (int index = 0; index < resources->count_connectors && result.empty(); ++index) {
+            if (auto *connector = drmModeGetConnector(fd, resources->connectors[index])) {
+              if (connector->connection == DRM_MODE_CONNECTED) {
+                if (char *render_node = drmGetRenderDeviceNameFromFd(fd)) {
+                  result = render_node;
+                  free(render_node);
+                }
+              }
+              drmModeFreeConnector(connector);
+            }
+          }
+          drmModeFreeResources(resources);
+        }
+        close(fd);
+        if (!result.empty()) {
+          break;
+        }
+      }
+      closedir(directory);
+      return result;
+#else
+      return {};
+#endif
+    }
+  }  // namespace
+
+  std::string
+  resolve_render_device() {
+    if (!config::video.adapter_name.empty()) {
+      return config::video.adapter_name;
+    }
+    auto detected = find_render_node_with_display();
+    return detected.empty() ? "/dev/dri/renderD128" : detected;
+  }
+
+  namespace {
+    constexpr cap_value_t full_caps[] = { CAP_SYS_ADMIN, CAP_SYS_NICE };
+    constexpr cap_value_t admin_caps[] = { CAP_SYS_ADMIN };
+    constexpr std::span<const cap_value_t> elevated_privileges_full { full_caps };
+    constexpr std::span<const cap_value_t> elevated_privileges_admin { admin_caps };
+  }  // namespace
+
+  bool
+  has_elevated_privileges(bool all_caps) {
+    const auto caps_to_check = all_caps ? elevated_privileges_full : elevated_privileges_admin;
+    cap_t caps = cap_get_proc();
+    if (!caps) return false;
+
+    for (const auto capability : caps_to_check) {
+      cap_flag_value_t value {};
+      if (cap_get_flag(caps, capability, CAP_EFFECTIVE, &value) == 0 && value == CAP_SET) {
+        cap_free(caps);
+        return true;
+      }
+      if (cap_get_flag(caps, capability, CAP_PERMITTED, &value) == 0 && value == CAP_SET) {
+        cap_free(caps);
+        return true;
+      }
+    }
+    cap_free(caps);
+    return false;
+  }
+
+  void
+  drop_elevated_privileges(bool all_caps) {
+    const auto caps_to_drop = all_caps ? elevated_privileges_full : elevated_privileges_admin;
+    cap_t caps = cap_get_proc();
+    if (!caps) {
+      BOOST_LOG(error) << "Failed to read process capabilities"sv;
+      return;
+    }
+
+    cap_set_flag(caps, CAP_EFFECTIVE, caps_to_drop.size(), caps_to_drop.data(), CAP_CLEAR);
+    cap_set_flag(caps, CAP_PERMITTED, caps_to_drop.size(), caps_to_drop.data(), CAP_CLEAR);
+    if (cap_set_proc(caps) != 0) {
+      BOOST_LOG(error) << "Failed to drop process capabilities: "sv << std::strerror(errno);
+    }
+    cap_free(caps);
+
+    if (prctl(PR_SET_DUMPABLE, 1) != 0) {
+      BOOST_LOG(error) << "Failed to restore dumpable process state: "sv << std::strerror(errno);
+    }
   }
 }  // namespace platf

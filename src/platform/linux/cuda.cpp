@@ -271,7 +271,11 @@ namespace cuda {
 
         fs::path dri_path { "/dev/dri"sv };
         auto device_path = dri_path / file;
-        return open(device_path.c_str(), O_RDWR);
+#ifdef SUNSHINE_BUILD_DRM
+        return platf::kms::privileged_open_drm_card_fd(device_path.c_str());
+#else
+        return platf::open_drm_card_fd(device_path);
+#endif
       }
     }
     catch (const std::filesystem::filesystem_error &err) {

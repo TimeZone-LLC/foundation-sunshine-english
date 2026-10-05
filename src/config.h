@@ -137,6 +137,12 @@ namespace config {
       bool strict_rc_buffer;
     } vaapi;
 
+    struct {
+      int tune;  // FFmpeg Vulkan tune (0 lets the driver choose)
+      int rc_mode;  // FFmpeg Vulkan rate-control mode (0 lets the driver choose)
+      int quality;  // 1 speed, 2 balanced, 3 quality
+    } vk;
+
     std::string capture;
     std::string encoder;
     std::string adapter_name;

@@ -6,6 +6,7 @@ const IntelQuickSyncEncoder = defineAsyncComponent(() => import('./encoders/Inte
 const AmdAmfEncoder = defineAsyncComponent(() => import('./encoders/AmdAmfEncoder.vue'))
 const VideotoolboxEncoder = defineAsyncComponent(() => import('./encoders/VideotoolboxEncoder.vue'))
 const VaapiEncoder = defineAsyncComponent(() => import('./encoders/VaapiEncoder.vue'))
+const VulkanEncoder = defineAsyncComponent(() => import('./encoders/VulkanEncoder.vue'))
 const SoftwareEncoder = defineAsyncComponent(() => import('./encoders/SoftwareEncoder.vue'))
 
 const props = defineProps([
@@ -50,6 +51,12 @@ const config = ref(props.config)
   <!-- VA-API Encoder Tab -->
   <VaapiEncoder
       v-if="currentTab === 'vaapi'"
+      :config="config"
+  />
+
+  <!-- Vulkan Video Encoder Tab -->
+  <VulkanEncoder
+      v-if="currentTab === 'vk'"
       :config="config"
   />
 

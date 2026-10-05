@@ -13,7 +13,11 @@
 #include <xf86drmMode.h>
 
 #include <filesystem>
+#include <functional>
+#include <future>
+#include <stdexcept>
 #include <thread>
+#include <type_traits>
 
 #include "src/config.h"
 #include "src/logging.h"
@@ -33,28 +37,142 @@ namespace fs = std::filesystem;
 namespace platf {
 
   namespace kms {
-
-    class cap_sys_admin {
-    public:
-      cap_sys_admin() {
-        caps = cap_get_proc();
-
-        cap_value_t sys_admin = CAP_SYS_ADMIN;
-        if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &sys_admin, CAP_SET) || cap_set_proc(caps)) {
-          BOOST_LOG(error) << "Failed to gain CAP_SYS_ADMIN";
+    namespace {
+      class cap_sys_admin {
+      public:
+        cap_sys_admin() {
+          caps = cap_get_proc();
+          cap_value_t capability = CAP_SYS_ADMIN;
+          if (!caps || cap_set_flag(caps, CAP_EFFECTIVE, 1, &capability, CAP_SET) || cap_set_proc(caps)) {
+            BOOST_LOG(error) << "Failed to gain CAP_SYS_ADMIN";
+          }
         }
-      }
 
-      ~cap_sys_admin() {
-        cap_value_t sys_admin = CAP_SYS_ADMIN;
-        if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &sys_admin, CAP_CLEAR) || cap_set_proc(caps)) {
-          BOOST_LOG(error) << "Failed to drop CAP_SYS_ADMIN";
+        ~cap_sys_admin() {
+          if (!caps) return;
+          cap_value_t capability = CAP_SYS_ADMIN;
+          if (cap_set_flag(caps, CAP_EFFECTIVE, 1, &capability, CAP_CLEAR)) {
+            BOOST_LOG(error) << "Failed to clear CAP_SYS_ADMIN capability flag"sv;
+          } else if (cap_set_proc(caps) && errno != EPERM) {
+            // The worker intentionally clears its permitted set when KMS/NvFBC
+            // is no longer selected. In that case the stale cap_t cannot be
+            // applied and EPERM is the expected result.
+            BOOST_LOG(error) << "Failed to drop CAP_SYS_ADMIN"sv;
+          }
+          cap_free(caps);
         }
-        cap_free(caps);
-      }
 
-      cap_t caps;
-    };
+      private:
+        cap_t caps {};
+      };
+
+      class privileged_drm_worker_stopped final: public std::runtime_error {
+      public:
+        using std::runtime_error::runtime_error;
+      };
+
+      class privileged_drm_worker {
+      public:
+        static void ensure_started() {
+          instance();
+        }
+
+        static void drop_worker_privileges() {
+          instance().run([]() { platf::drop_elevated_privileges(true); });
+        }
+
+        static int open_drm_card_fd_privileged(const char *path) {
+          try {
+            return instance().run([path]() { return platf::open_drm_card_fd(path); });
+          }
+          catch (const privileged_drm_worker_stopped &) {
+            return -1;
+          }
+        }
+
+        static drmModeFB2Ptr drmModeGetFB2_privileged(int fd, std::uint32_t buffer_id) {
+          try {
+            return instance().run([fd, buffer_id]() { return drmModeGetFB2(fd, buffer_id); });
+          }
+          catch (const privileged_drm_worker_stopped &) {
+            return nullptr;
+          }
+        }
+
+        static drmModeFBPtr drmModeGetFB_privileged(int fd, std::uint32_t buffer_id) {
+          try {
+            return instance().run([fd, buffer_id]() { return drmModeGetFB(fd, buffer_id); });
+          }
+          catch (const privileged_drm_worker_stopped &) {
+            return nullptr;
+          }
+        }
+
+      private:
+        static privileged_drm_worker &instance() {
+          static privileged_drm_worker worker;
+          return worker;
+        }
+
+        privileged_drm_worker():
+            thread_ {[this]() {
+              sigset_t signals;
+              sigfillset(&signals);
+              if (pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0) {
+                BOOST_LOG(error) << "Failed to block signals in DRM worker"sv;
+                queue_.stop();
+                return;
+              }
+              platf::set_thread_name("drm_worker");
+              while (auto task = queue_.pop()) {
+                (*task)();
+              }
+            }} {}
+
+        ~privileged_drm_worker() {
+          queue_.stop();
+        }
+
+        template<class F>
+        auto run(F &&function) -> std::invoke_result_t<F> {
+          using result_t = std::invoke_result_t<F>;
+          auto task = std::make_shared<std::packaged_task<result_t()>>(
+            [function = std::forward<F>(function)]() mutable -> result_t {
+              cap_sys_admin capability;
+              return function();
+            });
+          auto result = task->get_future();
+          if (!queue_.raise([task]() mutable { (*task)(); })) {
+            throw privileged_drm_worker_stopped { "DRM worker stopped" };
+          }
+          return result.get();
+        }
+
+        safe::queue_t<std::function<void()>> queue_ {
+          32,
+          safe::queue_t<std::function<void()>>::overflow_policy_e::reject,
+        };
+        std::jthread thread_;
+      };
+    }  // namespace
+
+    void
+    ensure_privileged_drm_worker_started() {
+      privileged_drm_worker::ensure_started();
+    }
+
+    void
+    drop_drm_worker_privileges() {
+      static std::once_flag dropped;
+      std::call_once(dropped, []() {
+        privileged_drm_worker::drop_worker_privileges();
+      });
+    }
+
+    int
+    privileged_open_drm_card_fd(const char *path) {
+      return privileged_drm_worker::open_drm_card_fd_privileged(path);
+    }
 
     class wrapper_fb {
     public:
@@ -291,11 +409,9 @@ namespace platf {
 
       int
       init(const char *path) {
-        cap_sys_admin admin;
-        fd.el = open(path, O_RDWR);
+        fd.el = privileged_drm_worker::open_drm_card_fd_privileged(path);
 
         if (fd.el < 0) {
-          BOOST_LOG(error) << "Couldn't open: "sv << path << ": "sv << strerror(errno);
           return -1;
         }
 
@@ -348,14 +464,12 @@ namespace platf {
 
       fb_t
       fb(plane_t::pointer plane) {
-        cap_sys_admin admin;
-
-        auto fb2 = drmModeGetFB2(fd.el, plane->fb_id);
+        auto fb2 = privileged_drm_worker::drmModeGetFB2_privileged(fd.el, plane->fb_id);
         if (fb2) {
           return std::make_unique<wrapper_fb>(fb2);
         }
 
-        auto fb = drmModeGetFB(fd.el, plane->fb_id);
+        auto fb = privileged_drm_worker::drmModeGetFB_privileged(fd.el, plane->fb_id);
         if (fb) {
           return std::make_unique<wrapper_fb>(fb);
         }

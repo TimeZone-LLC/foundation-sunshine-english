@@ -263,6 +263,9 @@ namespace egl {
   std::optional<ctx_t>
   make_ctx(display_t::pointer display);
 
+  void
+  ensure_privileged_egl_worker_started();
+
   std::optional<rgb_t>
   import_source(
     display_t::pointer egl_display,

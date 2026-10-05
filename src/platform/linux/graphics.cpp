@@ -8,6 +8,12 @@
 #include "src/video.h"
 
 #include <fcntl.h>
+#include <csignal>
+#include <functional>
+#include <future>
+#include <stdexcept>
+#include <sys/capability.h>
+#include <type_traits>
 
 extern "C" {
 #include <libavutil/pixdesc.h>
@@ -311,6 +317,107 @@ namespace gbm {
 }  // namespace gbm
 
 namespace egl {
+  namespace {
+    class cap_sys_nice {
+    public:
+      cap_sys_nice() {
+        caps_ = cap_get_proc();
+        cap_value_t capability = CAP_SYS_NICE;
+        if (!caps_ || cap_set_flag(caps_, CAP_EFFECTIVE, 1, &capability, CAP_SET) || cap_set_proc(caps_)) {
+          BOOST_LOG(debug) << "CAP_SYS_NICE is unavailable for EGL context creation"sv;
+        }
+      }
+
+      ~cap_sys_nice() {
+        if (!caps_) return;
+        cap_value_t capability = CAP_SYS_NICE;
+        cap_set_flag(caps_, CAP_EFFECTIVE, 1, &capability, CAP_CLEAR);
+        cap_set_proc(caps_);
+        cap_free(caps_);
+      }
+
+    private:
+      cap_t caps_ {};
+    };
+
+    class privileged_egl_worker_stopped final: public std::runtime_error {
+    public:
+      using std::runtime_error::runtime_error;
+    };
+
+    class privileged_egl_worker {
+    public:
+      static void ensure_started() {
+        instance();
+      }
+
+      static EGLContext create_context(EGLDisplay display, EGLConfig config, const EGLint *attributes) {
+        try {
+          return instance().run([display, config, attributes]() {
+            if (!eglBindAPI(EGL_OPENGL_API)) {
+              BOOST_LOG(error) << "Couldn't bind OpenGL in EGL worker"sv;
+              return EGL_NO_CONTEXT;
+            }
+            return eglCreateContext(display, config, EGL_NO_CONTEXT, attributes);
+          });
+        }
+        catch (const privileged_egl_worker_stopped &) {
+          return EGL_NO_CONTEXT;
+        }
+      }
+
+    private:
+      static privileged_egl_worker &instance() {
+        static privileged_egl_worker worker;
+        return worker;
+      }
+
+      privileged_egl_worker():
+          thread_ {[this]() {
+            sigset_t signals;
+            sigfillset(&signals);
+            if (pthread_sigmask(SIG_BLOCK, &signals, nullptr) != 0) {
+              queue_.stop();
+              return;
+            }
+            platf::set_thread_name("egl_worker");
+            while (auto task = queue_.pop()) {
+              (*task)();
+            }
+          }} {}
+
+      ~privileged_egl_worker() {
+        queue_.stop();
+      }
+
+      template<class F>
+      auto run(F &&function) -> std::invoke_result_t<F> {
+        using result_t = std::invoke_result_t<F>;
+        auto task = std::make_shared<std::packaged_task<result_t()>>(
+          [function = std::forward<F>(function)]() mutable -> result_t {
+            cap_sys_nice capability;
+            return function();
+          });
+        auto result = task->get_future();
+        if (!queue_.raise([task]() mutable { (*task)(); })) {
+          throw privileged_egl_worker_stopped { "EGL worker stopped" };
+        }
+        return result.get();
+      }
+
+      safe::queue_t<std::function<void()>> queue_ {
+        32,
+        safe::queue_t<std::function<void()>>::overflow_policy_e::reject,
+      };
+      std::jthread thread_;
+    };
+  }  // namespace
+
+  void
+  ensure_privileged_egl_worker_started() {
+    privileged_egl_worker::ensure_started();
+  }
+
   constexpr auto EGL_LINUX_DMA_BUF_EXT = 0x3270;
   constexpr auto EGL_LINUX_DRM_FOURCC_EXT = 0x3271;
   constexpr auto EGL_DMA_BUF_PLANE0_FD_EXT = 0x3272;
@@ -421,16 +528,11 @@ namespace egl {
       return std::nullopt;
     }
 
-    if (!eglBindAPI(EGL_OPENGL_API)) {
-      BOOST_LOG(error) << "Couldn't bind API: ["sv << util::hex(eglGetError()).to_string_view() << ']';
-      return std::nullopt;
-    }
-
     constexpr int attr[] {
       EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE
     };
 
-    ctx_t ctx { display, eglCreateContext(display, conf, EGL_NO_CONTEXT, attr) };
+    ctx_t ctx { display, privileged_egl_worker::create_context(display, conf, attr) };
     if (fail()) {
       BOOST_LOG(error) << "Couldn't create EGL context: ["sv << util::hex(eglGetError()).to_string_view() << ']';
       return std::nullopt;

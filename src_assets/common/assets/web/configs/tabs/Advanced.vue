@@ -294,6 +294,8 @@ const hdrToggleDisabled = computed(() => codecStrategy.value !== 'modern')
               <option value="wlr">wlroots</option>
               <option value="kms">KMS</option>
               <option value="x11">X11</option>
+              <option value="kwin">KWin ScreenCast</option>
+              <option value="portal">XDG Desktop Portal</option>
             </template>
             <template #windows>
               <option value="ddx">Desktop Duplication API</option>
@@ -360,6 +362,7 @@ const hdrToggleDisabled = computed(() => codecStrategy.value !== 'modern')
           <template #linux>
             <option value="nvenc">NVIDIA NVENC</option>
             <option value="vaapi">VA-API</option>
+            <option value="vulkan">Vulkan Video</option>
           </template>
           <template #macos>
             <option value="videotoolbox">VideoToolbox</option>

@@ -22,6 +22,7 @@ option(SUNSHINE_REQUIRE_TRAY "Require system tray icon. Fail the build if tray r
 option(SUNSHINE_ENABLE_LEGACY_TRAY "Use the in-process C++ tray instead of the Windows GUI user agent." OFF)
 
 option(SUNSHINE_SYSTEM_WAYLAND_PROTOCOLS "Use system installation of wayland-protocols rather than the submodule." OFF)
+option(SUNSHINE_SYSTEM_VULKAN_HEADERS "Use the system Vulkan headers." ON)
 
 if(APPLE)
     option(BOOST_USE_STATIC "Use static boost libraries." OFF)
@@ -53,6 +54,8 @@ elseif(UNIX)  # Linux
             "Enable a Flatpak build." OFF)
     option(SUNSHINE_CONFIGURE_PKGBUILD
             "Configure files required for AUR. Recommended to use with SUNSHINE_CONFIGURE_ONLY" OFF)
+    option(SUNSHINE_CONFIGURE_APKBUILD
+            "Configure files required for Alpine Linux. Recommended to use with SUNSHINE_CONFIGURE_ONLY" OFF)
     option(SUNSHINE_CONFIGURE_FLATPAK_MAN
             "Configure manifest file required for Flatpak build. Recommended to use with SUNSHINE_CONFIGURE_ONLY" OFF)
 
@@ -63,8 +66,14 @@ elseif(UNIX)  # Linux
             "Enable KMS grab if available." ON)
     option(SUNSHINE_ENABLE_VAAPI
             "Enable building vaapi specific code." ON)
+    option(SUNSHINE_ENABLE_VULKAN
+            "Enable Vulkan video encoding." ON)
     option(SUNSHINE_ENABLE_WAYLAND
             "Enable building wayland specific code." ON)
     option(SUNSHINE_ENABLE_X11
             "Enable X11 grab if available." ON)
+    option(SUNSHINE_ENABLE_KWIN
+            "Enable direct KWin ScreenCast capture." ON)
+    option(SUNSHINE_ENABLE_PORTAL
+            "Enable XDG Desktop Portal capture." ON)
 endif()

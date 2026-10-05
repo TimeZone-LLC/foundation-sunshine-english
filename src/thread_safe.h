@@ -262,19 +262,28 @@ namespace safe {
   public:
     using status_t = util::optional_t<T>;
 
-    queue_t(std::uint32_t max_elements = 32):
-        _max_elements { max_elements } {}
+    enum class overflow_policy_e {
+      drop_oldest,
+      reject,
+    };
+
+    queue_t(std::uint32_t max_elements = 32, overflow_policy_e overflow_policy = overflow_policy_e::drop_oldest):
+        _max_elements { max_elements },
+        _overflow_policy { overflow_policy } {}
 
     template <class... Args>
-    void
+    bool
     raise(Args &&...args) {
       std::lock_guard ul { _lock };
 
       if (!_continue) {
-        return;
+        return false;
       }
 
       if (_queue.size() == _max_elements) {
+        if (_overflow_policy == overflow_policy_e::reject) {
+          return false;
+        }
         // Make room for the newest element by dropping only the oldest one. Clearing the whole
         // queue would throw away every buffered frame whenever the consumer stalls briefly.
         _queue.erase(std::begin(_queue));
@@ -283,6 +292,7 @@ namespace safe {
       _queue.emplace_back(std::forward<Args>(args)...);
 
       _cv.notify_all();
+      return true;
     }
 
     bool
@@ -355,6 +365,7 @@ namespace safe {
   private:
     bool _continue { true };
     std::uint32_t _max_elements;
+    overflow_policy_e _overflow_policy;
 
     std::mutex _lock;
     std::condition_variable _cv;

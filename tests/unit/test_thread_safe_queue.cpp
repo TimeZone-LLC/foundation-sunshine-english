@@ -43,3 +43,18 @@ TEST(SafeQueue, BelowCapacityKeepsEverythingInOrder) {
   EXPECT_EQ(pop_value(queue), 7);
   EXPECT_EQ(pop_value(queue), 8);
 }
+
+TEST(SafeQueue, RejectPolicyNeverDiscardsPrivilegedWork) {
+  using queue_t = safe::queue_t<int>;
+  queue_t queue { 1, queue_t::overflow_policy_e::reject };
+
+  EXPECT_TRUE(queue.raise(7));
+  EXPECT_FALSE(queue.raise(8));
+  EXPECT_EQ(pop_value(queue), 7);
+}
+
+TEST(SafeQueue, RaiseFailsAfterStop) {
+  safe::queue_t<int> queue { 1 };
+  queue.stop();
+  EXPECT_FALSE(queue.raise(7));
+}

@@ -1689,7 +1689,13 @@ namespace video {
       // Common options for AV1
       {
         { "forced_idr"s, 1 },
+        { "idr_interval"s, std::numeric_limits<int>::max() },
         { "async_depth"s, 1 },
+        { "tune"s, &config::video.vk.tune },
+        { "rc_mode"s, &config::video.vk.rc_mode },
+        { "units"s, 0 },
+        { "usage"s, "stream"s },
+        { "content"s, "rendered"s },
       },
       {},  // SDR-specific options
       {},  // HDR-specific options
@@ -1702,7 +1708,13 @@ namespace video {
       // Common options for HEVC (if supported)
       {
         { "forced_idr"s, 1 },
+        { "idr_interval"s, std::numeric_limits<int>::max() },
         { "async_depth"s, 1 },
+        { "tune"s, &config::video.vk.tune },
+        { "rc_mode"s, &config::video.vk.rc_mode },
+        { "units"s, 0 },
+        { "usage"s, "stream"s },
+        { "content"s, "rendered"s },
       },
       {},  // SDR-specific options
       {},  // HDR-specific options
@@ -1715,7 +1727,13 @@ namespace video {
       // Common options for H.264 (if supported)
       {
         { "forced_idr"s, 1 },
+        { "idr_interval"s, std::numeric_limits<int>::max() },
         { "async_depth"s, 1 },
+        { "tune"s, &config::video.vk.tune },
+        { "rc_mode"s, &config::video.vk.rc_mode },
+        { "units"s, 0 },
+        { "usage"s, "stream"s },
+        { "content"s, "rendered"s },
       },
       {},  // SDR-specific options
       {},  // HDR-specific options
@@ -1724,7 +1742,7 @@ namespace video {
       {},  // Fallback options
       "h264_vulkan"s,
     },
-    PARALLEL_ENCODING
+    LIMITED_GOP_SIZE | PARALLEL_ENCODING
   };
 #endif
 
@@ -3778,6 +3796,13 @@ namespace video {
         // If minimum_fps_target is set or boost is active, we'll encode anyway to maintain minimum FPS.
       }
 
+      // Re-check immediately before submitting work. Capture teardown can race
+      // the conversion path, and Vulkan makes the resulting in-flight UAF
+      // especially reproducible.
+      if (shutdown_event->peek() || !images->running() || (reinit_event.peek() && frame_nr > 1)) {
+        break;
+      }
+
       if (encode(frame_nr++, *session, packets, channel_data, frame_timestamp, std::move(pipeline_trace))) {
         BOOST_LOG(error) << "Could not encode video packet"sv;
         // Don't exit permanently — break to let the outer reinit loop handle recovery
@@ -3810,6 +3835,8 @@ namespace video {
         display->offset_y,
         config.width,
         config.height,
+        display->logical_width,
+        display->logical_height,
       },
       display->env_width,
       display->env_height,
@@ -5141,7 +5168,18 @@ namespace video {
   vulkan_init_avcodec_hardware_input_buffer(platf::avcodec_encode_device_t *encode_device) {
     avcodec_buffer_t hw_device_buf;
 
-    auto status = av_hwdevice_ctx_create(&hw_device_buf, AV_HWDEVICE_TYPE_VULKAN, nullptr, nullptr, 0);
+#ifdef SUNSHINE_BUILD_VULKAN
+    using linux_vulkan_init_fn = int (*)(platf::avcodec_encode_device_t *, AVBufferRef **);
+    if (encode_device && encode_device->data) {
+      if (((linux_vulkan_init_fn) encode_device->data)(encode_device, &hw_device_buf)) {
+        return -1;
+      }
+      return hw_device_buf;
+    }
+#endif
+
+    const auto *device = config::video.adapter_name.empty() ? nullptr : config::video.adapter_name.c_str();
+    auto status = av_hwdevice_ctx_create(&hw_device_buf, AV_HWDEVICE_TYPE_VULKAN, device, nullptr, 0);
     if (status < 0) {
       char string[AV_ERROR_MAX_STRING_SIZE];
       BOOST_LOG(error) << "Failed to create a Vulkan device: "sv << av_make_error_string(string, AV_ERROR_MAX_STRING_SIZE, status);

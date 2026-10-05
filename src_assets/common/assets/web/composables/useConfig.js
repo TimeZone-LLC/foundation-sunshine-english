@@ -6,9 +6,9 @@ import { deepClone, safeJsonParse } from '../utils/helpers.js'
 
 // 平台相关的标签页排除规则
 const PLATFORM_EXCLUSIONS = {
-  windows: ['vt', 'vaapi'],
+  windows: ['vt', 'vaapi', 'vk'],
   linux: ['amd', 'qsv', 'vt'],
-  macos: ['amd', 'nv', 'qsv', 'vaapi'],
+  macos: ['amd', 'nv', 'qsv', 'vaapi', 'vk'],
 }
 
 // 不参与默认值比较的键
@@ -209,6 +209,15 @@ const DEFAULT_TABS = [
           vaapi_quality: 'auto',
           vaapi_rc: 'auto',
           vaapi_strict_rc_buffer: 'disabled',
+        },
+      },
+      {
+        id: 'vk',
+        name: 'Vulkan Encoder',
+        options: {
+          vk_tune: 0,
+          vk_rc_mode: 0,
+          vk_quality: 'balanced',
         },
       },
       {

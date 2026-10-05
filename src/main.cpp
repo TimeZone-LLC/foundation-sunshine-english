@@ -4,9 +4,11 @@
  */
 // standard includes
 #include <atomic>
+#include <cerrno>
 #include <chrono>
 #include <codecvt>
 #include <csignal>
+#include <cstring>
 #include <fstream>
 #include <future>
 #include <iostream>
@@ -45,6 +47,13 @@
 
 #ifdef __APPLE__
   #include "platform/macos/misc.h"
+#endif
+
+#ifdef __linux__
+  #include <sys/auxv.h>
+
+  #include "platform/linux/graphics.h"
+  #include "platform/linux/misc.h"
 #endif
 
 #ifdef _WIN32
@@ -228,6 +237,28 @@ probe_encoders_with_watchdog() {
 
 int
 main(int argc, char *argv[]) {
+#ifdef __linux__
+  const bool privileged_execution = getauxval(AT_SECURE) != 0 || platf::has_elevated_privileges(true);
+  if (privileged_execution && !platf::sanitize_process_environment()) {
+    std::cerr << "Failed to sanitize the environment for privileged execution: "
+              << std::strerror(errno) << '\n';
+    return 1;
+  }
+
+  // Worker threads inherit capability sets. Construct them before pruning the
+  // main thread so only these narrow queues can perform privileged operations.
+  #ifdef SUNSHINE_BUILD_DRM
+  platf::kms::ensure_privileged_drm_worker_started();
+  #endif
+  if (platf::has_elevated_privileges(false)) {
+    platf::drop_elevated_privileges(false);
+  }
+  egl::ensure_privileged_egl_worker_started();
+  if (platf::has_elevated_privileges(true)) {
+    platf::drop_elevated_privileges(true);
+  }
+#endif
+
   lifetime::argv = argv;
 
   task_pool_util::TaskPool::task_id_t force_shutdown = nullptr;

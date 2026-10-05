@@ -219,6 +219,24 @@ namespace video {
     }
   };
 
+  /** Return the requested frame rate without losing fractional NTSC timings. */
+  inline AVRational
+  framerate_to_rational(const config_t &config) {
+    if (config.frameRateNum > 0 && config.frameRateDen > 0) {
+      return AVRational { config.frameRateNum, config.frameRateDen };
+    }
+    return AVRational { config.framerate, 1 };
+  }
+
+  /** Return one capture-frame interval using the exact client frame rate. */
+  inline std::chrono::nanoseconds
+  capture_frame_interval(const config_t &config) {
+    const AVRational fps = framerate_to_rational(config);
+    return std::chrono::nanoseconds {
+      (static_cast<std::int64_t>(fps.den) * 1'000'000'000LL) / fps.num
+    };
+  }
+
   // Convert a total video transport budget (including FEC) to encoder bitrate.
   int
   encoder_bitrate_from_total_bitrate(int total_bitrate_kbps, int fec_percentage);
