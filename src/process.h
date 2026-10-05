@@ -157,6 +157,15 @@ namespace proc {
   std::tuple<std::string, std::string>
   calculate_app_id(const std::string &app_name, std::string app_image_path, int index);
 
+  /**
+   * @brief Prepare a configured command for execution.
+   *
+   * @param command Configured command line.
+   * @return Command line with any package-specific launcher prefix applied.
+   */
+  std::string
+  prepare_command(const std::string &command);
+
   std::string
   validate_app_image_path(std::string app_image_path);
   void

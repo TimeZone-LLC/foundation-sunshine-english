@@ -10,6 +10,7 @@
 #include <boost/property_tree/xml_parser.hpp>
 #include <nlohmann/json.hpp>
 
+#include "src/config.h"
 #include "src/file_handler.h"
 #include "src/logging.h"
 #include "src/process.h"
@@ -53,6 +54,7 @@ namespace nvhttp::apps {
   void
   list(resp_https_t response, req_https_t request) {
     log_request(request);
+    proc::refresh(config::stream.file_apps);
 
     pt::ptree tree;
 

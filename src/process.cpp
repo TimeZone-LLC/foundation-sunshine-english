@@ -155,6 +155,24 @@ namespace proc {
     return cmd_path.parent_path();
   }
 
+  std::string
+  prepare_command(const std::string &command) {
+#ifdef SUNSHINE_BUILD_FLATPAK
+    constexpr auto host_command_prefix = "flatpak-spawn --host "sv;
+    const auto stripped_command = boost::trim_copy(command);
+    if (stripped_command.empty() || stripped_command.starts_with(host_command_prefix)) {
+      if (!stripped_command.empty()) {
+        BOOST_LOG(warning) << "Command ["sv << stripped_command << "] already includes [flatpak-spawn --host], which is no longer required for Flatpak builds."sv;
+      }
+      return stripped_command;
+    }
+
+    return std::string { host_command_prefix } + stripped_command;
+#else
+    return command;
+#endif
+  }
+
   int
   proc_t::execute(int app_id, std::shared_ptr<rtsp_stream::launch_session_t> launch_session) {
     // Ensure starting from a clean slate
@@ -244,22 +262,23 @@ namespace proc {
         continue;
       }
 
+      const auto command = prepare_command(cmd.do_cmd);
       boost::filesystem::path working_dir = _app.working_dir.empty() ?
-                                              find_working_directory(cmd.do_cmd, _env) :
+                                              find_working_directory(command, _env) :
                                               boost::filesystem::path(_app.working_dir);
-      BOOST_LOG(info) << "Executing Do Cmd: ["sv << cmd.do_cmd << ']';
-      auto child = platf::run_command(cmd.elevated, true, cmd.do_cmd, working_dir, _env, _pipe.get(), ec, nullptr);
+      BOOST_LOG(info) << "Executing Do Cmd: ["sv << command << ']';
+      auto child = platf::run_command(cmd.elevated, true, command, working_dir, _env, _pipe.get(), ec, nullptr);
 
       if (ec) {
         // We don't want any prep commands failing launch of the desktop.
         // This is to prevent the issue where users reboot their PC and need to log in with Sunshine.
         // permission_denied is typically returned when the user impersonation fails, which can happen when user is not signed in yet.
         if (!(_app.cmd.empty() && ec == std::errc::permission_denied)) {
-          BOOST_LOG(error) << "Couldn't run ["sv << cmd.do_cmd << "]: System: "sv << ec.message();
+          BOOST_LOG(error) << "Couldn't run ["sv << command << "]: System: "sv << ec.message();
           return -1;
         }
 
-        BOOST_LOG(warning) << "Skipping Desktop prep command ["sv << cmd.do_cmd
+        BOOST_LOG(warning) << "Skipping Desktop prep command ["sv << command
                            << "] because Sunshine could not run it under the user's session: "sv << ec.message()
                            << ". Desktop streaming will continue, but this prep command's effect will not be applied."sv;
         ec.clear();
@@ -268,24 +287,25 @@ namespace proc {
 
       child.wait(ec);
       if (ec) {
-        BOOST_LOG(error) << '[' << cmd.do_cmd << "] wait failed with error code ["sv << ec << ']';
+        BOOST_LOG(error) << '[' << command << "] wait failed with error code ["sv << ec << ']';
         return -1;
       }
       auto ret = child.exit_code();
       if (ret != 0) {
-        BOOST_LOG(error) << '[' << cmd.do_cmd << "] exited with code ["sv << ret << ']';
+        BOOST_LOG(error) << '[' << command << "] exited with code ["sv << ret << ']';
         return -1;
       }
     }
 
     for (auto &cmd : _app.detached) {
+      const auto command = prepare_command(cmd);
       boost::filesystem::path working_dir = _app.working_dir.empty() ?
-                                              find_working_directory(cmd, _env) :
+                                              find_working_directory(command, _env) :
                                               boost::filesystem::path(_app.working_dir);
-      BOOST_LOG(info) << "Spawning ["sv << cmd << "] in ["sv << working_dir << ']';
-      auto child = platf::run_command(_app.elevated, true, cmd, working_dir, _env, _pipe.get(), ec, nullptr);
+      BOOST_LOG(info) << "Spawning ["sv << command << "] in ["sv << working_dir << ']';
+      auto child = platf::run_command(_app.elevated, true, command, working_dir, _env, _pipe.get(), ec, nullptr);
       if (ec) {
-        BOOST_LOG(warning) << "Couldn't spawn ["sv << cmd << "]: System: "sv << ec.message();
+        BOOST_LOG(warning) << "Couldn't spawn ["sv << command << "]: System: "sv << ec.message();
       }
       else {
         child.detach();
@@ -297,13 +317,14 @@ namespace proc {
       placebo = true;
     }
     else {
+      const auto command = prepare_command(_app.cmd);
       boost::filesystem::path working_dir = _app.working_dir.empty() ?
-                                              find_working_directory(_app.cmd, _env) :
+                                              find_working_directory(command, _env) :
                                               boost::filesystem::path(_app.working_dir);
-      BOOST_LOG(info) << "Executing: ["sv << _app.cmd << "] in ["sv << working_dir << ']';
-      _process = platf::run_command(_app.elevated, true, _app.cmd, working_dir, _env, _pipe.get(), ec, &_process_group);
+      BOOST_LOG(info) << "Executing: ["sv << command << "] in ["sv << working_dir << ']';
+      _process = platf::run_command(_app.elevated, true, command, working_dir, _env, _pipe.get(), ec, &_process_group);
       if (ec) {
-        BOOST_LOG(warning) << "Couldn't run ["sv << _app.cmd << "]: System: "sv << ec.message();
+        BOOST_LOG(warning) << "Couldn't run ["sv << command << "]: System: "sv << ec.message();
         return -1;
       }
     }
@@ -370,11 +391,12 @@ namespace proc {
         continue;
       }
 
+      const auto command = prepare_command(cmd.undo_cmd);
       boost::filesystem::path working_dir = _app.working_dir.empty() ?
-                                              find_working_directory(cmd.undo_cmd, _env) :
+                                              find_working_directory(command, _env) :
                                               boost::filesystem::path(_app.working_dir);
-      BOOST_LOG(info) << "Executing Undo Cmd: ["sv << cmd.undo_cmd << ']';
-      auto child = platf::run_command(cmd.elevated, true, cmd.undo_cmd, working_dir, _env, _pipe.get(), ec, nullptr);
+      BOOST_LOG(info) << "Executing Undo Cmd: ["sv << command << ']';
+      auto child = platf::run_command(cmd.elevated, true, command, working_dir, _env, _pipe.get(), ec, nullptr);
 
       if (ec) {
         BOOST_LOG(warning) << "System: "sv << ec.message();
@@ -531,7 +553,7 @@ namespace proc {
     });
 
     if (iter != _app.menu_cmds.end()) {
-      auto cmd = iter->do_cmd;
+      const auto cmd = prepare_command(iter->do_cmd);
       std::error_code ec;
 
       boost::filesystem::path working_dir = _app.working_dir.empty() ?
@@ -1022,6 +1044,20 @@ namespace proc {
 
   void
   refresh(const std::string &file_name) {
+    struct apps_file_snapshot_t {
+      std::string file_name;
+      std::filesystem::file_time_type modified_at;
+    };
+    static std::optional<apps_file_snapshot_t> last_successful_parse;
+
+    std::error_code ec;
+    const auto modified_at = std::filesystem::last_write_time(file_name, ec);
+    if (!ec && last_successful_parse &&
+        last_successful_parse->file_name == file_name &&
+        last_successful_parse->modified_at == modified_at) {
+      return;
+    }
+
     auto proc_opt = proc::parse(file_name);
 
     if (proc_opt) {
@@ -1056,6 +1092,12 @@ namespace proc {
         proc.set_env(proc_opt->get_env());
       }
       proc.set_apps(proc_opt->get_apps());
+      if (ec) {
+        last_successful_parse.reset();
+      }
+      else {
+        last_successful_parse = apps_file_snapshot_t { file_name, modified_at };
+      }
     }
   }
 }  // namespace proc
