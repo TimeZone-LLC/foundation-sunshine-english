@@ -871,7 +871,7 @@ namespace stream {
 
     ctx.mic_socket_enabled.store(false);
 
-    auto address_family = net::af_from_enum_string(config::sunshine.address_family);
+    auto address_family = net::get_effective_address_family(net::af_from_enum_string(config::sunshine.address_family));
     auto protocol = address_family == net::IPV4 ? udp::v4() : udp::v6();
     auto mic_port = net::map_port(MIC_STREAM_PORT);
     boost::system::error_code ec;
@@ -3895,7 +3895,7 @@ namespace stream {
 
   int
   start_broadcast(broadcast_ctx_t &ctx) {
-    auto address_family = net::af_from_enum_string(config::sunshine.address_family);
+    auto address_family = net::get_effective_address_family(net::af_from_enum_string(config::sunshine.address_family));
     auto protocol = address_family == net::IPV4 ? udp::v4() : udp::v6();
     auto control_port = net::map_port(CONTROL_PORT);
     auto video_port = net::map_port(VIDEO_STREAM_PORT);

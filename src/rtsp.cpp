@@ -715,6 +715,7 @@ namespace rtsp_stream {
         acceptor.close(close_ec);
       });
 
+      af = net::get_effective_address_family(af);
       acceptor.open(af == net::IPV4 ? tcp::v4() : tcp::v6(), ec);
       if (ec) {
         return -1;

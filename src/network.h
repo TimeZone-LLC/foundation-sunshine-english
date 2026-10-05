@@ -64,6 +64,15 @@ namespace net {
   af_from_enum_string(const std::string_view &view);
 
   /**
+   * @brief Get the effective address family for listening sockets.
+   * @details An IPv4 bind address narrows dual-stack mode to IPv4 so the socket protocol matches the bind endpoint.
+   * @param af Configured address family.
+   * @return IPv4 for a valid IPv4 bind address in dual-stack mode, or `af` otherwise.
+   */
+  af_e
+  get_effective_address_family(af_e af);
+
+  /**
    * @brief Get the wildcard binding address for a given address family.
    * @param af Address family.
    * @return Normalized address.
