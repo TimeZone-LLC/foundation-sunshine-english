@@ -218,26 +218,6 @@
                 {{ saveError }}
               </div>
 
-              <!-- 推荐服务 -->
-              <div class="promo-service-section mt-3">
-                <h5 class="mb-3">
-                  <i class="fas fa-bullhorn"></i>
-                  {{ $t('setup.featured_services') }}
-                </h5>
-                <div class="promo-service-links">
-                  <ResourceLink
-                    v-for="resource in FEATURED_RESOURCES"
-                    :key="resource.id"
-                    :href="resourceHref(resource)"
-                    :title="resourceTitle(resource)"
-                    :description="resourceDescription(resource)"
-                    :image-src="resource.imageSrc"
-                    :image-alt="resource.imageAlt"
-                    :variant="resource.variant"
-                  />
-                </div>
-              </div>
-
               <!-- 客户端下载 -->
               <div class="client-download-section mt-3">
                 <h5 class="mb-3">
@@ -397,9 +377,7 @@ import ConfirmDialog from './common/ConfirmDialog.vue'
 import BrandMark from './common/BrandMark.vue'
 import {
   CLIENT_RESOURCES,
-  FEATURED_RESOURCES,
   HARMONY_CLIENT_URL,
-  resolveResourceHref,
   resolveResourceText,
 } from '../config/resources.js'
 
@@ -456,10 +434,6 @@ export default {
     displayDevices: {
       type: Array,
       default: () => []
-    },
-    hasLocale: {
-      type: Boolean,
-      default: false
     }
   },
   data() {
@@ -483,13 +457,12 @@ export default {
     }
   },
   setup() {
-    return { FEATURED_RESOURCES, ...useVddStatus() }
+    return useVddStatus()
   },
   mounted() {
     // 记录进入设置向导
     trackEvents.pageView('setup_wizard')
     trackEvents.userAction('setup_wizard_started', {
-      has_locale: this.hasLocale,
       adapter_count: this.adapters.length
     })
     
@@ -499,12 +472,6 @@ export default {
     }
     this.refreshVddStatus()
     this.renderClientQrCodes()
-  },
-  watch: {
-    '$i18n.locale'() {
-      // Two of the client links are locale specific, so re-render the codes.
-      this.renderClientQrCodes()
-    },
   },
   beforeUnmount() {
     if (this.restartTimer) {
@@ -556,13 +523,11 @@ export default {
     },
     setupClientResources() {
       const resourcesById = new Map(CLIENT_RESOURCES.map((resource) => [resource.id, resource]))
-      const locale = this.$i18n.locale
       return SETUP_CLIENT_RESOURCE_ORDER
         .map((id) => resourcesById.get(id))
         .filter(Boolean)
         .map((resource) => ({
           ...resource,
-          href: resolveResourceHref(resource, locale),
           icon: SETUP_CLIENT_ICON_OVERRIDES[resource.id] || resource.icon,
         }))
     }
@@ -583,7 +548,7 @@ export default {
         const resource = CLIENT_RESOURCES.find((item) => item.id === resourceId)
         if (!resource) continue
         try {
-          this[field] = await QRCode.toDataURL(this.resourceHref(resource), {
+          this[field] = await QRCode.toDataURL(resource.href, {
             width: 320,
             margin: 2,
             // A QR code must stay dark-on-light in both themes to stay scannable.
@@ -604,9 +569,6 @@ export default {
     },
     resourceDescription(resource) {
       return resolveResourceText(this.$t, resource, 'description')
-    },
-    resourceHref(resource) {
-      return resolveResourceHref(resource, this.$i18n.locale)
     },
     handleResourceActivate(resource, event) {
       if (resource.action !== 'harmony') return
@@ -1266,25 +1228,17 @@ export default {
 }
 
 /* 完成页资源区样式 */
-.client-download-section,
-.promo-service-section {
+.client-download-section {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
   padding: 1em;
   border-radius: 0;
 }
 
-.client-download-section h5,
-.promo-service-section h5 {
+.client-download-section h5 {
   font-size: 1em;
   margin-bottom: 0.8em;
   color: var(--ui-text-primary);
-}
-
-.promo-service-links {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75em;
 }
 
 .client-download-layout {
@@ -1534,9 +1488,6 @@ export default {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .promo-service-links {
-    grid-template-columns: 1fr;
-  }
 }
 </style>
 

@@ -43,7 +43,6 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import AccountMenu from '../common/AccountMenu.vue'
 import BrandMark from '../common/BrandMark.vue'
-import { useBackground } from '../../composables/useBackground.js'
 import { useTheme } from '../../composables/useTheme.js'
 
 /*
@@ -62,8 +61,6 @@ const navItems = Object.freeze([
   { path: '/config', icon: 'fa-cog', label: 'navbar.configuration' },
 ])
 
-// 使用背景管理 composable
-const { loadBackground, addDragListeners } = useBackground()
 const isEmbeddedGui = window.isTauri === true && window.parent !== window
 
 if (isEmbeddedGui) {
@@ -88,9 +85,6 @@ const updateCurrentPath = () => {
   currentPath.value = window.location.pathname
 }
 
-// 清理函数引用
-let removeDragListeners = null
-
 // 链接点击处理函数
 const handleLinkClick = (e) => {
   if (e.target.closest('a.nav-link')?.href) {
@@ -98,15 +92,8 @@ const handleLinkClick = (e) => {
   }
 }
 
-// 错误处理函数
-const handleBackgroundError = (error) => {
-  console.error('Background error:', error)
-}
-
-onMounted(async () => {
-  await loadBackground()
+onMounted(() => {
   updateCurrentPath()
-  removeDragListeners = addDragListeners(handleBackgroundError)
   window.addEventListener('popstate', updateCurrentPath)
   document.addEventListener('click', handleLinkClick)
 })
@@ -114,7 +101,6 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('popstate', updateCurrentPath)
   document.removeEventListener('click', handleLinkClick)
-  removeDragListeners?.()
 })
 </script>
 

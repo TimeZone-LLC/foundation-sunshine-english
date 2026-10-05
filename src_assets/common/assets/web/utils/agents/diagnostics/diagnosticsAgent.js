@@ -36,9 +36,6 @@ export const DIAGNOSTICS_CAPABILITIES = [
     stage: 'log-analysis',
     icon: 'fa-chart-simple',
     label: 'Log severity summary',
-    labels: {
-      zh: 'Log severity summary',
-    },
     defaultEnabled: true,
     userSelectable: true,
   },
@@ -47,9 +44,6 @@ export const DIAGNOSTICS_CAPABILITIES = [
     stage: 'log-analysis',
     icon: 'fa-magnifying-glass-chart',
     label: 'Log pattern detection',
-    labels: {
-      zh: 'Log pattern detection',
-    },
     defaultEnabled: true,
     userSelectable: true,
   },
@@ -58,9 +52,6 @@ export const DIAGNOSTICS_CAPABILITIES = [
     stage: 'log-analysis',
     icon: 'fa-screwdriver-wrench',
     label: 'Log remediation suggestions',
-    labels: {
-      zh: 'Log remediation suggestions',
-    },
     defaultEnabled: true,
     userSelectable: true,
   },

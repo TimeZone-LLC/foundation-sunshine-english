@@ -84,7 +84,7 @@ export const DEFAULT_BUILT_IN_APPS = {
         },
         {
           id: 'rjeOKHmcdL',
-          name: 'Desktop Pet',
+          name: 'Toolbar',
           cmd: '.\\assets\\gui\\sunshine-gui.exe --toolbar',
           elevated: 'false'
         }

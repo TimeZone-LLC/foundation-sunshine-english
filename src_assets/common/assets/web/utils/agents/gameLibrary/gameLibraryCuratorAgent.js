@@ -34,9 +34,6 @@ export const GAME_LIBRARY_AGENT_CAPABILITIES = [
     stage: 'memory',
     icon: 'fa-clock-rotate-left',
     label: 'Confirmed overrides',
-    labels: {
-      zh: 'Confirmed overrides',
-    },
     required: true,
     defaultEnabled: true,
     userSelectable: false,
@@ -46,9 +43,6 @@ export const GAME_LIBRARY_AGENT_CAPABILITIES = [
     stage: 'metadata',
     icon: 'fa-wand-magic-sparkles',
     label: 'AI name cleanup',
-    labels: {
-      zh: 'AI name cleanup',
-    },
     defaultEnabled: true,
     userSelectable: true,
   },
@@ -57,9 +51,6 @@ export const GAME_LIBRARY_AGENT_CAPABILITIES = [
     stage: 'asset',
     icon: 'fa-image',
     label: 'AI cover matching',
-    labels: {
-      zh: 'AI cover matching',
-    },
     defaultEnabled: true,
     userSelectable: true,
   },

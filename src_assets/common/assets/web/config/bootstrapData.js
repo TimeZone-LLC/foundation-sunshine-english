@@ -1,7 +1,6 @@
 import { apiJson } from '../utils/apiFetch.js'
 
 let configRequest = null
-let localeRequest = null
 
 const cachedRequest = (path, getCurrent, setCurrent) => {
   const current = getCurrent()
@@ -18,10 +17,6 @@ const cachedRequest = (path, getCurrent, setCurrent) => {
 export const getBootstrapConfig = () =>
   cachedRequest('/api/config', () => configRequest, (request) => { configRequest = request })
 
-export const getBootstrapLocale = () =>
-  cachedRequest('/api/configLocale', () => localeRequest, (request) => { localeRequest = request })
-
 export const resetBootstrapDataCache = () => {
   configRequest = null
-  localeRequest = null
 }

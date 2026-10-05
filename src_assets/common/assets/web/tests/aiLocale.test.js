@@ -1,12 +1,16 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { getPromptLanguageName } from '../utils/aiLocale.js'
+import {
+  buildLocalizedInstruction,
+  getCurrentLocale,
+  getPromptLanguageName,
+} from '../utils/aiLocale.js'
 
-test('getPromptLanguageName maps supported Sunshine locales', () => {
-  assert.equal(getPromptLanguageName('zh'), 'Simplified Chinese')
-  assert.equal(getPromptLanguageName('zh-TW'), 'Traditional Chinese')
-  assert.equal(getPromptLanguageName('pt-BR'), 'Brazilian Portuguese')
-  assert.equal(getPromptLanguageName('de'), 'German')
-  assert.equal(getPromptLanguageName('unknown'), 'English')
+test('AI prompt language is always English', () => {
+  assert.equal(getCurrentLocale(), 'en')
+  assert.equal(getPromptLanguageName(), 'English')
+  assert.equal(getPromptLanguageName('zh-TW'), 'English')
+  assert.equal(getPromptLanguageName('de'), 'English')
+  assert.equal(buildLocalizedInstruction('fr'), 'Use English for user-facing explanations and short reasons.')
 })

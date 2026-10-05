@@ -7,7 +7,6 @@
       v-if="showSetupWizard"
       :adapters="adapters"
       :display-devices="displayDevices"
-      :has-locale="hasLocale"
       @setup-complete="onSetupComplete"
     />
 
@@ -83,20 +82,6 @@
       <!-- 错误日志 -->
       <ErrorLogs :fatal-logs="fatalLogs" />
 
-      <!-- 版本信息 -->
-      <VersionCard
-        v-if="showVersionDetails"
-        id="version-details"
-        :version="version"
-        :github-version="githubVersion"
-        :pre-release-version="preReleaseVersion"
-        :notify-pre-releases="notifyPreReleases"
-        :loading="loading"
-        :stable-build-available="stableBuildAvailable"
-        :pre-release-build-available="preReleaseBuildAvailable"
-        :parsed-stable-body="parsedStableBody"
-        :parsed-pre-release-body="parsedPreReleaseBody"
-      />
     </main>
   </div>
 </template>
@@ -107,8 +92,6 @@ import { useI18n } from 'vue-i18n'
 import Navbar from '../components/layout/Navbar.vue'
 import SetupWizard from '../components/SetupWizard.vue'
 import ErrorLogs from '../components/common/ErrorLogs.vue'
-import VersionCard from '../components/common/VersionCard.vue'
-import { VERSION_CHECK_STATUS, useVersion } from '../composables/useVersion.js'
 import { useLogs } from '../composables/useLogs.js'
 import { useSetupWizard } from '../composables/useSetupWizard.js'
 import { trackEvents } from '../config/firebase.js'
@@ -124,16 +107,10 @@ const inputOnlyEnabled = ref(null)
 const inputOnlySaving = ref(false)
 const inputOnlyMessage = ref('')
 
-const hasStableUpdate = computed(() => stableBuildAvailable.value)
-
 const versionLabel = computed(() => {
-  const currentVersion = version.value?.version || hostConfig.value?.version
-  return currentVersion ? `Ver ${currentVersion}` : t('index.loading_latest')
+  const currentVersion = hostConfig.value?.version
+  return currentVersion ? `Ver ${currentVersion}` : t('index.version_unavailable')
 })
-
-// The card carries update notices only, so it appears only when there is one.
-// Pre-release notifications were removed, so only a stable update opens it.
-const showVersionDetails = computed(() => hasStableUpdate.value)
 
 const countCollection = (payload, key) => {
   if (Array.isArray(payload)) return payload.length
@@ -170,44 +147,9 @@ const toggleInputOnlyMode = async () => {
   }
 }
 
-// 使用组合式函数
-const {
-  version,
-  githubVersion,
-  preReleaseVersion,
-  notifyPreReleases,
-  versionCheckStatus,
-  loading,
-  stableBuildAvailable,
-  preReleaseBuildAvailable,
-  parsedStableBody,
-  parsedPreReleaseBody,
-  fetchVersions,
-} = useVersion()
-
 const { fatalLogs, fetchLogs } = useLogs()
 
-const { showSetupWizard, adapters, displayDevices, hasLocale, checkSetupWizard, onSetupComplete } = useSetupWizard()
-
-// 上报显卡信息
-const reportGPUInfo = (config) => {
-  try {
-    const adapters = config.adapters || []
-    const adapterNames = adapters.map((a) => (typeof a === 'string' ? a : a?.name || String(a))).join(', ')
-
-    const gpuInfo = {
-      platform: config.platform || 'unknown',
-      adapter_count: adapters.length,
-      adapters: adapterNames,
-      selected_adapter: config.adapter_name || (adapters.length ? 'auto' : 'none'),
-      has_selected_adapter: !!config.adapter_name,
-    }
-
-    trackEvents.gpuReported(gpuInfo)
-  } catch (error) {
-    console.error('Failed to report GPU information:', error)
-  }
-}
+const { showSetupWizard, adapters, displayDevices, checkSetupWizard, onSetupComplete } = useSetupWizard()
 
 // 初始化
 onMounted(async () => {
@@ -218,10 +160,6 @@ onMounted(async () => {
     const config = await getBootstrapConfig()
     hostConfig.value = config
     hostStatus.value = 'ready'
-
-    setTimeout(() => {
-      reportGPUInfo(config)
-    }, 1000)
 
     // 检查是否需要显示设置向导
     if (checkSetupWizard(config)) {
@@ -240,12 +178,11 @@ onMounted(async () => {
       inputOnlyMessage.value = t('index.input_only_failed')
     }
 
-    // 版本和日志互不阻塞，避免外部版本检查拖延本机状态提示
-    await Promise.allSettled([fetchVersions(config), fetchLogs()])
+    await fetchLogs()
 
     // 更新页面标题
-    if (version.value) {
-      document.title += ` Ver ${version.value.version}`
+    if (config.version) {
+      document.title += ` Ver ${config.version}`
     }
   } catch (e) {
     hostStatus.value = 'error'
@@ -348,7 +285,7 @@ onMounted(async () => {
 
 /*
  * "Nothing is wrong" does not need a colour. Colour is reserved for states the
- * user has to act on - loading, error, update available - so a healthy host
+ * user has to act on - loading or error - so a healthy host
  * reads as quiet chrome rather than a green badge.
  */
 .home-status-ready {
@@ -367,12 +304,6 @@ onMounted(async () => {
   border-color: var(--ui-danger-border);
   background: var(--ui-danger-soft);
   color: var(--ui-danger-text);
-}
-
-.home-status-update {
-  border-color: var(--ui-info-border);
-  background: var(--ui-info-soft);
-  color: var(--ui-info-text);
 }
 
 .host-overview {
@@ -633,10 +564,6 @@ onMounted(async () => {
 .quick-action-arrow {
   color: var(--ui-text-muted);
   font-size: 0.58rem;
-}
-
-#version-details {
-  scroll-margin-top: 1rem;
 }
 
 @media (min-width: 1440px) {

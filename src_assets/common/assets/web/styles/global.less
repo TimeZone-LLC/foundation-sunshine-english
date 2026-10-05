@@ -34,20 +34,9 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-color: var(--ui-page-bg);
-  background-position: center;
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
   color: var(--ui-text-primary);
   position: relative;
   z-index: 0;
-
-  // The retired wallpaper sampler used to toggle these classes; pin them to
-  // the token background so any leftover class cannot repaint the page.
-  &.bg-light,
-  &.bg-dark {
-    background-color: var(--ui-page-bg) !important;
-  }
 }
 
 // Bootstrap variables, in both themes, so its own components read the tokens.
@@ -63,12 +52,6 @@ body {
   --bs-dropdown-border-color: var(--ui-border);
   --bs-dropdown-link-color: var(--ui-text-primary);
   --bs-dropdown-link-hover-bg: var(--ui-surface-hover);
-}
-
-// Drag and drop indicator
-.dragover {
-  outline: 3px dashed var(--ui-warning);
-  outline-offset: -8px;
 }
 
 // Layout

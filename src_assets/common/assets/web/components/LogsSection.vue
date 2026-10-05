@@ -55,10 +55,6 @@
             <i class="fas fa-copy me-1"></i>
             {{ $t('troubleshooting.copy_config') }}
           </button>
-          <span
-            class="dev-trigger"
-            @click="handleDevTap"
-          ></span>
         </div>
       </div>
     </div>
@@ -75,28 +71,8 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { apiFetch } from '../utils/apiFetch.js'
-
-const DEV_TAP_THRESHOLD = 7
-const DEV_TAP_TIMEOUT = 3000
-const DEV_STORAGE_KEY = 'sunshine_dev_mode'
-
-const readDevMode = () => {
-  try {
-    return localStorage.getItem(DEV_STORAGE_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-const writeDevMode = (enabled) => {
-  try {
-    localStorage.setItem(DEV_STORAGE_KEY, enabled ? '1' : '0')
-  } catch (e) {
-    console.warn('Persist dev mode failed:', e)
-  }
-}
 
 const props = defineProps({
   logFilter: {
@@ -187,24 +163,6 @@ const downloadLogs = async () => {
   }
 }
 
-// Dev mode: 7 taps within 3 seconds
-const devMode = ref(readDevMode())
-const devTapCount = ref(0)
-let devTapTimer = null
-
-const handleDevTap = () => {
-  devTapCount.value++
-  clearTimeout(devTapTimer)
-  devTapTimer = setTimeout(() => { devTapCount.value = 0 }, DEV_TAP_TIMEOUT)
-
-  if (devTapCount.value >= DEV_TAP_THRESHOLD) {
-    devTapCount.value = 0
-    devMode.value = !devMode.value
-    writeDevMode(devMode.value)
-    // Dispatch event so other components can react
-    window.dispatchEvent(new CustomEvent('sunshine-background-bypass', { detail: { enabled: devMode.value } }))
-  }
-}
 </script>
 
 <style scoped>
@@ -354,12 +312,4 @@ const handleDevTap = () => {
   }
 }
 
-.dev-trigger {
-  display: inline-block;
-  width: 12px;
-  min-height: 24px;
-  cursor: default;
-  user-select: none;
-  opacity: 0;
-}
 </style>

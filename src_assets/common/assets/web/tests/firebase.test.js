@@ -1,26 +1,41 @@
-import test, { after } from 'node:test'
+import test from 'node:test'
 import assert from 'node:assert/strict'
 
-const originalRequestIdleCallback = globalThis.requestIdleCallback
-globalThis.requestIdleCallback = () => 1
+import {
+  analytics,
+  initFirebase,
+  trackEvent,
+  trackEvents,
+} from '../config/firebase.js'
 
-const { trackEvent } = await import('../config/firebase.js')
+test('analytics compatibility facade never initializes an outbound client', async () => {
+  let scheduled = false
+  let fetched = false
+  const originalIdleCallback = globalThis.requestIdleCallback
+  const originalFetch = globalThis.fetch
+  globalThis.requestIdleCallback = () => { scheduled = true }
+  globalThis.fetch = async () => { fetched = true }
 
-after(() => {
-  if (originalRequestIdleCallback) {
-    globalThis.requestIdleCallback = originalRequestIdleCallback
-  } else {
-    delete globalThis.requestIdleCallback
+  try {
+    trackEvent('ignored', { private: 'value' })
+    trackEvents.pageView('home')
+    assert.equal(await initFirebase(), null)
+    assert.equal(analytics, null)
+    assert.equal(scheduled, false)
+    assert.equal(fetched, false)
+  } finally {
+    globalThis.requestIdleCallback = originalIdleCallback
+    globalThis.fetch = originalFetch
   }
 })
 
-test('accepts explicitly null analytics parameters', () => {
-  assert.doesNotThrow(() => trackEvent('null_params', null))
-})
-
-test('does not throw when an analytics parameter contains a cycle', () => {
+test('analytics compatibility methods remain safe no-ops', () => {
   const circularValue = {}
   circularValue.self = circularValue
 
+  assert.doesNotThrow(() => trackEvent('null_params', null))
   assert.doesNotThrow(() => trackEvent('circular_params', { value: circularValue }))
+  for (const method of Object.values(trackEvents)) {
+    assert.doesNotThrow(() => method('value', { detail: true }))
+  }
 })
