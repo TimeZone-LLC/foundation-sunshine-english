@@ -319,6 +319,10 @@ namespace platf {
   struct touch_port_t {
     int offset_x, offset_y;
     int width, height;
+    // Logical coordinates are distinct from buffer pixels on fractional-scale Wayland desktops.
+    // Zero means the capture backend could not determine a logical extent.
+    int logical_width = 0;
+    int logical_height = 0;
   };
 
   // These values must match Limelight-internal.h's SS_FF_* constants!
@@ -761,8 +765,10 @@ namespace platf {
     // Offsets for when streaming a specific monitor. By default, they are 0.
     int offset_x, offset_y;
     int env_width, env_height;
+    int env_logical_width = 0, env_logical_height = 0;
 
     int width, height;
+    int logical_width = 0, logical_height = 0;
 
   protected:
     // collect capture timing data (at loglevel debug)
