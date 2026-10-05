@@ -12,6 +12,7 @@
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <limits>
 #include <filesystem>
 #include <memory>
@@ -362,10 +363,16 @@ namespace nvhttp {
     launch_session->rtsp_url_scheme = launch_session->rtsp_cipher ? "rtspenc://"s : "rtsp://"s;
 
     // Generate the unique identifiers for this connection that we will send later during RTSP handshake
-    unsigned char raw_payload[8];
-    RAND_bytes(raw_payload, sizeof(raw_payload));
-    launch_session->av_ping_payload = util::hex_vec(raw_payload);
-    RAND_bytes((unsigned char *) &launch_session->control_connect_data, sizeof(launch_session->control_connect_data));
+    const auto random_data = crypto::rand(8 + sizeof(launch_session->control_connect_data));
+    if (random_data.size() != 8 + sizeof(launch_session->control_connect_data)) {
+      BOOST_LOG(error) << "Failed to generate launch session random data"sv;
+      return {};
+    }
+    launch_session->av_ping_payload = util::hex_vec(random_data.substr(0, 8));
+    std::memcpy(
+      &launch_session->control_connect_data,
+      random_data.data() + 8,
+      sizeof(launch_session->control_connect_data));
 
     launch_session->iv.resize(16);
     uint32_t prepend_iv = util::endian::big<uint32_t>(util::from_view(get_arg(args, "rikeyid")));
@@ -709,6 +716,12 @@ namespace nvhttp {
 
     host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
     const auto launch_session = make_launch_session(host_audio, args);
+    if (!launch_session) {
+      tree.put("root.resume", 0);
+      tree.put("root.<xmlattr>.status_code", 500);
+      tree.put("root.<xmlattr>.status_message", "Failed to generate launch session credentials");
+      return;
+    }
     launch_session->input_only_mode = config::input_only_mode.load(std::memory_order_acquire);
     launch_session->env["SUNSHINE_INPUT_ONLY_MODE"] = launch_session->input_only_mode ? "true" : "false";
     const rtsp_stream::launch_preparation_guard_t launch_preparation;
@@ -897,6 +910,12 @@ namespace nvhttp {
       host_audio = util::from_view(get_arg(args, "localAudioPlayMode"));
     }
     const auto launch_session = make_launch_session(host_audio, args);
+    if (!launch_session) {
+      tree.put("root.resume", 0);
+      tree.put("root.<xmlattr>.status_code", 500);
+      tree.put("root.<xmlattr>.status_message", "Failed to generate launch session credentials");
+      return;
+    }
     launch_session->input_only_mode = config::input_only_mode.load(std::memory_order_acquire);
     launch_session->env["SUNSHINE_INPUT_ONLY_MODE"] = launch_session->input_only_mode ? "true" : "false";
     const rtsp_stream::launch_preparation_guard_t launch_preparation;
@@ -1138,8 +1157,8 @@ namespace nvhttp {
     std::string usb_forwarding_token;
     bool usb_forwarding_available = false;
     if (config::nvhttp.usb_forwarding_enabled) {
-      std::array<unsigned char, 32> token_bytes {};
-      if (RAND_bytes(token_bytes.data(), static_cast<int>(token_bytes.size())) == 1) {
+      const auto token_bytes = crypto::rand(32);
+      if (token_bytes.size() == 32) {
         usb_forwarding_token = util::hex_vec(token_bytes);
         remote_usb::reverse_tunnel_config tunnel_config;
         tunnel_config.bind_address = bind_address.empty() ? "0.0.0.0" : bind_address;
