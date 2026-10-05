@@ -328,6 +328,11 @@ file(GLOB_RECURSE TEST_SOURCES CONFIGURE_DEPENDS
         ${CMAKE_SOURCE_DIR}/tests/*.h
         ${CMAKE_SOURCE_DIR}/tests/*.cpp)
 
+if (APPLE)
+    list(APPEND TEST_SOURCES
+            ${CMAKE_SOURCE_DIR}/tests/unit/platform/macos/test_microphone_permission.mm)
+endif ()
+
 # Standalone diagnostic programs under tests/tools have their own targets and
 # must not be linked into the aggregate GoogleTest executable.
 list(FILTER TEST_SOURCES EXCLUDE REGEX "/tests/tools/")

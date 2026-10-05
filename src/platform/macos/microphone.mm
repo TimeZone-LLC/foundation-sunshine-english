@@ -5,11 +5,56 @@
 #include "src/platform/common.h"
 #include "src/platform/macos/av_audio.h"
 
+#include <atomic>
+
 #include "src/config.h"
 #include "src/logging.h"
 
 namespace platf {
   using namespace std::literals;
+
+  bool
+  request_microphone_permission(AVAuthorizationStatus authorization_status, const microphone_permission_request_t &request_access) {
+    if (authorization_status == AVAuthorizationStatusNotDetermined) {
+      BOOST_LOG(info) << "Requesting microphone access."sv;
+    }
+
+    auto permission_granted = std::atomic<bool> { authorization_status == AVAuthorizationStatusAuthorized };
+    if (authorization_status == AVAuthorizationStatusNotDetermined) {
+      auto permission_resolved = dispatch_semaphore_create(0);
+      request_access([&](bool granted) {
+        permission_granted.store(granted, std::memory_order_release);
+        dispatch_semaphore_signal(permission_resolved);
+      });
+
+      dispatch_semaphore_wait(permission_resolved, DISPATCH_TIME_FOREVER);
+      dispatch_release(permission_resolved);
+    }
+
+    if (!permission_granted.load(std::memory_order_acquire)) {
+      if (authorization_status == AVAuthorizationStatusRestricted) {
+        BOOST_LOG(error) << "Microphone access is restricted by macOS."sv;
+      }
+      else {
+        BOOST_LOG(error) << "Microphone access was denied. Enable Foundation Sunshine in System Settings -> Privacy & Security -> Microphone."sv;
+      }
+    }
+
+    return permission_granted.load(std::memory_order_acquire);
+  }
+
+  bool
+  request_microphone_permission() {
+    return request_microphone_permission(
+      [AVCaptureDevice authorizationStatusForMediaType:AVMediaTypeAudio],
+      [](microphone_permission_callback_t callback) {
+        [AVCaptureDevice requestAccessForMediaType:AVMediaTypeAudio
+                                completionHandler:^(BOOL granted) {
+                                  callback(granted == YES);
+                                }];
+      }
+    );
+  }
 
   struct av_mic_t: public mic_t {
     AVAudio *av_audio_capture {};
@@ -55,6 +100,10 @@ namespace platf {
     microphone(const std::uint8_t *mapping, int channels, std::uint32_t sample_rate, std::uint32_t frame_size, bool continuous_audio) override {
       auto mic = std::make_unique<av_mic_t>();
       const char *audio_sink = "";
+
+      if (!request_microphone_permission()) {
+        return nullptr;
+      }
 
       if (!config::audio.sink.empty()) {
         audio_sink = config::audio.sink.c_str();

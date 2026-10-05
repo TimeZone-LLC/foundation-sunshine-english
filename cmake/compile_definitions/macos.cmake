@@ -27,6 +27,7 @@ list(APPEND SUNSHINE_EXTERNAL_LIBRARIES
         ${VIDEO_TOOLBOX_LIBRARY})
 
 set(APPLE_PLIST_FILE "${SUNSHINE_SOURCE_ASSETS_DIR}/macos/assets/Info.plist")
+set(APPLE_ENTITLEMENTS_FILE "${SUNSHINE_SOURCE_ASSETS_DIR}/macos/entitlements.plist")
 
 # todo - tray is not working on macos
 set(SUNSHINE_TRAY 0)
@@ -48,6 +49,7 @@ set(PLATFORM_TARGET_FILES
         "${CMAKE_SOURCE_DIR}/src/platform/macos/publish.cpp"
         "${CMAKE_SOURCE_DIR}/third-party/TPCircularBuffer/TPCircularBuffer.c"
         "${CMAKE_SOURCE_DIR}/third-party/TPCircularBuffer/TPCircularBuffer.h"
+        ${APPLE_ENTITLEMENTS_FILE}
         ${APPLE_PLIST_FILE})
 
 if(SUNSHINE_ENABLE_TRAY)
