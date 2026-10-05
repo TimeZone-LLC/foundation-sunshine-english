@@ -429,6 +429,38 @@ namespace config {
     }
   }  // namespace sw
 
+  namespace vaapi {
+    namespace {
+      constexpr int RC_CBR = 0x00000002;
+      constexpr int RC_VBR = 0x00000004;
+      constexpr int RC_CQP = 0x00000010;
+      constexpr int RC_ICQ = 0x00000040;
+      constexpr int RC_QVBR = 0x00000400;
+      constexpr int RC_AVBR = 0x00000800;
+    }  // namespace
+
+    std::optional<int>
+    quality_from_view(const std::string_view value, const std::optional<int> &original) {
+      if (value == "auto"sv) return 0;
+      if (value == "speed"sv) return 1;
+      if (value == "balanced"sv) return 2;
+      if (value == "quality"sv) return 3;
+      return original;
+    }
+
+    std::optional<int>
+    rate_control_from_view(const std::string_view value, const std::optional<int> &original) {
+      if (value == "auto"sv) return 0;
+      if (value == "avbr"sv) return RC_AVBR;
+      if (value == "cbr"sv) return RC_CBR;
+      if (value == "cqp"sv) return RC_CQP;
+      if (value == "icq"sv) return RC_ICQ;
+      if (value == "qvbr"sv) return RC_QVBR;
+      if (value == "vbr"sv) return RC_VBR;
+      return original;
+    }
+  }  // namespace vaapi
+
   video_t video {
     28,  // qp
 
@@ -489,6 +521,10 @@ namespace config {
     },  // vt
 
     {
+      0,  // block-level bitrate control
+      0,  // quality (automatic)
+      0,  // rate control (automatic)
+      "auto"s,  // rate-control name
       false,  // strict_rc_buffer
     },  // vaapi
 
@@ -1363,6 +1399,16 @@ namespace config {
     int_f(vars, "vt_software", video.vt.vt_require_sw, vt::force_software_from_view);
     int_f(vars, "vt_realtime", video.vt.vt_realtime, vt::rt_from_view);
 
+    std::string vaapi_quality;
+    string_f(vars, "vaapi_quality", vaapi_quality);
+    if (!vaapi_quality.empty()) {
+      video.vaapi.vaapi_quality = vaapi::quality_from_view(vaapi_quality, video.vaapi.vaapi_quality);
+    }
+    string_f(vars, "vaapi_rc", video.vaapi.vaapi_rc_str);
+    if (!video.vaapi.vaapi_rc_str.empty()) {
+      video.vaapi.vaapi_rc = vaapi::rate_control_from_view(video.vaapi.vaapi_rc_str, video.vaapi.vaapi_rc);
+    }
+    bool_f(vars, "vaapi_blbrc", (bool &) video.vaapi.blbrc);
     bool_f(vars, "vaapi_strict_rc_buffer", video.vaapi.strict_rc_buffer);
 
     string_f(vars, "capture", video.capture);

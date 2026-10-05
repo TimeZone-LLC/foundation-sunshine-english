@@ -79,6 +79,21 @@ TEST(AmdMaxAuSizeConfig, AcceptsOnlyTheSupportedRange) {
   EXPECT_TRUE(config::amd::is_valid_max_au_size(std::numeric_limits<int>::max()));
 }
 
+TEST(VaapiConfig, ParsesQualityAndRateControlWithoutStickingOnAutomatic) {
+  EXPECT_EQ(config::vaapi::quality_from_view("speed", 0), 1);
+  EXPECT_EQ(config::vaapi::quality_from_view("balanced", 0), 2);
+  EXPECT_EQ(config::vaapi::quality_from_view("quality", 0), 3);
+  EXPECT_EQ(config::vaapi::quality_from_view("auto", 3), 0);
+  EXPECT_EQ(config::vaapi::quality_from_view("invalid", 2), 2);
+
+  EXPECT_EQ(config::vaapi::rate_control_from_view("cbr", 0), 0x00000002);
+  EXPECT_EQ(config::vaapi::rate_control_from_view("vbr", 0), 0x00000004);
+  EXPECT_EQ(config::vaapi::rate_control_from_view("qvbr", 0), 0x00000400);
+  EXPECT_EQ(config::vaapi::rate_control_from_view("avbr", 0), 0x00000800);
+  EXPECT_EQ(config::vaapi::rate_control_from_view("auto", 0x00000004), 0);
+  EXPECT_EQ(config::vaapi::rate_control_from_view("invalid", 0x00000002), 0x00000002);
+}
+
 TEST(ConfigParse, PreservesHashCharactersInsideJsonStrings) {
   const auto parsed = config::parse_config(
     R"(clients = [{"uuid":"client-1","name":"Display #1 ]","hdrProfile":"Custom#.icc"}] # trailing comment

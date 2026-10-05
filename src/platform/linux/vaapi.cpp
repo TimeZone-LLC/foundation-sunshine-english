@@ -2,8 +2,11 @@
  * @file src/platform/linux/vaapi.cpp
  * @brief Definitions for VA-API hardware accelerated capture.
  */
+#include <algorithm>
+#include <cctype>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 #include <fcntl.h>
 
@@ -240,9 +243,81 @@ namespace va {
       }
 
       auto vendor = vaQueryVendorString(va_display);
-      if (ctx->codec_id != AV_CODEC_ID_H264 || (vendor && !strstr(vendor, "Intel"))) {
+
+      // FFmpeg maps compression_level to VAEncMiscParameterBufferQualityLevel.
+      VAConfigAttrib quality_attr {VAConfigAttribEncQualityRange};
+      auto status = vaGetConfigAttributes(va_display, va_profile, va_entrypoint, &quality_attr, 1);
+      if (status != VA_STATUS_SUCCESS || quality_attr.value == VA_ATTRIB_NOT_SUPPORTED) {
+        quality_attr.value = 0;
+      }
+
+      const auto configured_quality = config::video.vaapi.vaapi_quality.value_or(0);
+      int target_quality = 0;
+      switch (configured_quality) {
+        case 1:  // Prefer speed: highest supported quality-level number.
+          target_quality = quality_attr.value;
+          break;
+        case 2:  // Balanced: true midpoint from best (1) to fastest.
+          target_quality = (1 + quality_attr.value) / 2;
+          break;
+        case 3:  // Prefer quality: best level.
+          target_quality = 1;
+          break;
+        default:  // Automatic: leave the driver default untouched.
+          break;
+      }
+      if (quality_attr.value > 0 && target_quality > 0) {
+        ctx->compression_level = target_quality;
+        BOOST_LOG(info) << "VA-API quality level set to "sv << target_quality
+                        << " (fastest supported level: "sv << quality_attr.value << ')';
+      }
+
+      VAConfigAttrib rc_attr {VAConfigAttribRateControl};
+      status = vaGetConfigAttributes(va_display, va_profile, va_entrypoint, &rc_attr, 1);
+      if (status != VA_STATUS_SUCCESS || rc_attr.value == VA_ATTRIB_NOT_SUPPORTED) {
+        rc_attr.value = 0;
+      }
+
+      bool automatic_override =
+        (vendor && std::string_view {vendor}.contains("Intel")) || ctx->codec_id == AV_CODEC_ID_AV1;
+      std::string rc_mode = config::video.vaapi.vaapi_rc_str;
+      auto rc_value = config::video.vaapi.vaapi_rc.value_or(0);
+      std::string_view override_label;
+
+      if (rc_value > 0 && (rc_attr.value & rc_value)) {
+        // A supported explicit selection takes precedence over automatic tuning.
+        automatic_override = false;
+      }
+      else if (automatic_override && (rc_attr.value & VA_RC_VBR)) {
+        rc_mode = "vbr";
+        rc_value = VA_RC_VBR;
+        override_label = " (automatic compatibility override)";
+      }
+      else if (rc_attr.value & VA_RC_CBR) {
+        rc_mode = "cbr";
+        rc_value = VA_RC_CBR;
+      }
+      else {
+        rc_mode = "cqp";
+        rc_value = VA_RC_CQP;
+      }
+
+      const bool single_frame_vbv = config::video.vaapi.strict_rc_buffer || automatic_override;
+      if (single_frame_vbv) {
         ctx->rc_buffer_size = ctx->bit_rate * ctx->framerate.den / ctx->framerate.num;
       }
+
+      std::ranges::transform(rc_mode, rc_mode.begin(), [](const unsigned char character) {
+        return static_cast<char>(std::toupper(character));
+      });
+      av_dict_set(options, "rc_mode", rc_mode.c_str(), 0);
+      if (rc_value == VA_RC_CQP || rc_value == VA_RC_ICQ || rc_value == VA_RC_QVBR) {
+        av_dict_set_int(options, "qp", config::video.qp, 0);
+      }
+
+      BOOST_LOG(info) << "Using VA-API "sv << rc_mode << " rate control "sv
+                      << (single_frame_vbv ? "with single-frame VBV size"sv : "with standard VBV size"sv)
+                      << override_label;
     }
 
     int

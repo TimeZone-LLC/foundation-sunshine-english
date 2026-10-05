@@ -11,6 +11,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -35,6 +36,11 @@ namespace config {
       return value >= -1;
     }
   }  // namespace amd
+
+  namespace vaapi {
+    std::optional<int> quality_from_view(std::string_view value, const std::optional<int> &original);
+    std::optional<int> rate_control_from_view(std::string_view value, const std::optional<int> &original);
+  }  // namespace vaapi
 
   // track modified config options
   inline std::unordered_map<std::string, std::string> modified_config_settings;
@@ -124,6 +130,10 @@ namespace config {
     } vt;
 
     struct {
+      std::optional<int> blbrc;
+      std::optional<int> vaapi_quality;
+      std::optional<int> vaapi_rc;
+      std::string vaapi_rc_str;
       bool strict_rc_buffer;
     } vaapi;
 
