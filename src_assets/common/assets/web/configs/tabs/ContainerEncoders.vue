@@ -5,6 +5,7 @@ const NvidiaNvencEncoder = defineAsyncComponent(() => import('./encoders/NvidiaN
 const IntelQuickSyncEncoder = defineAsyncComponent(() => import('./encoders/IntelQuickSyncEncoder.vue'))
 const AmdAmfEncoder = defineAsyncComponent(() => import('./encoders/AmdAmfEncoder.vue'))
 const VideotoolboxEncoder = defineAsyncComponent(() => import('./encoders/VideotoolboxEncoder.vue'))
+const VaapiEncoder = defineAsyncComponent(() => import('./encoders/VaapiEncoder.vue'))
 const SoftwareEncoder = defineAsyncComponent(() => import('./encoders/SoftwareEncoder.vue'))
 
 const props = defineProps([
@@ -43,6 +44,12 @@ const config = ref(props.config)
   <VideotoolboxEncoder
       v-if="currentTab === 'vt'"
       :platform="platform"
+      :config="config"
+  />
+
+  <!-- VA-API Encoder Tab -->
+  <VaapiEncoder
+      v-if="currentTab === 'vaapi'"
       :config="config"
   />
 

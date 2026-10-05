@@ -202,6 +202,16 @@ const DEFAULT_TABS = [
         },
       },
       {
+        id: 'vaapi',
+        name: 'VA-API Encoder',
+        options: {
+          vaapi_blbrc: 'disabled',
+          vaapi_quality: 'auto',
+          vaapi_rc: 'auto',
+          vaapi_strict_rc_buffer: 'disabled',
+        },
+      },
+      {
         id: 'sw',
         name: 'Software Encoder',
         options: {

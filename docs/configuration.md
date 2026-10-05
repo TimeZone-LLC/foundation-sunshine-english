@@ -3252,6 +3252,151 @@ editing the `conf` file in a text editor. Use the examples as reference.
     </tr>
 </table>
 
+## [VA-API encoder](https://localhost:47990/config/#va-api-encoder)
+
+### [vaapi_blbrc](https://localhost:47990/config/#vaapi_blbrc)
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Enable block-level bitrate control on supported encoders. This can improve quality with CBR or VBR rate control.
+            @note{This option only applies when using VA-API.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            vaapi_blbrc = enabled
+            @endcode</td>
+    </tr>
+</table>
+
+### [vaapi_quality](https://localhost:47990/config/#vaapi_quality)
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Set the encoder tradeoff between quality and speed or power consumption.
+            @note{This option only applies when using VA-API.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            auto
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            vaapi_quality = balanced
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="4">Choices</td>
+        <td>auto</td>
+        <td>let the driver choose</td>
+    </tr>
+    <tr>
+        <td>speed</td>
+        <td>prefer encoding speed and lower power consumption</td>
+    </tr>
+    <tr>
+        <td>balanced</td>
+        <td>balance quality and encoding speed</td>
+    </tr>
+    <tr>
+        <td>quality</td>
+        <td>prefer encoding quality</td>
+    </tr>
+</table>
+
+### [vaapi_rc](https://localhost:47990/config/#vaapi_rc)
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Select the encoder rate-control mode. Availability varies by driver.
+            Automatic mode applies compatibility tuning for Intel hardware and AV1.
+            @note{This option only applies when using VA-API.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            auto
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            vaapi_rc = vbr
+            @endcode</td>
+    </tr>
+    <tr>
+        <td rowspan="7">Choices</td>
+        <td>auto</td>
+        <td>select a compatible mode automatically</td>
+    </tr>
+    <tr>
+        <td>avbr</td>
+        <td>average variable bitrate</td>
+    </tr>
+    <tr>
+        <td>cbr</td>
+        <td>constant bitrate</td>
+    </tr>
+    <tr>
+        <td>cqp</td>
+        <td>constant quantization parameter</td>
+    </tr>
+    <tr>
+        <td>icq</td>
+        <td>intelligent constant quality</td>
+    </tr>
+    <tr>
+        <td>qvbr</td>
+        <td>quality-defined variable bitrate</td>
+    </tr>
+    <tr>
+        <td>vbr</td>
+        <td>variable bitrate</td>
+    </tr>
+</table>
+
+### [vaapi_strict_rc_buffer](https://localhost:47990/config/#vaapi_strict_rc_buffer)
+
+<table>
+    <tr>
+        <td>Description</td>
+        <td colspan="2">
+            Use a single-frame VBV buffer to reduce oversized frames. This can reduce quality during motion.
+            @note{This option only applies when using VA-API.}
+        </td>
+    </tr>
+    <tr>
+        <td>Default</td>
+        <td colspan="2">@code{}
+            disabled
+            @endcode</td>
+    </tr>
+    <tr>
+        <td>Example</td>
+        <td colspan="2">@code{}
+            vaapi_strict_rc_buffer = enabled
+            @endcode</td>
+    </tr>
+</table>
+
 ## [Software Encoder](https://localhost:47990/config/#software-encoder)
 
 ### [sw_preset](https://localhost:47990/config/#sw_preset)
