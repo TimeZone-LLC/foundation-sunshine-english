@@ -546,6 +546,7 @@ namespace platf::audio {
         return -1;
       }
 
+      follows_default_device = !selected_device_id;
       device_t device;
       if (selected_device_id) {
         auto status = device_enum->GetDevice(selected_device_id->c_str(), &device);
@@ -669,8 +670,11 @@ namespace platf::audio {
           (*default_endpt_changed_cb)();
         }
 
-        // Reinitialize to pick up the new default device
-        return capture_e::reinit;
+        // Reinitialize only when capture follows the default endpoint. A
+        // session pinned to an explicit sink keeps capturing that endpoint.
+        if (follows_default_device) {
+          return capture_e::reinit;
+        }
       }
 
       status = WaitForSingleObjectEx(audio_event.get(), default_latency_ms, FALSE);
@@ -758,6 +762,7 @@ namespace platf::audio {
     float *sample_buf_pos;
     int channels;
     bool continuous_audio;
+    bool follows_default_device = true;
 
     HANDLE mmcss_task_handle = NULL;
   };
@@ -1686,6 +1691,40 @@ namespace platf::audio {
       return mic_redirect_device->write_pcm(samples, frame_count);
     }
   };
+
+#ifdef SUNSHINE_TESTS
+  namespace tests {
+    capture_e
+    simulate_default_device_change(
+      bool follows_default_device,
+      bool install_callback,
+      bool render_device_changed,
+      int &callback_count) {
+      mic_wasapi_t mic;
+      mic.audio_event.reset(CreateEventA(nullptr, FALSE, FALSE, nullptr));
+      mic.default_latency_ms = 0;
+      mic.sample_buf = util::buffer_t<float> {1};
+      mic.sample_buf_pos = std::begin(mic.sample_buf);
+      mic.continuous_audio = false;
+      mic.follows_default_device = follows_default_device;
+
+      if (install_callback) {
+        mic.default_endpt_changed_cb = [&callback_count] {
+          ++callback_count;
+        };
+      }
+
+      mic.endpt_notification.OnDefaultDeviceChanged(
+        render_device_changed ? eRender : eCapture,
+        eConsole,
+        nullptr
+      );
+
+      std::vector<float> sample(1);
+      return mic.sample(sample);
+    }
+  }  // namespace tests
+#endif
 }  // namespace platf::audio
 
 namespace platf {
