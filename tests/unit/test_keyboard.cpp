@@ -28,6 +28,7 @@ namespace {
   constexpr std::uint16_t VKEY_SHIFT = 0x10;
   constexpr std::uint16_t VKEY_CONTROL = 0x11;
   constexpr std::uint16_t VKEY_MENU = 0x12;
+  constexpr std::uint16_t VKEY_RETURN = 0x0D;
   constexpr std::uint16_t VKEY_LWIN = 0x5B;
   constexpr std::uint16_t VKEY_RWIN = 0x5C;
   constexpr std::uint16_t VKEY_SPACE = 0x20;
@@ -41,6 +42,9 @@ namespace {
     auto token = (event.release ? "-" : "+") + std::to_string(event.key_code);
     if (event.flags != 0) {
       token += ":" + std::to_string(event.flags);
+    }
+    if (event.extended) {
+      token += ":e";
     }
     return token;
   }
@@ -194,6 +198,26 @@ TEST_F(KeyboardStateTest, IgnoresDuplicatePressesAndUnmatchedReleases) {
   release(input, VKEY_Z);
   release(input, VKEY_Z);
   EXPECT_EQ(taken(), (std::vector<std::string> { "-90" }));
+}
+
+TEST_F(KeyboardStateTest, PreservesExtendedEnterOnReleaseAndDisconnect) {
+  auto input = input::testing::make_input();
+
+  press(input, VKEY_RETURN);
+  release(input, VKEY_RETURN);
+  EXPECT_EQ(taken(), (std::vector<std::string> { "+13", "-13" }));
+
+  press(input, VKEY_RETURN, MODIFIER_EXTENDED | MODIFIER_SHIFT);
+  EXPECT_EQ(taken(), (std::vector<std::string> { "+16", "+13:e", "-16" }));
+
+  // Key-up packets may omit the bit, so release using the identity captured on key-down.
+  release(input, VKEY_RETURN);
+  EXPECT_EQ(taken(), (std::vector<std::string> { "-13:e" }));
+
+  press(input, VKEY_RETURN, MODIFIER_EXTENDED);
+  EXPECT_EQ(taken(), (std::vector<std::string> { "+13:e" }));
+  input::testing::release_held_keys();
+  EXPECT_EQ(taken(), (std::vector<std::string> { "-13:e" }));
 }
 
 TEST_F(KeyboardStateTest, ForwardsModifierKeysWithoutSyntheticInjection) {

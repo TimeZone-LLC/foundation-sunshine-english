@@ -859,7 +859,7 @@ namespace platf {
   }
 
   void
-  keyboard_update(input_t &input, uint16_t modcode, bool release, uint8_t flags) {
+  keyboard_update(input_t &input, uint16_t modcode, bool release, uint8_t flags, bool extended) {
     INPUT i {};
     i.type = INPUT_KEYBOARD;
     auto &ki = i.ki;
@@ -907,6 +907,10 @@ namespace platf {
         break;
       default:
         break;
+    }
+
+    if (extended) {
+      ki.dwFlags |= KEYEVENTF_EXTENDEDKEY;
     }
 
     if (release) {
