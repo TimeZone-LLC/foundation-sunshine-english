@@ -8,9 +8,10 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
-#include <condition_variable>
 #include <cstring>
 #include <deque>
 #include <limits>
@@ -24,6 +25,7 @@
 #include <boost/asio/ip/tcp.hpp>
 #include <boost/asio/post.hpp>
 #include <boost/asio/read.hpp>
+#include <boost/asio/steady_timer.hpp>
 #include <boost/asio/write.hpp>
 #include <boost/system/errc.hpp>
 
@@ -62,6 +64,7 @@ constexpr std::size_t kMaxQueuedBytes = 8u * 1024u * 1024u;
 constexpr std::size_t kMaxInflight = 4096;
 /* A cancelled submit may still race with a RET_SUBMIT on the broker path. */
 constexpr std::size_t kMaxCancelledSubmits = kMaxInflight;
+constexpr auto kTerminalReplyLinger = std::chrono::milliseconds(100);
 
 /*
  * The documented USB/IP wire value for a non-isochronous URB is -1.  Some
@@ -329,6 +332,42 @@ valid_ret_unlink_wire(const std::vector<std::uint8_t> &wire,
                               canonical) &&
          all_zero(wire.data() + 24, kPduHeaderSize - 24);
 }
+
+/*
+ * Keep a socket alive briefly after sending a terminal protocol reply.  In
+ * particular, Windows can turn an immediate close-and-reuse into a reset
+ * before the loopback peer receives the async_write() payload.  The bounded
+ * delay lets the kernel publish the completed write without allowing an
+ * uncooperative local peer to retain the socket indefinitely.
+ */
+struct delayed_socket_close final : std::enable_shared_from_this<delayed_socket_close> {
+  explicit delayed_socket_close(tcp::socket socket):
+      socket(std::move(socket)),
+      timer(this->socket.get_executor()) {
+  }
+
+  void
+  start() {
+    timer.expires_after(kTerminalReplyLinger);
+    const auto self = shared_from_this();
+    timer.async_wait([self](const boost::system::error_code &timer_error) {
+      if (!timer_error) {
+        self->finish();
+      }
+    });
+  }
+
+  void
+  finish() {
+    boost::system::error_code ignored;
+    socket.cancel(ignored);
+    socket.shutdown(tcp::socket::shutdown_both, ignored);
+    socket.close(ignored);
+  }
+
+  tcp::socket socket;
+  asio::steady_timer timer;
+};
 
 }  // namespace
 
@@ -1043,7 +1082,7 @@ struct loopback_usbip_bridge::impl final : std::enable_shared_from_this<loopback
       return;
     }
     if (drained) {
-      close_session(close_reason::transport_rejected);
+      close_session(close_reason::transport_rejected, true);
       return;
     }
     start_write(session_generation);
@@ -1062,7 +1101,7 @@ struct loopback_usbip_bridge::impl final : std::enable_shared_from_this<loopback
   }
 
   void
-  close_session(close_reason reason) {
+  close_session(close_reason reason, bool reply_drained = false) {
     std::function<void(close_reason)> closed_callback;
     bool notify = false;
     {
@@ -1083,10 +1122,16 @@ struct loopback_usbip_bridge::impl final : std::enable_shared_from_this<loopback
       notify = true;
     }
 
-    boost::system::error_code ignored;
-    socket.cancel(ignored);
-    socket.shutdown(tcp::socket::shutdown_both, ignored);
-    socket.close(ignored);
+    if (reply_drained) {
+      auto closing_socket = std::make_shared<delayed_socket_close>(std::move(socket));
+      socket = tcp::socket(io);
+      closing_socket->start();
+    } else {
+      boost::system::error_code ignored;
+      socket.cancel(ignored);
+      socket.shutdown(tcp::socket::shutdown_both, ignored);
+      socket.close(ignored);
+    }
 
     if (notify && closed_callback) {
       try {

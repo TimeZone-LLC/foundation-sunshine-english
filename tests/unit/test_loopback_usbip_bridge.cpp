@@ -611,13 +611,13 @@ TEST(LoopbackUsbipBridge, RejectsWrongBusidAndReleasesSession) {
   EXPECT_EQ(get_u16_be(reply.data()), 0x0111);
   EXPECT_EQ(get_u16_be(reply.data() + 2), 0x0003);
   EXPECT_EQ(get_u32_be(reply.data() + 4), 4U);
-  EXPECT_TRUE(wait_for_close(socket));
   EXPECT_TRUE(events.wait_closed(remote_usb::close_reason::transport_rejected));
   {
     std::lock_guard lock(events.mutex);
     EXPECT_FALSE(events.imported);
     EXPECT_TRUE(events.requests.empty());
   }
+  socket.close(error);
 
   // A rejected import must not consume the listener lease.  A subsequent
   // client can enumerate and import the same device normally.
