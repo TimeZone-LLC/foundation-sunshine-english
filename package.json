@@ -18,6 +18,8 @@
     "preview:build": "npm run build && npm run preview",
     "lint:webui": "eslint \"src_assets/common/assets/web/**/*.{js,vue}\" --max-warnings 0",
     "test:webui": "node --test \"src_assets/common/assets/web/tests/*.test.js\"",
+    "icons:generate": "node scripts/generate-icon-set.mjs",
+    "icons:check": "node scripts/generate-icon-set.mjs --check",
     "i18n:validate": "node scripts/validate-i18n.js",
     "i18n:format": "node scripts/format-i18n.js",
     "i18n:format:check": "node scripts/format-i18n.js --check"

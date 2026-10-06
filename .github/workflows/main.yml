@@ -191,6 +191,7 @@ jobs:
         shell: pwsh
         run: |
           npm ci
+          npm run icons:check
           npm run lint:webui
           npm run test:webui
           New-Item -ItemType Directory -Force -Path build | Out-Null
