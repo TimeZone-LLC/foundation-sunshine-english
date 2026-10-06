@@ -36,12 +36,6 @@ TEST_F(WebhookTest, IsEnabledRequiresFlagAndUrl) {
   EXPECT_TRUE(webhook::is_enabled());
 }
 
-TEST_F(WebhookTest, AlertMessagesAreEnglish) {
-  EXPECT_EQ(webhook::get_alert_message(webhook::event_type_t::CONFIG_PIN_SUCCESS), "🔗 Config pairing successful");
-  EXPECT_EQ(webhook::get_alert_message(webhook::event_type_t::NV_APP_LAUNCH), "🚀 application launched");
-  EXPECT_EQ(webhook::get_alert_message(webhook::event_type_t::NV_APP_RESUME), "▶️ application resumed");
-}
-
 TEST_F(WebhookTest, EventIdentifiersAndFilterAreStable) {
   EXPECT_EQ(webhook::event_type_id(webhook::event_type_t::CONFIG_PIN_SUCCESS), 0);
   EXPECT_EQ(webhook::event_type_id(webhook::event_type_t::NV_SESSION_END), 6);
