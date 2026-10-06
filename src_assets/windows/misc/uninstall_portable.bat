@@ -10,17 +10,15 @@ REM ================================================
 
 REM Get script directory path (scripts folder)
 set "SCRIPT_DIR=%~dp0scripts"
-REM Set language file directory path
-set "LANG_DIR=%SCRIPT_DIR%\languages"
+REM English is the only supported installer language.
+set "LANG_FILE=%SCRIPT_DIR%\languages\en-US.lang"
 
 REM ================================================
-REM Multi-language support initialization
+REM Message catalogue initialization
 REM ================================================
 
-REM Detect system language and select corresponding language file
-call :DetectLanguage
-REM Load selected language file
-call :LoadLanguageFile "%SELECTED_LANG%"
+call :LoadEnglishMessages
+if errorlevel 1 exit /b 1
 
 echo.
 echo "================================================"
@@ -187,25 +185,25 @@ REM ================================================
 :LogInfo
 REM Function - Output info level log (white)
 cls
-echo [信息] %~1
+echo [Info] %~1
 goto :eof
 
 :LogSuccess
 REM Function - Output success level log (green)
 cls
-powershell -c "Write-Host '[成功] %~1' -ForegroundColor Green"
+powershell -c "Write-Host '[Success] %~1' -ForegroundColor Green"
 goto :eof
 
 :LogWarning
 REM Function - Output warning level log (yellow)
 cls
-powershell -c "Write-Host '[警告] %~1' -ForegroundColor Yellow"
+powershell -c "Write-Host '[Warning] %~1' -ForegroundColor Yellow"
 goto :eof
 
 :LogError
 REM Function - Output error level log (red)
 cls
-powershell -c "Write-Host '[错误] %~1' -ForegroundColor Red"
+powershell -c "Write-Host '[Error] %~1' -ForegroundColor Red"
 goto :eof
 
 :LogStep
@@ -217,57 +215,17 @@ powershell -c "Write-Host '[%~1] %~2' -ForegroundColor Cyan"
 goto :eof
 
 
-:DetectLanguage
-REM Function - Detect system language and select corresponding language file
-REM Parameters - None
-REM Returns - Set SELECTED_LANG variable
+:LoadEnglishMessages
+REM Load the fixed English message catalogue.
 cls
 
-REM Get system language code
-REM Use PowerShell to get system language for better compatibility
-for /f "tokens=*" %%i in ('powershell -c "[System.Globalization.CultureInfo]::CurrentCulture.Name" 2^>nul') do set "LOCALE=%%i"
-
-REM If PowerShell fails, use default language
-if "%LOCALE%"=="" set "LOCALE=en-US"
-
-REM Select corresponding language file based on system language code
-if "%LOCALE:~0,2%"=="zh" (
-    set "SELECTED_LANG=zh-Simple"
-    set "SELECTED_LANG_DISPLAY=简体中文"
-) else if "%LOCALE:~0,2%"=="de" (
-    set "SELECTED_LANG=de-DE"
-    set "SELECTED_LANG_DISPLAY=Deutsch"
-) else if "%LOCALE:~0,2%"=="fr" (
-    set "SELECTED_LANG=fr-FR"
-    set "SELECTED_LANG_DISPLAY=Français"
-) else if "%LOCALE:~0,2%"=="ja" (
-    set "SELECTED_LANG=ja-JP"
-    set "SELECTED_LANG_DISPLAY=日本語"
-) else (
-    REM Default to English
-    set "SELECTED_LANG=en-US"
-    set "SELECTED_LANG_DISPLAY=English"
-)
-goto :eof
-
-:LoadLanguageFile
-REM Function - Load specified language file
-REM Parameters - %%1 = Language code (e.g. zh-CN, en-US)
-REM Returns - Set all language variables
-cls
-
-REM Build language file path
-set "LANG_FILE=%LANG_DIR%\%~1.lang"
-
-REM Check if language file exists
 if not exist "%LANG_FILE%" (
     echo [ERROR] Language file not found: %LANG_FILE%
-    echo [ERROR] Language file does not exist: %LANG_FILE%
     pause
     exit /b 1
 )
 
-REM Parse language file and set variables
+REM Parse the message file and set variables.
 for /f "usebackq tokens=1* delims==" %%a in ("%LANG_FILE%") do (
     if not "%%a"=="" if not "%%a:~0,1%"=="#" if not "%%a:~0,2%"=="::" (
         if not "%%b"=="" (
@@ -275,68 +233,7 @@ for /f "usebackq tokens=1* delims==" %%a in ("%LANG_FILE%") do (
         )
     )
 ) 2>nul
-
-REM Check if this is the first time loading language (show confirmation)
-if not defined LANG_CONFIRMED (
-    call :LogInfo "%LANG_DETECTED%: !SELECTED_LANG_DISPLAY!"
-    call :LogInfo "%LANG_CONFIRM%"
-
-    set "lang_confirm_input=Y"
-    set /p lang_confirm_input="%LANG_CONFIRM_PROMPT% "
-    if /i "!lang_confirm_input!"=="N" (
-        call :ShowLanguageSelection
-    ) else (
-        set "LANG_CONFIRMED=1"
-    )
-)
-goto :eof
-
-:ShowLanguageSelection
-REM Function - Display language selection menu
-REM Parameters - None
-REM Returns - Reload selected language file
-cls
-
-echo.
-echo %LANG_SELECT%:
-echo 1. %LANG_ZH_SIMPLE% (简体中文)
-echo 2. %LANG_EN% (English)
-echo 3. %LANG_DE% (Deutsch)
-echo 4. %LANG_FR% (Français)
-echo 5. %LANG_JA% (日本語)
-echo 6. %LANG_RU% (Русский)
-echo.
-set "lang_choice="
-set /p lang_choice="%LANG_SELECT_PROMPT% "
-
-REM Set language code based on user selection
-if "!lang_choice!"=="1" (
-    set "SELECTED_LANG=zh-Simple"
-    set "SELECTED_LANG_DISPLAY=简体中文"
-) else if "!lang_choice!"=="2" (
-    set "SELECTED_LANG=en-US"
-    set "SELECTED_LANG_DISPLAY=English"
-) else if "!lang_choice!"=="3" (
-    set "SELECTED_LANG=de-DE"
-    set "SELECTED_LANG_DISPLAY=Deutsch"
-) else if "!lang_choice!"=="4" (
-    set "SELECTED_LANG=fr-FR"
-    set "SELECTED_LANG_DISPLAY=Français"
-) else if "!lang_choice!"=="5" (
-    set "SELECTED_LANG=ja-JP"
-    set "SELECTED_LANG_DISPLAY=日本語"
-) else if "!lang_choice!"=="6" (
-    set "SELECTED_LANG=ru-RU"
-    set "SELECTED_LANG_DISPLAY=Русский"
-) else (
-    call :LogError "%ERROR_INVALID_SELECTION%"
-    set "SELECTED_LANG=en-US"
-    set "SELECTED_LANG_DISPLAY=English"
-)
-
-REM Reload selected language file
-call :LoadLanguageFile "%SELECTED_LANG%"
-goto :eof
+exit /b 0
 
 :ShowUninstallConfirmation
 REM Function - Display uninstall confirmation interface

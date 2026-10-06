@@ -39,7 +39,7 @@ function buildQueryString(options) {
  * 通用fetch请求封装
  * @param {string} url 请求URL
  * @param {Object} options fetch选项
- * @returns {Promise<Object|null>} 响应数据
+ * @returns {Promise<Object|null>} Response data
  */
 async function fetchJson(url, options = {}) {
   try {
@@ -57,7 +57,7 @@ async function fetchJson(url, options = {}) {
  * 搜索Steam应用 (使用Steam Store搜索API)
  * @param {string} searchName 搜索名称
  * @param {number} maxResults 最大结果数量
- * @returns {Promise<Array>} 匹配的Steam应用列表
+ * @returns {Promise<Array>} Matching Steam applications
  */
 export async function searchSteamApps(searchName, maxResults = 20) {
   if (!searchName?.trim()) {
@@ -86,7 +86,7 @@ export async function searchSteamApps(searchName, maxResults = 20) {
 /**
  * 加载Steam应用列表 (已弃用，保留兼容性)
  * @deprecated 使用 searchSteamApps 代替
- * @returns {Promise<Array>} 空数组
+ * @returns {Promise<Array>} Empty array
  */
 export async function loadSteamApps() {
   console.warn('loadSteamApps is deprecated; use searchSteamApps to search directly')
@@ -96,7 +96,7 @@ export async function loadSteamApps() {
 /**
  * 获取Steam应用详情
  * @param {number} appId Steam应用ID
- * @returns {Promise<Object|null>} Steam应用详情
+ * @returns {Promise<Object|null>} Steam application details
  */
 export async function getSteamAppDetails(appId) {
   const data = await fetchJson(`/steam-store/api/appdetails?appids=${appId}&l=schinese`)
@@ -108,7 +108,7 @@ export async function getSteamAppDetails(appId) {
  * 优化：直接使用CDN URL，不再获取详情API，大幅提升速度
  * @param {string} name 应用名称
  * @param {number} maxResults 最大结果数量
- * @returns {Promise<Array>} 封面列表
+ * @returns {Promise<Array>} Cover list
  */
 export async function searchSteamCovers(name, maxResults = 20) {
   if (!name) {
@@ -137,7 +137,7 @@ export async function searchSteamCovers(name, maxResults = 20) {
  * 搜索Steam应用封面（完整模式，包含详情）
  * @param {string} name 应用名称
  * @param {number} maxResults 最大结果数量
- * @returns {Promise<Array>} 封面列表（包含详情）
+ * @returns {Promise<Array>} Cover list with details
  */
 export async function searchSteamCoversWithDetails(name, maxResults = 20) {
   if (!name) {
@@ -210,7 +210,7 @@ export function getSteamCoverUrl(appId, type = 'header') {
 /**
  * 检查图片URL是否有效（带缓存）
  * @param {string} url 图片URL
- * @returns {Promise<boolean>} 是否有效
+ * @returns {Promise<boolean>} Whether the URL is valid
  */
 export async function checkImageExists(url) {
   if (imageExistsCache.has(url)) {
@@ -231,7 +231,7 @@ export async function checkImageExists(url) {
 /**
  * 获取最佳可用的Steam封面URL（带缓存）
  * @param {number} appId Steam应用ID
- * @returns {Promise<string>} 最佳封面URL
+ * @returns {Promise<string>} Best available cover URL
  */
 export async function getCachedBestCoverUrl(appId) {
   if (coverUrlCache.has(appId)) {
@@ -250,7 +250,7 @@ export async function getCachedBestCoverUrl(appId) {
  * 获取最佳可用的Steam封面URL
  * @param {number} appId Steam应用ID
  * @param {string} headerImage header图片URL (从API获取的)
- * @returns {Promise<string>} 最佳封面URL
+ * @returns {Promise<string>} Best available cover URL
  */
 export async function getBestCoverUrl(appId, headerImage) {
   const libraryUrl = getSteamCoverUrl(appId, 'library')
@@ -260,8 +260,8 @@ export async function getBestCoverUrl(appId, headerImage) {
 
 /**
  * 批量获取Steam封面URL（优化版本）
- * @param {Array<number>} appIds Steam应用ID数组
- * @returns {Promise<Map<number, string>>} appId到封面URL的映射
+ * @param {Array<number>} appIds Array of Steam application IDs
+ * @returns {Promise<Map<number, string>>} Map of application IDs to cover URLs
  */
 export async function batchGetCoverUrls(appIds) {
   const results = new Map()
@@ -363,7 +363,7 @@ function mapSteamGridDBItem(item) {
  * @param {string} resourceType 资源类型 (grids, heroes, logos, icons)
  * @param {number} gameId 游戏ID
  * @param {Object} options 选项
- * @returns {Promise<Array>} 资源列表
+ * @returns {Promise<Array>} Resource list
  */
 async function fetchSteamGridDBResource(resourceType, gameId, options = {}) {
   if (!gameId) {
@@ -384,7 +384,7 @@ async function fetchSteamGridDBResource(resourceType, gameId, options = {}) {
 /**
  * 在SteamGridDB上搜索游戏
  * @param {string} searchTerm 搜索词
- * @returns {Promise<Array>} 游戏列表
+ * @returns {Promise<Array>} Game list
  */
 export async function searchSteamGridDB(searchTerm) {
   if (!searchTerm?.trim()) {
@@ -409,7 +409,7 @@ export async function searchSteamGridDB(searchTerm) {
 /**
  * 通过Steam AppID获取SteamGridDB游戏ID
  * @param {number} steamAppId Steam应用ID
- * @returns {Promise<number|null>} SteamGridDB游戏ID
+ * @returns {Promise<number|null>} SteamGridDB game ID
  */
 export async function getSteamGridDBGameId(steamAppId) {
   const cacheKey = `steam_${steamAppId}`
@@ -432,7 +432,7 @@ export async function getSteamGridDBGameId(steamAppId) {
  * 获取SteamGridDB封面（Grids）
  * @param {number} gameId SteamGridDB游戏ID
  * @param {Object} options 选项
- * @returns {Promise<Array>} 封面列表
+ * @returns {Promise<Array>} Cover list
  */
 export function getSteamGridDBGrids(gameId, options = {}) {
   return fetchSteamGridDBResource('grids', gameId, options)
@@ -442,7 +442,7 @@ export function getSteamGridDBGrids(gameId, options = {}) {
  * 获取SteamGridDB英雄图（Heroes）
  * @param {number} gameId SteamGridDB游戏ID
  * @param {Object} options 选项
- * @returns {Promise<Array>} 英雄图列表
+ * @returns {Promise<Array>} Hero image list
  */
 export function getSteamGridDBHeroes(gameId, options = {}) {
   return fetchSteamGridDBResource('heroes', gameId, options)
@@ -452,7 +452,7 @@ export function getSteamGridDBHeroes(gameId, options = {}) {
  * 获取SteamGridDB Logo
  * @param {number} gameId SteamGridDB游戏ID
  * @param {Object} options 选项
- * @returns {Promise<Array>} Logo列表
+ * @returns {Promise<Array>} Logo list
  */
 export function getSteamGridDBLogos(gameId, options = {}) {
   return fetchSteamGridDBResource('logos', gameId, options)
@@ -462,7 +462,7 @@ export function getSteamGridDBLogos(gameId, options = {}) {
  * 获取SteamGridDB图标（Icons）
  * @param {number} gameId SteamGridDB游戏ID
  * @param {Object} options 选项
- * @returns {Promise<Array>} 图标列表
+ * @returns {Promise<Array>} Icon list
  */
 export function getSteamGridDBIcons(gameId, options = {}) {
   return fetchSteamGridDBResource('icons', gameId, options)
@@ -481,7 +481,7 @@ const DEFAULT_GRID_OPTIONS = {
  * @param {string} name 游戏名称
  * @param {number} maxResults 最大结果数量
  * @param {Object} gridOptions 封面选项
- * @returns {Promise<Array>} 封面列表
+ * @returns {Promise<Array>} Cover list
  */
 export async function searchSteamGridDBCovers(name, maxResults = 20, gridOptions = {}) {
   if (!name) {
@@ -522,7 +522,7 @@ export async function searchSteamGridDBCovers(name, maxResults = 20, gridOptions
  * 通过Steam AppID获取SteamGridDB封面
  * @param {number} steamAppId Steam应用ID
  * @param {Object} gridOptions 封面选项
- * @returns {Promise<Array>} 封面列表
+ * @returns {Promise<Array>} Cover list
  */
 export async function getSteamGridDBCoversBySteamId(steamAppId, gridOptions = {}) {
   const gameId = await getSteamGridDBGameId(steamAppId)

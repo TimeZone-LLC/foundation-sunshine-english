@@ -168,7 +168,7 @@ const codecStrategy = computed({
       config.value.hevc_mode = hdr ? 3 : 2
       config.value.av1_mode = hdr ? 3 : 2
     }
-    // 'custom' → 不修改值，由用户在展开区编辑
+    // For 'custom', leave the values unchanged so the user can edit them in the expanded section.
   },
 })
 
@@ -178,7 +178,7 @@ const enableHdr = computed({
     return hevcModeNum.value === 3 || av1ModeNum.value === 3
   },
   set(v) {
-    // 仅在"现代编码器"策略下生效
+    // This only applies under the "Modern codecs" policy.
     if (codecStrategy.value !== 'modern') return
     config.value.hevc_mode = v ? 3 : 2
     config.value.av1_mode = v ? 3 : 2

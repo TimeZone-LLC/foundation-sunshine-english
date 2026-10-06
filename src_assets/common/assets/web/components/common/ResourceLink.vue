@@ -175,44 +175,15 @@ const rel = computed(() => (props.target === '_blank' ? 'noopener noreferrer' : 
   transition: var(--transition-default);
 }
 
-.resource-link--accent-alt {
-  --link-color: var(--ui-info-rgb);
-  --link-foreground: var(--ui-info-text);
-}
-
-.resource-link--android {
-  --link-color: var(--ui-success-rgb);
-  --link-foreground: var(--ui-success-text);
-}
-
-.resource-link--apple {
-  --link-color: 100, 116, 139;
-  --link-foreground: var(--ui-text-secondary);
-}
-
+.resource-link--accent-alt,
+.resource-link--android,
+.resource-link--apple,
 .resource-link--desktop,
-.resource-link--github {
-  --link-color: 100, 116, 139;
-  --link-foreground: var(--ui-text-secondary);
-}
-
-.resource-link--harmony {
-  --link-color: var(--ui-info-rgb);
-  --link-foreground: var(--ui-info-text);
-}
-
+.resource-link--github,
+.resource-link--harmony,
 .resource-link--moonlink {
-  --link-color: 142, 126, 173;
+  --link-color: var(--ui-accent-rgb);
   --link-foreground: var(--ui-text-secondary);
-}
-
-[data-bs-theme='dark'] .resource-link--apple {
-  --link-color: 184, 171, 154;
-}
-
-[data-bs-theme='dark'] .resource-link--desktop,
-[data-bs-theme='dark'] .resource-link--github {
-  --link-color: 184, 171, 154;
 }
 
 @media (max-width: 575.98px) {

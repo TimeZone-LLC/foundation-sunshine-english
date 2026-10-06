@@ -1176,27 +1176,6 @@ namespace webhook {
     }
   }
 
-  std::string get_alert_message(event_type_t type) {
-    switch (type) {
-      case event_type_t::CONFIG_PIN_SUCCESS:
-        return "🔗 Config pairing successful";
-      case event_type_t::CONFIG_PIN_FAILED:
-        return "❌ Config pairing failed";
-      case event_type_t::NV_APP_LAUNCH:
-        return "🚀 application launched";
-      case event_type_t::NV_APP_RESUME:
-        return "▶️ application resumed";
-      case event_type_t::NV_APP_TERMINATE:
-        return "⏹️ application terminated";
-      case event_type_t::NV_SESSION_START:
-        return "📱 session started";
-      case event_type_t::NV_SESSION_END:
-        return "📱 session ended";
-      default:
-        return "🔔 System notification";
-    }
-  }
-
   std::string sanitize_json_string(const std::string &str) {
     std::string result;
     result.reserve(str.size());

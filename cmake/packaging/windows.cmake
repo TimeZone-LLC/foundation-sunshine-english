@@ -71,14 +71,14 @@ install(DIRECTORY "${SUNSHINE_SOURCE_ASSETS_DIR}/windows/misc/service/"
 install(DIRECTORY "${SUNSHINE_SOURCE_ASSETS_DIR}/windows/misc/migration/"
         DESTINATION "scripts"
         COMPONENT assets)
-# Portable initialization and uninstall scripts and language files
+# Portable initialization and uninstall scripts with the English message catalogue
 install(FILES "${SUNSHINE_SOURCE_ASSETS_DIR}/windows/misc/install_portable.bat"
         DESTINATION "."
         COMPONENT application)
 install(FILES "${SUNSHINE_SOURCE_ASSETS_DIR}/windows/misc/uninstall_portable.bat"
         DESTINATION "."
         COMPONENT application)
-install(DIRECTORY "${SUNSHINE_SOURCE_ASSETS_DIR}/windows/misc/languages/"
+install(FILES "${SUNSHINE_SOURCE_ASSETS_DIR}/windows/misc/languages/en-US.lang"
         DESTINATION "scripts/languages"
         COMPONENT application)
 # add sunshine environment to PATH

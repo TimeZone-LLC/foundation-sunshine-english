@@ -122,7 +122,7 @@ export function useApps() {
   const deleteConfirmIndex = ref(null)
 
   // 批量删除：selectionMode 仅控制 UI 是否显示多选 checkbox；
-  // selectedIndices 是 Set<number>，存的是 apps.value 的原始 index，
+  // selectedIndices is a Set<number> containing the original indices from apps.value,
   // 不能存 filteredApps 的下标，否则搜索后下标会错位。
   const selectionMode = ref(false)
   const selectedIndices = ref(new Set())

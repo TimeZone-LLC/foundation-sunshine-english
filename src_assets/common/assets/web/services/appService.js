@@ -17,7 +17,7 @@ const withoutIndex = (app) => {
 export class AppService {
   /**
    * 获取应用列表
-   * @returns {Promise<Array>} 应用列表
+   * @returns {Promise<Array>} Application list
    */
   static async getApps() {
     try {
@@ -33,7 +33,7 @@ export class AppService {
    * 保存应用
    * @param {Array} apps 应用列表
    * @param {Object} editApp 编辑的应用（可选）
-   * @returns {Promise<boolean>} 是否保存成功
+   * @returns {Promise<boolean>} Whether the save succeeded
    */
   static async saveApps(apps, editApp = null) {
     try {
@@ -48,7 +48,7 @@ export class AppService {
   /**
    * 删除应用
    * @param {number} index 应用索引
-   * @returns {Promise<boolean>} 是否删除成功
+   * @returns {Promise<boolean>} Whether the deletion succeeded
    */
   static async deleteApp(index) {
     try {
@@ -83,7 +83,7 @@ export class AppService {
 
   /**
    * 获取平台信息
-   * @returns {Promise<string>} 平台信息
+   * @returns {Promise<string>} Platform information
    */
   static async getPlatform() {
     try {

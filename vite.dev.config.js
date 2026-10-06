@@ -38,10 +38,10 @@ function createProxyLogger(prefix, target, rewritePath) {
     rewrite: (path) => path.replace(rewritePath, ''),
     configure(proxy) {
       proxy.on('proxyReq', (proxyReq, req) => {
-        console.log(`${prefix}请求:`, req.method, req.url, '-> ' + target + req.url.replace(rewritePath, ''))
+        console.log(`${prefix} request:`, req.method, req.url, '-> ' + target + req.url.replace(rewritePath, ''))
       })
       proxy.on('proxyRes', (proxyRes, req) => {
-        console.log(`✅ ${prefix}响应:`, req.url, '状态码:', proxyRes.statusCode)
+        console.log(`${prefix} response:`, req.url, 'status:', proxyRes.statusCode)
       })
     },
   }
@@ -87,25 +87,25 @@ export default defineConfig({
       port: 3000,
     },
     proxy: {
-      '/steam-api': createProxyLogger('🎮 Steam API', 'https://api.steampowered.com', /^\/steam-api/),
-      '/steam-store': createProxyLogger('🛒 Steam Store', 'https://store.steampowered.com', /^\/steam-store/),
+      '/steam-api': createProxyLogger('Steam API', 'https://api.steampowered.com', /^\/steam-api/),
+      '/steam-store': createProxyLogger('Steam Store', 'https://store.steampowered.com', /^\/steam-store/),
       '/boxart': {
         target: 'https://localhost:47990',
         changeOrigin: true,
         secure: false,
         configure(proxy) {
           proxy.on('error', (err, req, res) => {
-            console.log('❌ Boxart 代理错误:', err.message)
+            console.log('Box art proxy error:', err.message)
             if (!res.headersSent) {
               res.writeHead(500, { 'Content-Type': 'text/plain' })
             }
             res.end('Boxart proxy error: ' + err.message)
           })
           proxy.on('proxyReq', (proxyReq, req) => {
-            console.log('🖼️  Boxart 请求:', req.method, req.url, '-> https://localhost:47990' + req.url)
+            console.log('Box art request:', req.method, req.url, '-> https://localhost:47990' + req.url)
           })
           proxy.on('proxyRes', (proxyRes, req) => {
-            console.log('✅ Boxart 响应:', req.url, '状态码:', proxyRes.statusCode)
+            console.log('Box art response:', req.url, 'status:', proxyRes.statusCode)
             // 清理可能有问题的响应头
             delete proxyRes.headers['content-encoding']
           })
@@ -127,8 +127,7 @@ export default defineConfig({
               '/api/config': {
                 platform: 'windows',
                 version: '0.21.0-dev',
-                notify_pre_releases: true,
-                locale: 'zh_CN',
+                locale: 'en',
                 sunshine_name: 'Sunshine Development Server',
                 min_log_level: 2,
                 port: 47990,
@@ -187,10 +186,10 @@ export default defineConfig({
             }
           })
           proxy.on('proxyReq', (proxyReq, req) => {
-            console.log('🔗 代理请求:', req.method, req.url, '-> https://localhost:47990' + req.url)
+            console.log('Proxy request:', req.method, req.url, '-> https://localhost:47990' + req.url)
           })
           proxy.on('proxyRes', (proxyRes, req) => {
-            console.log('✅ 代理响应:', req.url, '状态码:', proxyRes.statusCode)
+            console.log('Proxy response:', req.url, 'status:', proxyRes.statusCode)
           })
         },
       },

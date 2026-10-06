@@ -179,7 +179,7 @@ const modes = [
   justify-content: center;
   border-radius: 0;
   background: var(--ui-accent);
-  color: var(--ui-on-accent, #fff);
+  color: var(--ui-on-accent);
   font-size: 0.48rem;
 }
 

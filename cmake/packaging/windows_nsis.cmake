@@ -71,7 +71,7 @@ FunctionEnd
 ; Finish Page 自定义选项
 ; 复选框1: 打开使用教程（默认勾选）
 !define MUI_FINISHPAGE_RUN
-!define MUI_FINISHPAGE_RUN_TEXT '打开使用教程'
+!define MUI_FINISHPAGE_RUN_TEXT 'Open documentation'
 !define MUI_FINISHPAGE_RUN_FUNCTION OpenDocumentation
 
 Function OpenDocumentation
@@ -121,8 +121,8 @@ set(CPACK_NSIS_WELCOME_TITLE "Welcome to Foundation Sunshine Game Streaming Serv
 set(CPACK_NSIS_WELCOME_TITLE_3LINES "ON")
 
 # Custom finish page configuration
-set(CPACK_NSIS_FINISH_TITLE "安装完成！")
-set(CPACK_NSIS_FINISH_TEXT "Foundation Sunshine Game Streaming Server 已成功安装到您的系统中。\\r\\n\\r\\n点击 '完成' 开始使用这个强大的游戏流媒体服务器。")
+set(CPACK_NSIS_FINISH_TITLE "Installation complete")
+set(CPACK_NSIS_FINISH_TEXT "Foundation Sunshine Game Streaming Server was installed successfully.\\r\\n\\r\\nClick Finish to close the installer.")
 
 # ==============================================================================
 # Installation Progress and User Feedback
@@ -140,7 +140,7 @@ SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
         ; 安全防护：防止符号链接攻击 - 使用 IfFileExists 检查文件是否存在
         ;           限制在 $INSTDIR 目录内，避免路径遍历攻击
         ; ----------------------------------------------------------------------
-        DetailPrint '🧹 清理便携版脚本...'
+        DetailPrint 'Removing portable setup scripts...'
         ; 安全删除：先检查文件是否存在，避免符号链接攻击
         IfFileExists '\$INSTDIR\\\\install_portable.bat' 0 +2
         Delete '\$INSTDIR\\\\install_portable.bat'
@@ -148,7 +148,7 @@ SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
         Delete '\$INSTDIR\\\\uninstall_portable.bat'
         
         ; 重置文件权限
-        DetailPrint '🔓 重置文件权限...'
+        DetailPrint 'Resetting file permissions...'
         nsExec::ExecToLog 'icacls \\\"$INSTDIR\\\" /reset /T /C /Q >nul 2>&1'
         
         ; ----------------------------------------------------------------------
@@ -158,36 +158,36 @@ SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
         ;           但限制在 $INSTDIR 目录内，且 NSIS 的 Delete 命令会处理符号链接
         ;           为了更安全，可以考虑逐个检查文件，但通配符删除在安装目录内风险较低
         ; ----------------------------------------------------------------------
-        DetailPrint '🧹 清理临时文件...'
+        DetailPrint 'Removing temporary files...'
         ; 使用通配符删除，限制在 $INSTDIR 目录内
         ; NSIS 的 Delete 命令在处理符号链接时会删除链接本身，不会跟随到目标
         Delete '\$INSTDIR\\\\*.tmp'
         Delete '\$INSTDIR\\\\*.old'
         
         ; 显示安装进度信息
-        DetailPrint '🎯 正在配置 Foundation Sunshine Game Streaming Server...'
+        DetailPrint 'Configuring Foundation Sunshine Game Streaming Server...'
                 
         ; 系统配置
-        DetailPrint '🔧 配置系统权限...'
+        DetailPrint 'Configuring system permissions...'
         nsExec::ExecToLog 'icacls \\\"$INSTDIR\\\" /reset'
         
-        DetailPrint '🛣️ 更新系统PATH环境变量...'
+        DetailPrint 'Updating system PATH...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\update-path.bat\\\" add'
         
-        DetailPrint '📦 迁移配置文件...'
+        DetailPrint 'Migrating configuration files...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\migrate-config.bat\\\"'
         
-        DetailPrint '🔥 配置防火墙规则...'
+        DetailPrint 'Configuring firewall rules...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\add-firewall-rule.bat\\\"'
         
-        DetailPrint '📺 安装虚拟显示器驱动...'
+        DetailPrint 'Installing virtual display driver...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\install-vdd.bat\\\"'
         
 
-        DetailPrint '🎯 安装虚拟游戏手柄...'
+        DetailPrint 'Installing virtual gamepad...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\install-gamepad.bat\\\"'
         
-        DetailPrint '⚙️ 安装并启动系统服务...'
+        DetailPrint 'Installing and starting system service...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\install-service.bat\\\"'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\autostart-service.bat\\\"'
 
@@ -195,7 +195,7 @@ SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
         SetRegView 64
         WriteRegStr HKLM 'SOFTWARE\\\\AlkaidLab\\\\Sunshine' 'InstallDir' '$INSTDIR'
         
-        DetailPrint '✅ 安装完成！'
+        DetailPrint 'Installation complete.'
         
         NoController:
         ")
@@ -204,25 +204,25 @@ SET(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
 set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
         "${CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS}
         ; 显示卸载进度信息
-        DetailPrint '正在卸载 Foundation Sunshine Game Streaming Server...'
+        DetailPrint 'Uninstalling Foundation Sunshine Game Streaming Server...'
         
         ; 停止运行的程序
-        DetailPrint '停止运行的程序...'
+        DetailPrint 'Stopping running Sunshine processes...'
         nsExec::ExecToLog 'taskkill /f /im sunshine-gui.exe'
         nsExec::ExecToLog 'taskkill /f /im sunshine.exe'
         
         ; 卸载系统组件
-        DetailPrint '删除防火墙规则...'
+        DetailPrint 'Removing firewall rules...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\delete-firewall-rule.bat\\\"'
         
-        DetailPrint '卸载系统服务...'
+        DetailPrint 'Uninstalling system service...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\uninstall-service.bat\\\"'
         
-        DetailPrint '卸载虚拟显示器驱动...'
+        DetailPrint 'Uninstalling virtual display driver...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\uninstall-vdd.bat\\\"'
         
 
-        DetailPrint '恢复NVIDIA设置...'
+        DetailPrint 'Restoring NVIDIA settings...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\${CMAKE_PROJECT_NAME}.exe\\\" --restore-nvprefs-undo'
         
         DeleteRegValue HKCU 'Software\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\Run' 'Sunshine GUI Desktop'
@@ -240,7 +240,7 @@ set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS
             DeleteRegValue HKLM 'SOFTWARE\\\\AlkaidLab\\\\Sunshine' 'InstallDir'
             DeleteRegKey /ifempty HKLM 'SOFTWARE\\\\AlkaidLab\\\\Sunshine'
         
-        DetailPrint '清理环境变量...'
+        DetailPrint 'Cleaning environment variables...'
         nsExec::ExecToLog '\\\"$INSTDIR\\\\scripts\\\\update-path.bat\\\" remove'
         
         NoDelete:

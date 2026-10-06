@@ -141,14 +141,21 @@ import { searchAllCovers } from '../utils/coverSearch.js'
 import { apiPostJson } from '../utils/apiFetch.js'
 import { getFocusableElements, resolveDialogTeleportTarget } from '../utils/focus.js'
 
-const createPlaceholderImage = (label) =>
-  'data:image/svg+xml,' +
-  encodeURIComponent(`
+const createPlaceholderImage = (label) => {
+  const theme = getComputedStyle(document.documentElement)
+  const background = theme.getPropertyValue('--ui-surface-hover').trim()
+  const foreground = theme.getPropertyValue('--ui-text-muted').trim()
+
+  return (
+    'data:image/svg+xml,' +
+    encodeURIComponent(`
   <svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300">
-    <rect fill="#1a1a2e" width="200" height="300"/>
-    <text x="100" y="150" text-anchor="middle" fill="#4a4a6a" font-size="14">${label}</text>
+    <rect fill="${background}" width="200" height="300"/>
+    <text x="100" y="150" text-anchor="middle" fill="${foreground}" font-size="14">${label}</text>
   </svg>
 `)
+  )
+}
 
 const COVER_FINDER_TABS = [
   { key: 'all', icon: 'fas fa-globe', labelKey: 'apps.cover_search_tab_all' },
@@ -578,7 +585,7 @@ export default {
     height: 40px;
     border: 3px solid var(--ui-accent-soft);
     border-top-color: var(--ui-accent);
-    border-radius: 0;
+    border-radius: 50%;
     animation: cover-finder-spin 1s linear infinite;
   }
 
@@ -645,7 +652,7 @@ export default {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #ffffff;
+    color: var(--ui-text-primary);
     font-size: 2rem;
     background: var(--ui-overlay);
     opacity: 0;

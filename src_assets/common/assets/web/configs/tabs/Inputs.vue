@@ -755,7 +755,7 @@ onBeforeUnmount(() => {
   height: 14px;
   border: 2px solid currentColor;
   border-top-color: transparent;
-  border-radius: 0;
+  border-radius: 50%;
   animation: vmouse-spin 0.6s linear infinite;
 }
 

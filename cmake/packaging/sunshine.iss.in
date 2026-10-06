@@ -78,7 +78,6 @@ SetupLogging=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
-Name: "chinesesimplified"; MessagesFile: "@CMAKE_SOURCE_DIR@\cmake\packaging\ChineseSimplified.isl"
 
 [CustomMessages]
 ; English custom messages
@@ -122,48 +121,6 @@ english.MsgUninstallGamepad=Do you want to remove Virtual Gamepad?
 english.MsgUninstallData=Do you want to remove all data in %1?%n(This includes configuration, cover images, and settings)
 english.StatusStoppingService=Stopping Sunshine service...
 english.StatusStoppingProcesses=Stopping running Sunshine processes...
-
-; Chinese Simplified custom messages
-chinesesimplified.ComponentApplication=Sunshine 主程序
-chinesesimplified.ComponentAssets=必要资源（着色器、Web UI）
-chinesesimplified.ComponentGUI=Sunshine GUI 与托盘代理（必需）
-chinesesimplified.ComponentVDD=Zako 虚拟显示驱动（HDR）
-chinesesimplified.ComponentAutostart=开机自动启动
-chinesesimplified.ComponentFirewall=添加防火墙规则
-chinesesimplified.ComponentGamepad=虚拟手柄（ViGEmBus）
-chinesesimplified.ComponentVmouse=虚拟鼠标驱动（UMDF）
-chinesesimplified.ComponentTools=诊断工具（dxgi-info、audio-info）
-chinesesimplified.TypeRecommended=推荐安装（虚拟显示器 + 防火墙 + 开机自启）
-chinesesimplified.TypeFull=完全安装（所有组件）
-chinesesimplified.TypeCompact=简洁安装（仅核心）
-chinesesimplified.TypeCustom=自定义安装
-chinesesimplified.ComponentVDDDesc=无头/远程串流必装。无需外接显示器即可串流，支持 HDR 直通。
-chinesesimplified.ComponentFirewallDesc=允许 Moonlight 客户端通过网络发现并连接本机。
-chinesesimplified.ComponentAutostartDesc=Windows 启动时自动运行 Sunshine。推荐常驻串流使用。
-chinesesimplified.ComponentGamepadDesc=模拟 Xbox 手柄。仅需要从客户端传入手柄输入时安装。
-chinesesimplified.ComponentVmouseDesc=提供平滑的绝对定位鼠标。如鼠标延迟可尝试安装。
-chinesesimplified.ComponentToolsDesc=dxgi-info、audio-info 等，用于排查显示和音频问题。
-chinesesimplified.StatusResetPermissions=正在重置文件权限...
-chinesesimplified.StatusUpdatePath=正在更新系统 PATH...
-chinesesimplified.StatusMigrateConfig=正在迁移配置文件...
-chinesesimplified.StatusFirewall=正在配置防火墙规则...
-chinesesimplified.StatusInstallVDD=正在安装虚拟显示驱动...
-chinesesimplified.StatusInstallGamepad=正在安装虚拟手柄...
-chinesesimplified.StatusInstallVmouse=正在安装虚拟鼠标驱动...
-chinesesimplified.StatusInstallService=正在安装系统服务...
-chinesesimplified.StatusAutostart=正在配置自动启动...
-chinesesimplified.FinishOpenDocs=打开使用文档
-chinesesimplified.FinishLaunchGUI=启动 Sunshine 管理界面
-chinesesimplified.MsgOldNSISDetected=检测到旧版 NSIS 安装的 Sunshine。%n需要先卸载才能继续。%n%n是否现在卸载旧版本？
-chinesesimplified.MsgOldNSISFailed=无法完全移除旧版安装。%n请手动卸载后重试。
-chinesesimplified.MsgOldNSISStaleRegistry=旧版本的文件已经不存在，但注册表中仍残留旧版的卸载信息。%n是否清理残留的注册表项并继续安装？
-chinesesimplified.MsgOldNSISCleanupFailed=清理旧版注册表项失败。%n请手动删除 HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Sunshine 后重试。
-chinesesimplified.MsgServiceInstallFailed=无法安装或验证 Sunshine 服务。%n%n程序文件已经装好并会保留。请重启后以管理员身份运行 "{app}\scripts\install-service.bat"，或在 Sunshine 管理界面里使用修复功能。详细信息见 TEMP 目录下的安装日志。
-chinesesimplified.MsgVDDInstallFailed=无法安装或验证虚拟显示驱动。%n%nSunshine 已安装但尚未启动。请检查 TEMP 目录中的安装日志，然后在 Sunshine 管理界面中使用修复功能。
-chinesesimplified.MsgUninstallGamepad=是否移除虚拟手柄（ViGEmBus）？
-chinesesimplified.MsgUninstallData=是否删除 %1 中的所有数据？%n（包括配置文件、封面图片和设置）
-chinesesimplified.StatusStoppingService=正在停止 Sunshine 服务...
-chinesesimplified.StatusStoppingProcesses=正在停止 Sunshine 进程...
 
 [Types]
 Name: "recommended"; Description: "{cm:TypeRecommended}"
@@ -222,8 +179,8 @@ Source: "{#MySourceDir}\tools\hdr_enhanced\nvidia_dlssnr\NVIDIA-OPTICAL-FLOW-NOT
 Source: "{#MySourceDir}\install_portable.bat"; DestDir: "{app}"; Flags: ignoreversion; Components: application
 Source: "{#MySourceDir}\uninstall_portable.bat"; DestDir: "{app}"; Flags: ignoreversion; Components: application
 
-; Language files
-Source: "{#MySourceDir}\scripts\languages\*"; DestDir: "{app}\scripts\languages"; Flags: ignoreversion recursesubdirs; Components: application
+; English message catalogue for the portable scripts
+Source: "{#MySourceDir}\scripts\languages\en-US.lang"; DestDir: "{app}\scripts\languages"; Flags: ignoreversion; Components: application
 
 ; Service scripts
 Source: "{#MySourceDir}\scripts\install-service.bat"; DestDir: "{app}\scripts"; Flags: ignoreversion; Components: application

@@ -55,21 +55,6 @@ INFO_STARTING=Creating startup script...
 SUCCESS_STARTUP_SCRIPT=Startup script created successfully. You can later run start_sunshine.vbs to start Sunshine
 INFO_LATER=You can later run sunshine.exe directly to start Sunshine
 
-# Language selection related
-LANG_DETECTED=Detected system language
-LANG_CONFIRM=Please confirm if you want to use this language
-LANG_YES=Yes (Y)
-LANG_NO=No (N)
-LANG_SELECT=Please select language
-LANG_SELECT_PROMPT=Please select language (1-6)
-LANG_CONFIRM_PROMPT=Please select (Y/N, Default: Y)
-LANG_ZH_SIMPLE=简体中文
-LANG_EN=English
-LANG_DE=Deutsch
-LANG_FR=Français
-LANG_JA=日本語
-LANG_RU=Русский
-
 # Script execution confirmation
 SCRIPT_CONFIRM_TITLE=Script Execution Confirmation
 SCRIPT_CONFIRM_DESC=The following operations will be performed
@@ -81,11 +66,6 @@ SCRIPT_CONFIRM_AUTOSTART=Configure startup autostart
 SCRIPT_CONFIRM_PROCEED=Do you want to continue? (Y/N, Default: Y)
 SCRIPT_CONFIRM_CANCEL=Operation cancelled
 SCRIPT_CONFIRM_PROCEEDING=Starting initialization...
-
-# Error messages
-ERROR_INVALID_SELECTION=Invalid selection, using default language
-ERROR_LANG_FILE_NOT_FOUND=Language file not found
-ERROR_LANG_FILE_NOT_FOUND_EN=Language file not found
 
 # Uninstall related
 TITLE_UNINSTALL=Sunshine Portable Uninstall Tool

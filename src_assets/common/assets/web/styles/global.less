@@ -93,7 +93,7 @@ samp {
   font-size: 1.05rem;
   font-weight: var(--ui-label-weight);
   margin-bottom: 0.5rem;
-  letter-spacing: -0.01em;
+  letter-spacing: normal;
   text-transform: none;
   color: var(--text-title-color, var(--ui-text-primary));
 
@@ -567,6 +567,15 @@ samp {
   text-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+}
+
+// Loading indicators are the only deliberate round shapes. Keep this
+// allow-list after the flattening reset so progress rings do not render as
+// glitching square blocks.
+.spinner-border,
+.cover-finder__loading-spinner,
+.vmouse-spinner {
+  border-radius: 50% !important;
 }
 
 // Resting surfaces: the smallest step, and never more than one per stack.

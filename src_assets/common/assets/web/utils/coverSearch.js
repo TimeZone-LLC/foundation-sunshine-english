@@ -65,7 +65,7 @@ function normalizeSearchString(str) {
 /**
  * 生成字符串的bigrams集合
  * @param {string} str 输入字符串
- * @returns {Set<string>} bigrams集合
+ * @returns {Set<string>} Set of bigrams
  */
 function getBigrams(str) {
   const bigrams = new Set()
@@ -149,7 +149,7 @@ function matchesSearch(gameName, searchTerm) {
  * @param {Map} cache 缓存Map
  * @param {string} key 缓存键
  * @param {Function} fetchFn 获取数据的函数
- * @returns {Promise<any>} 数据
+ * @returns {Promise<any>} Retrieved data
  */
 async function fetchWithCache(cache, key, fetchFn) {
   const cached = cache.get(key)
@@ -177,7 +177,7 @@ function buildIGDBImageUrl(thumbUrl, size = 't_cover_big_2x', ext = 'png') {
  * 搜索IGDB封面（单个结果，返回URL字符串）
  * @param {string} searchName 搜索名称
  * @param {string} bucket bucket标识符
- * @returns {Promise<string>} 封面URL，未找到返回空字符串
+ * @returns {Promise<string>} Cover URL, or an empty string if none is found
  */
 export async function searchIGDBCover(searchName, bucket) {
   // 检查搜索词是否适合IGDB搜索
@@ -229,7 +229,7 @@ export async function searchIGDBCover(searchName, bucket) {
  * @param {string} name 应用名称
  * @param {AbortSignal} signal 可选的AbortSignal用于取消请求
  * @param {number} maxResults 最大结果数量
- * @returns {Promise<Array>} 封面结果数组
+ * @returns {Promise<Array>} Array of cover results
  */
 export async function searchIGDBCovers(name, signal = null, maxResults = 20) {
   if (!name) return []
@@ -314,7 +314,7 @@ export async function searchIGDBCovers(name, signal = null, maxResults = 20) {
  * 搜索封面图片（单个结果，用于useApps.js）
  * 同时搜索IGDB和Steam，返回第一个找到的结果
  * @param {string} appName 应用名称
- * @returns {Promise<string>} 封面URL，未找到返回空字符串
+ * @returns {Promise<string>} Cover URL, or an empty string if none is found
  */
 export async function searchCoverImage(appName) {
   if (!appName) return ''
@@ -341,7 +341,7 @@ export async function searchCoverImage(appName) {
 /**
  * 批量搜索封面图片
  * @param {Array} appList 应用列表
- * @returns {Promise<Array>} 带封面URL的应用列表
+ * @returns {Promise<Array>} Application list with cover URLs
  */
 export async function batchSearchCoverImages(appList) {
   const results = await Promise.allSettled(
@@ -357,7 +357,7 @@ export async function batchSearchCoverImages(appList) {
  * 同时搜索IGDB和Steam封面（多个结果，用于CoverFinder.vue）
  * @param {string} name 应用名称
  * @param {AbortSignal} signal 可选的AbortSignal用于取消请求
- * @returns {Promise<{igdb: Array, steam: Array}>} 包含IGDB和Steam结果的对象
+ * @returns {Promise<{igdb: Array, steam: Array}>} Object containing IGDB and Steam results
  */
 export async function searchAllCovers(name, signal = null) {
   if (!name) {

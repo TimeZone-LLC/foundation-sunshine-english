@@ -103,7 +103,7 @@ export function isTauriEnv(windowObject = globalThis.window) {
  * 打开外部链接（支持 Tauri 和浏览器环境）
  * @param {string} url 要打开的 URL
  * @param {Window} [windowObject] 当前窗口
- * @returns {Promise<boolean>} 是否已交给系统或浏览器打开
+ * @returns {Promise<boolean>} Whether the URL was handed off to the system or browser
  */
 export async function openExternalUrl(url, windowObject = globalThis.window) {
   const target = String(url).trim();
