@@ -1,9 +1,5 @@
 # Guides
 
-@admonition{Community | This collection of guides is written by the community!
-Feel free to contribute your own tips and trips by making a PR.}
-
-
 ## Linux
 
 ### Discord call cancellation

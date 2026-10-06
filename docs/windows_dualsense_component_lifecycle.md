@@ -34,7 +34,7 @@
 
 ### 3.1 已验证的 HIDMaestro 能力边界
 
-以 HIDMaestro v1.6.2 官方发布物和同标签源码为准，Sunshine 必须区分两类 profile，不把 USB/IP 当作所有 DS5 模拟的必需条件：
+Using the official HIDMaestro v1.6.2 release and source at the same tag as the baseline, Sunshine must distinguish two profile classes rather than treating USB/IP as a prerequisite for every DS5 emulation profile:
 
 | Profile | 后端 | 虚拟 HID | 四声道扬声器/触觉 | 系统级依赖 | 第一阶段用途 |
 |---|---|---:|---:|---|---|
@@ -119,15 +119,15 @@ common-c 仍使用回调存在性生成底层能力位，但这是应用层模�
 
 页面沿用现有管理页的标题、卡片密度、按钮和状态样式，不另建一套视觉语言。DualSense 模块仅在需要时展开安装、模式选择、自检和诊断；来源、能力探测及底层传输细节默认折叠。
 
-用户通过“模拟游戏手柄类型”选择 `自动`、Xbox 360、DualShock 4 或 DualSense。这里的全局选择只作用于没有应用级覆盖的会话；`AppEditor.vue` 仍可以为单个应用指定手柄类型，并覆盖全局选择。
-`DualSense` 是全局配置中的启用入口；DualSense 组件区域只负责安装、修复、HD Haptics、兼容模式、微调和测试，不再维护第二个全局启用开关。
-客户端通过 `/launch` 或 `/resume` 声明的手柄类型只绑定当前串流会话，不会覆盖其他客户端的选择。
+Users select `Automatic`, Xbox 360, DualShock 4, or DualSense through “Emulated gamepad type.” This global selection applies only to sessions with no per-application override; `AppEditor.vue` can still select a gamepad type for one application and override the global choice.
+`DualSense` is the enablement entry point in global configuration. The DualSense component area handles only installation, repair, HD Haptics, compatibility mode, tuning, and tests; it no longer maintains a second global enable switch.
+A gamepad type declared by the client through `/launch` or `/resume` is scoped to the current streaming session and does not override another client's selection.
 
-选择 DualSense 后，如果组件未安装或损坏，页面直接给出“安装组件”或“修复组件”的下一步。Sunshine Core 在组件不可用时统一回退到自动手柄选择，保证串流仍能获得可用手柄，并在日志中记录选择来源与回退原因。
+After selecting DualSense, if the component is missing or corrupt, the page presents “Install component” or “Repair component” as the direct next action. When the component is unavailable, Sunshine Core consistently falls back to automatic gamepad selection so the stream still receives a usable gamepad, and logs the selection source and fallback reason.
 
-全局手柄类型仍持久化在 `sunshine.conf`，但保存成功后会同时发布到进程内的原子运行时策略。已经创建的虚拟手柄不会在串流中途更换；没有应用级或客户端级覆盖时，后续新分配的手柄使用新选择，包括当前串流中之后连接并新建的手柄，无需重启 Sunshine。
+The global gamepad type remains persisted in `sunshine.conf`, but a successful save also publishes it to the in-process atomic runtime policy. Existing virtual gamepads do not change type during a stream. With no per-application or per-client override, subsequently allocated gamepads use the new selection—including gamepads connected and created later in the current stream—without restarting Sunshine.
 
-RTSP 的手柄能力声明和实际分配采用相同的客户端、应用级、全局选择优先级。控制循环仅在存在已成功分配 DualSense、音频触觉协商成功且未收到降级或断线通知的会话时，将等待上限调整为 5 ms；音频端点因 Windows 音频策略冲突降级为 HID-only 后会恢复普通轮询。仅声明客户端能力、选择 Xbox/DS4 或 DualSense 组件不可用时，不因此提高轮询频率。
+RTSP gamepad capability advertisement and actual allocation use the same client, application, then global selection priority. The control loop reduces its maximum wait to 5 ms only for a session with a successfully allocated DualSense, successful audio-haptics negotiation, and no downgrade or disconnect notification. If the audio endpoint falls back to HID-only because of a Windows audio-policy conflict, normal polling resumes. Merely advertising client capability, selecting Xbox/DS4, or having an unavailable DualSense component does not raise the polling frequency.
 
 本机自检通过后提供 ControllerMeta 入口，用于人工验证按键、摇杆、运动传感器、轮询和普通振动。页面必须明确说明：ControllerMeta 不能验证四声道 PCM、HD Haptics 传输协议或完整的 Sunshine → Moonlight 音频触觉链路。
 
@@ -307,18 +307,18 @@ ready
 
 ## 6. 控制接口
 
-### 6.0 控制器全局配置
+### 6.0 Global controller configuration
 
-Control Panel 不持有或回写完整的 `/api/config` 快照。它通过以下受认证接口只读写控制器字段：
+Control Panel does not retain or write back a complete `/api/config` snapshot. It reads and writes only controller fields through these authenticated endpoints:
 
 ```text
-GET  /api/gamepad/config  -> gamepad、DS4 行为与 DSU 设置
-POST /api/gamepad/config  -> 仅包含本次变化字段的部分更新
+GET  /api/gamepad/config  -> gamepad, DS4 behavior, and DSU settings
+POST /api/gamepad/config  -> partial update containing only fields changed by this request
 ```
 
-Core 只接受固定字段集合，并在 `config_file_mutex` 内把部分更新合并到 `sunshine.conf`。因此 Panel 修改 `gamepad` 时不会覆盖同时存在的显示、编码器、网络、证书或其他配置。`gamepad` 保存成功后在同一临界区发布运行时策略；其他控制器高级设置仍按各自现有生命周期生效。
+Core accepts only a fixed field set and merges partial updates into `sunshine.conf` while holding `config_file_mutex`. A Panel change to `gamepad` therefore cannot overwrite concurrent display, encoder, network, certificate, or other configuration. After `gamepad` saves successfully, Core publishes the runtime policy in the same critical section; other advanced controller settings continue to follow their existing lifecycles.
 
-发布时，Core 与 Panel 必须同时采用 `/api/gamepad/config` 和不含 `ds5_enabled` 的 DualSense 配置接口。Sunshine CI 从 Panel Release 下载预构建 GUI ZIP，不会直接构建子模块源码。因此应先发布匹配的 Panel，再构建 Sunshine 安装包；仅更新子模块指针不能保证安装包携带新版 GUI。复用构建缓存时，应通过 `GUI_VERSION` 指定已发布的匹配版本，避免继续使用缓存的 `latest` 包。
+For release, Core and Panel must adopt `/api/gamepad/config` and the DualSense configuration interface without `ds5_enabled` together. Sunshine CI downloads a prebuilt GUI ZIP from a Panel Release and does not build the submodule source directly. Publish the matching Panel before building the Sunshine installer; updating only the submodule pointer does not guarantee that the installer contains the new GUI. When reusing the build cache, set `GUI_VERSION` to the matching released version so the cached `latest` package is not reused.
 
 ### 6.1 GUI/Tauri 命令
 
@@ -430,11 +430,11 @@ src/platform/windows/ds5/
 
 ```text
 X360 / DS4 -> 现有 ViGEm 路径
-DS5        -> 组件可用时 Ds5Manager -> Sidecar
-           -> 组件不可用时回退到自动选择
+DS5        -> Ds5Manager -> Sidecar when the component is available
+           -> fall back to automatic selection when the component is unavailable
 ```
 
-Core 维护引用计数，按 session ID 管理多客户端。第一阶段可以限制一个 DS5 设备。组件不可用或 Sidecar 在分配阶段启动/attach 失败时回退到自动选择；已经成功建立的 DS5 设备在后续运行中发生故障时，仍由现有恢复和释放路径处理，不在半建立状态下悄悄切换类型。
+Core maintains reference counts and manages multiple clients by session ID. The first phase may limit operation to one DS5 device. If the component is unavailable or the Sidecar fails to start or attach during allocation, Core falls back to automatic selection. If an established DS5 device fails later at runtime, the existing recovery and release paths still handle it; the type does not silently change from a partially established state.
 
 ### 7.3 安装目录
 
@@ -544,12 +544,12 @@ Core 维护引用计数，按 session ID 管理多客户端。第一阶段可以
 
 第一阶段只暴露必要选项：
 
-- `模拟游戏手柄类型`：全局默认选择；没有应用级覆盖时，显式选择 `DualSense` 才使用 DS5，`自动` 不主动探测或选择 DS5。
+- `Emulated gamepad type`: global default; without an application override, only an explicit `DualSense` selection uses DS5. `Automatic` does not proactively detect or select DS5.
 - `串流结束后保留设备`：默认 10 秒，可选 0、10、30 秒。
 - `启用 HD Haptics 音频通道`：默认自动；客户端不支持时不发送。
 - `诊断日志`：默认普通，仅临时启用详细模式。
 
-`ds5_config.json` 只保存 HD Haptics、兼容模式和振动微调，不保存手柄类型或 DS5 启用状态。旧文件中的 `ds5_enabled` 仅在读取时忽略；下一次保存会将其移除，不据此修改 `sunshine.conf`。升级后用户需要在“设备中心 → 控制器 → 模拟游戏手柄类型”确认全局类型；已有应用级 `gamepad` 覆盖仍按应用配置生效。
+`ds5_config.json` stores only HD Haptics, compatibility mode, and vibration tuning; it does not store the gamepad type or DS5 enablement state. A legacy `ds5_enabled` field is ignored when read and removed on the next save, without changing `sunshine.conf`. After upgrading, users must confirm the global type under “Device center → Controllers → Emulated gamepad type”; existing per-application `gamepad` overrides continue to apply according to the application configuration.
 
 以下内容不应暴露给普通用户：USB/IP 端口、VID/PID、内部 Pipe 名称、原始 USB 描述符、Sidecar 命令行。
 
@@ -631,7 +631,7 @@ Core 维护引用计数，按 session ID 管理多客户端。第一阶段可以
 | 10 秒内重新连接 | 复用设备，避免重新枚举 |
 | 旧 Sidecar 协议 | 阻止 attach，提示升级 |
 | HID 正常、Audio 超时 | 普通控制可用，HD Haptics 明确降级 |
-| 已选择 DS5、组件未安装或损坏 | GUI 提示安装/修复；Core 记录告警并按自动模式创建可用手柄 |
+| DS5 selected, but component missing or corrupt | GUI prompts for installation or repair; Core logs a warning and creates a usable gamepad in automatic mode |
 | 多用户 Windows 会话 | 非所有者不能 detach 当前设备 |
 
 ## 15. 验收标准
@@ -672,8 +672,8 @@ UX 验收：
 
 截至 2026-08-14（Asia/Hong_Kong），首期实现已经冻结以下决策：
 
-1. Sidecar 调用 HIDMaestro v1.6.2 的公共 `HIDMaestro.Core.dll` API，不复制其实现，也不调用 HIDMaestroTest UI。
-2. HIDMaestro 使用官方发布物 `HIDMaestro-v1.6.2.zip`，固定下载地址和 SHA-256 `6ae8df0cf317baf7e65777e2929f618916a67831b5ff1162205310f2c08b80ff`。发布物大小为 118,881,819 bytes。
+1. The Sidecar calls the public `HIDMaestro.Core.dll` API from HIDMaestro v1.6.2; it neither copies the implementation nor invokes the HIDMaestroTest UI.
+2. HIDMaestro uses the official `HIDMaestro-v1.6.2.zip` release with a pinned download URL and SHA-256 `6ae8df0cf317baf7e65777e2929f618916a67831b5ff1162205310f2c08b80ff`. The release size is 118,881,819 bytes.
 3. Sunshine 主安装包仅携带自研 Sidecar 组件包的固定 manifest，不携带完整 .NET 运行时或 HIDMaestro DLL。Sidecar 自包含 ZIP 作为同一 Release 的独立资产发布；GUI 在用户明确选择安装时下载或读取用户选择的匹配 ZIP，并继续单独下载、校验 HIDMaestro 后只提取 Core、许可证、README 和第三方通知。
 4. 首期每个 Sunshine 进程只允许一个虚拟 DualSense。Xbox 360、DualShock 4 和既有自动模式继续走 ViGEm，不改变成熟驱动支持范围。
 5. 客户端只选择 `physical` 或 `emulated`。前者预检 USB DualSense 四声道端点后声明 `ML_FF_DS5_HAPTICS_PCM`；后者声明 `ML_FF_DS5_HAPTICS_IR_V2`。两位互斥且不在运行中自动切换。

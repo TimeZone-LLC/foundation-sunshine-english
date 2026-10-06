@@ -302,8 +302,7 @@ const preferredEncoderTab = (children = []) =>
 const scrollActiveTabIntoView = async () => {
   await nextTick()
   const activeTab = configTabsRef.value?.querySelector('.nav-link.active')
-  const behavior = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'
-  activeTab?.scrollIntoView?.({ behavior, block: 'nearest', inline: 'center' })
+  activeTab?.scrollIntoView?.({ behavior: 'auto', block: 'nearest', inline: 'center' })
 }
 
 const toggleEncoderDropdown = (tabId, event) => {

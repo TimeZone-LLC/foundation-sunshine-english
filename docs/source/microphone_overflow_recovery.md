@@ -1,74 +1,74 @@
-# 麦克风队列溢出恢复设计
+# Microphone queue-overflow recovery design
 
-## 背景
+## Background
 
-每个远程麦克风音源最多缓存 8 个 20 ms Opus 包。接收速度短时间高于主机播放速度时，混音器会丢弃最远的未来包。偶发溢出属于正常的实时降级；持续溢出则可能让音源的接收时间线和主机播放时间线长期错位，表现为 PLC 增多、声音断续或播放进度异常。
+Each remote microphone source buffers at most eight 20 ms Opus packets. When packets briefly arrive faster than the host can play them, the mixer drops the farthest packet in the future. Occasional overflow is a normal real-time degradation. Sustained overflow, however, can leave the source's receive timeline permanently misaligned with the host playback timeline, causing more PLC, intermittent audio, or abnormal playback progress.
 
-本机制只负责恢复单个麦克风音源的播放时间线，不负责修复网络、客户端发送节奏或主机调度本身的问题。
+This mechanism only restores the playback timeline of one microphone source. It does not repair the network, client send cadence, or host scheduling.
 
-## 参数与取舍
+## Parameters and tradeoffs
 
-| 参数 | 值 | 作用 |
+| Parameter | Value | Purpose |
 | --- | ---: | --- |
-| 单音源最大缓存 | 8 包 | 吸收短时突发，同时保持固定上限 |
-| 最大未来时间线窗口 | 16 帧（约 320 ms） | 让扩大后的有界队列先吸收突发，再判断时间线跳变 |
-| 溢出统计窗口 | 250 帧（约 5 秒） | 判断溢出是否持续 |
-| 重锚阈值 | 10 次溢出 | 避免单个乱序包触发恢复 |
-| 重锚冷却时间 | 100 帧（约 2 秒） | 持续故障时允许再次恢复，同时避免频繁清空时间线 |
-| 重锚后的 jitter buffer | 2 帧（约 40 ms） | 给新时间线留出稳定的播放缓冲 |
+| Maximum buffer per source | 8 packets | Absorb short bursts while retaining a fixed upper bound |
+| Maximum future timeline window | 16 frames (about 320 ms) | Let the larger bounded queue absorb a burst before treating it as a timeline jump |
+| Overflow statistics window | 250 frames (about 5 seconds) | Determine whether overflow is sustained |
+| Re-anchor threshold | 10 overflows | Prevent one reordered packet from triggering recovery |
+| Re-anchor cooldown | 100 frames (about 2 seconds) | Permit another recovery during a persistent fault without repeatedly clearing the timeline |
+| Jitter buffer after re-anchor | 2 frames (about 40 ms) | Give the new timeline a stable playback buffer |
 
-统计窗口和重锚冷却时间是两个独立概念。统计窗口决定“这一轮是否持续溢出”，冷却时间决定“距离上次溢出重锚多久后才允许再次溢出重锚”。冷却时间小于统计窗口，为下一次恢复保留判断机会；只有后续入队仍满足阈值、窗口和冷却条件时才会再次恢复，并非每隔 2 秒或 5 秒固定重锚。跳帧和其他时间线重置会清除冷却状态，因此冷却不是所有重锚路径的全局频率限制。
+The statistics window and re-anchor cooldown are independent. The statistics window determines whether overflow is sustained during the current round; the cooldown determines how long after the last overflow re-anchor another overflow re-anchor is allowed. Because the cooldown is shorter than the statistics window, a later recovery remains possible. Recovery occurs again only if subsequent enqueue attempts satisfy the threshold, window, and cooldown conditions—not automatically every two or five seconds. Frame skips and other timeline resets clear the cooldown, so it is not a global rate limit for every re-anchor path.
 
-### 为什么只增大到 8 包
+### Why increase the limit only to eight packets
 
-8 个 20 ms 包最多包含约 160 ms 的音频数据。这是包数量上限，不等于固定增加 160 ms 延迟，也不能与 2 帧 jitter buffer 相加计算实际延迟。首帧的播放位置仍由锚点和 2 帧预缓冲决定；队列只是允许未来包在短时突发期间暂存。
+Eight 20 ms packets contain at most about 160 ms of audio. This packet-count limit does not add a fixed 160 ms of latency and must not be added to the two-frame jitter buffer to calculate actual latency. The anchor and two-frame prebuffer still determine the first frame's playback position; the queue merely lets future packets wait during a short burst.
 
-有限增大队列可以减少短时间批量到包时的丢弃，但还需要考虑：
+A modestly larger queue reduces drops when a batch of packets arrives over a short interval, but:
 
-- 如果发送速度持续高于播放速度，任何有限容量最终都会耗尽；
-- 已经过期的包仍会丢弃，超过未来 16 个槽位的包仍会触发已有时间线重置；
-- 每个音源会额外保留最多 4 个 Opus 包，但仍然是固定上限；只有同时延后播放位置，才会进一步增加麦克风延迟。
+- any finite capacity is eventually exhausted when the send rate remains above the playback rate;
+- expired packets are still dropped, and a packet more than 16 slots into the future still triggers the existing timeline reset;
+- each source retains at most four additional Opus packets, still with a fixed bound; microphone latency increases further only if the playback position is also delayed.
 
-因此本次将容量从 4 包调整为 8 包，同时保持 2 帧初始预缓冲。后续仍应依据到包间隔、突发包数、队列占用和可接受的延迟，对比不同容量与预缓冲设置；不会无限扩大队列。
+The capacity therefore increases from four to eight packets while the initial prebuffer remains two frames. Future work should compare capacities and prebuffer settings using arrival intervals, burst sizes, queue occupancy, and acceptable latency; the queue must not grow without a bound.
 
-## 状态流程
+## State flow
 
 ```mermaid
 stateDiagram-v2
   [*] --> Normal
-  Normal --> OverflowWindow: 队列超过 8 包
-  OverflowWindow --> Normal: 统计窗口过期
-  OverflowWindow --> OverflowWindow: 溢出次数增加
-  OverflowWindow --> Reanchor: 次数 >= 10 且窗口未过期且冷却已结束
-  Reanchor --> Normal: 清空旧时间线，当前包按新锚点入队
-  OverflowWindow --> Normal: 统计窗口过期且没有新的溢出事件
-  Normal --> [*]: 音源移除或混音器清理
+  Normal --> OverflowWindow: Queue exceeds 8 packets
+  OverflowWindow --> Normal: Statistics window expires
+  OverflowWindow --> OverflowWindow: Overflow count increases
+  OverflowWindow --> Reanchor: Count >= 10, window valid, and cooldown complete
+  Reanchor --> Normal: Clear old timeline and enqueue current packet at new anchor
+  OverflowWindow --> Normal: Statistics window expires with no new overflow
+  Normal --> [*]: Source removed or mixer cleared
 ```
 
-## 接收与恢复逻辑
+## Receive and recovery logic
 
-1. 第一次队列溢出时，记录当前主机播放槽位作为统计窗口起点。
-2. 在窗口内累计溢出次数。队列短暂回落并成功入队时不清除当前窗口，避免多个短突发永远达不到恢复阈值。
-3. 每次检查前，如果统计窗口已经过期，清除旧计数，再由新的溢出事件开启新窗口。
-4. 先前已累计 10 次溢出后，在后续包通过序列号、时间线和迟到检查时，若窗口仍有效且距离上一次溢出重锚超过 100 帧（首次无冷却），则：
-   - 重置 Opus 解码器和音源时间线；
-   - 清空旧队列；
-   - 将当前包放到当前播放槽位之后的 2 帧；
-   - 清除旧的溢出状态，并记录新的重锚槽位。
-5. 主机播放线程跳帧、音源时间线重置或会话清理时，同时清除溢出窗口和重锚冷却状态，避免旧周期影响新周期。
+1. On the first queue overflow, record the current host playback slot as the start of the statistics window.
+2. Accumulate overflows within the window. Do not clear the current window when the queue briefly recedes and a packet is enqueued successfully; otherwise, a series of short bursts could never reach the recovery threshold.
+3. Before each check, clear the old count if the statistics window has expired. A new overflow then starts a new window.
+4. After ten overflows have accumulated, when a later packet passes sequence-number, timeline, and lateness checks, re-anchor if the window is still valid and more than 100 frames have elapsed since the previous overflow re-anchor (with no cooldown for the first one):
+   - reset the Opus decoder and source timeline;
+   - clear the old queue;
+   - place the current packet two frames after the current playback slot;
+   - clear the old overflow state and record the new re-anchor slot.
+5. When the host playback thread skips frames, the source timeline resets, or the session is cleared, also clear the overflow window and re-anchor cooldown so old-cycle state cannot affect the new cycle.
 
-## 用户可见行为
+## User-visible behavior
 
-重锚会重置解码器、清空旧队列，并将该音源标记为尚未开始播放。新包等待两个播放槽位，其间该音源不输出，也不会调用 Opus PLC。若只有这一个音源，混音器返回空结果，播放线程不写入该帧；其他活跃音源仍可继续混音。
+Re-anchoring resets the decoder, clears the old queue, and marks the source as not yet started. The new packet waits for two playback slots; during that interval the source emits no audio and does not invoke Opus PLC. If it is the only source, the mixer returns no result and the playback thread does not write that frame. Other active sources can continue to mix.
 
-在正常的 20 ms 调度下，从重锚入队到首次输出约为 40–60 ms，实际听感还受输出设备缓冲和调度影响，不能保证无停顿或最多中断 40 ms。持续溢出期间，仅在后续包满足恢复条件时再次重锚。
+With normal 20 ms scheduling, first output occurs about 40–60 ms after the re-anchor enqueue. Output-device buffering and scheduling also affect perception, so the design cannot guarantee a seamless result or a maximum 40 ms interruption. During sustained overflow, another re-anchor occurs only when a later packet satisfies the recovery conditions.
 
-如果 `queue_overflow`、`plc` 长时间持续增长，说明网络、客户端发送或主机调度仍然异常，重锚只能限制时间线错误的持续时间，不能替代对根因的处理。
+If `queue_overflow` and `plc` continue growing for a long time, the network, client sender, or host scheduler is still unhealthy. Re-anchoring limits how long a timeline error persists; it does not replace correction of the root cause.
 
-## 验证范围
+## Validation scope
 
-- 单元测试覆盖 8 包队列容量和第 9 个未来包的溢出。
-- 单元测试覆盖持续溢出达到阈值后的重锚。
-- 单元测试覆盖重锚后当前包按新锚点播放。
-- 单元测试覆盖队列窗口短暂回落后仍保留统计，以及主机跳帧后的窗口边界，确保旧状态不会错误触发重锚。
-- 真实设备验证需要观察长时间串流中的 `queue_overflow`、`reanchors`、`plc` 和 WASAPI 丢帧统计。
+- Unit tests cover the eight-packet queue capacity and overflow of the ninth future packet.
+- Unit tests cover re-anchoring after sustained overflow reaches the threshold.
+- Unit tests cover playback of the current packet at the new anchor after re-anchoring.
+- Unit tests cover retaining statistics when the queue briefly recedes and the window boundary after a host frame skip, ensuring that stale state cannot trigger a re-anchor incorrectly.
+- Physical-device validation must observe `queue_overflow`, `reanchors`, `plc`, and WASAPI dropped-frame statistics during a long streaming session.

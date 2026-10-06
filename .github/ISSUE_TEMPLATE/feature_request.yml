@@ -1,0 +1,53 @@
+name: Feature request
+description: Propose a functional host or control-panel improvement
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the infrastructure problem first, then the smallest behavior that would solve it. Client-only requests belong in the relevant client project.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Video or encoding
+        - HDR or display management
+        - Audio or microphone
+        - Controller or input
+        - Pairing or networking
+        - Web UI or control panel
+        - Build or packaging
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Explain the limitation or failure mode this request addresses.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe observable behavior, compatibility requirements, and relevant constraints.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: List existing workarounds or other designs you evaluated.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Technical context
+      description: Add protocol details, hardware constraints, logs, or references that affect implementation.

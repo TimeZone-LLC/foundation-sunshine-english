@@ -47,43 +47,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
 `General <https://localhost:47990/config/#general>`__
 -----------------------------------------------------
 
-`locale <https://localhost:47990/config/#locale>`__
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Description**
-   The locale used for Sunshine's user interface.
-
-**Choices**
-
-.. table::
-   :widths: auto
-
-   =======   ===========
-   Value     Description
-   =======   ===========
-   de        German
-   en        English
-   en_GB     English (UK)
-   en_US     English (United States)
-   es        Spanish
-   fr        French
-   it        Italian
-   ja        Japanese
-   pt        Portuguese
-   ru        Russian
-   sv        Swedish
-   tr        Turkish
-   zh        Chinese (Simplified)
-   =======   ===========
-
-**Default**
-   ``en``
-
-**Example**
-   .. code-block:: text
-
-      locale = en
-
 `sunshine_name <https://localhost:47990/config/#sunshine_name>`__
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -160,20 +123,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
    .. code-block:: text
 
       global_prep_cmd = [{"do":"nircmd.exe setdisplay 1280 720 32 144","undo":"nircmd.exe setdisplay 2560 1440 32 144"}]
-
-`notify_pre_releases <https://localhost:47990/config/#notify_pre_releases>`__
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Description**
-   Whether to be notified of new pre-release versions of Sunshine.
-
-**Default**
-   ``disabled``
-
-**Example**
-   .. code-block:: text
-
-      notify_pre_releases = disabled
 
 `Input <https://localhost:47990/config/#input>`__
 -------------------------------------------------

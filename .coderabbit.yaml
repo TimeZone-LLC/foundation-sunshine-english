@@ -1,5 +1,5 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-language: zh-CN
+language: en-US
 early_access: true
 
 reviews:
@@ -32,29 +32,33 @@ reviews:
   path_instructions:
     - path: "src/**/*.{cpp,c,h}"
       instructions: >
-        Sunshine 核心 C++ 源码，自托管游戏串流服务器。审查要点：内存安全、
-        线程安全、RAII 资源管理、安全漏洞。注意预处理宏控制的平台相关代码。
+        Core C and C++ host code. Review memory safety, thread safety, RAII
+        ownership, protocol correctness, and security boundaries. Account for
+        platform-specific code selected by preprocessor guards.
     - path: "src/platform/**"
       instructions: >
-        平台抽象层代码（Windows/Linux/macOS）。确保各平台实现一致，
-        注意 Windows API 调用的错误处理和资源释放。
+        Windows, Linux, and macOS platform implementations. Check consistent
+        behavior, operating-system API error handling, and resource release.
     - path: "cmake/**"
       instructions: >
-        CMake 构建系统文件。审查跨平台兼容性、现代 CMake 实践。
+        CMake build and packaging code. Check cross-platform behavior,
+        reproducibility, dependency handling, and modern CMake practices.
     - path: "src_assets/**/*.{vue,js,html}"
       instructions: >
-        基于 Vue.js 的 Web 配置面板。审查 XSS/CSRF 安全性、
-        组件设计、状态管理和可访问性。
+        Vue-based administration interfaces. Review XSS and CSRF defenses,
+        component state, authentication boundaries, and accessibility.
     - path: "docker/**"
       instructions: >
-        Docker 配置文件。审查最小化基础镜像、层缓存、安全性。
+        Container build definitions. Review base-image scope, layer caching,
+        dependency pinning, and security.
     - path: "packaging/**"
       instructions: >
-        打包配置（Inno Setup、Flatpak、DEB 等）。审查安装路径、
-        权限设置和依赖声明的正确性。
+        Installer and distribution packaging. Review paths, privileges,
+        upgrades, rollback behavior, and dependency declarations.
     - path: "tests/**"
       instructions: >
-        测试文件。验证测试覆盖率、边界情况和断言正确性。
+        Automated tests. Review boundary coverage, determinism, failure-mode
+        assertions, and whether the test exercises production behavior.
 
   auto_review:
     enabled: true

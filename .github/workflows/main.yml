@@ -184,7 +184,7 @@ jobs:
       - name: Build self-contained DualSense sidecar
         shell: pwsh
         env:
-          RELEASE_TAG: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
+          RELEASE_TAG: ${{ needs.setup_release.outputs.release_tag }}
         run: .\scripts\build-ds5-sidecar.ps1 -ReleaseTag $env:RELEASE_TAG
 
       - name: Build Web UI
@@ -230,12 +230,12 @@ jobs:
         shell: msys2 {0}
         env:
           # Same-repository PRs are trusted; fork PRs never receive the private credential.
-          RTX_VIDEO_SDK_URL: ${{ (github.repository == 'AlkaidLab/foundation-sunshine' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'AlkaidLab/foundation-sunshine')) && secrets.RTX_VIDEO_SDK_URL || '' }}
-          RTX_VIDEO_SDK_TOKEN: ${{ (github.repository == 'AlkaidLab/foundation-sunshine' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'AlkaidLab/foundation-sunshine')) && secrets.DRIVER_DOWNLOAD_TOKEN || '' }}
-          RTX_VIDEO_NGX_APPLICATION_ID: ${{ (github.repository == 'AlkaidLab/foundation-sunshine' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'AlkaidLab/foundation-sunshine')) && secrets.RTX_VIDEO_NGX_APPLICATION_ID || '' }}
-          SUNSHINE_RTX_HDR: ${{ !(github.repository == 'AlkaidLab/foundation-sunshine' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'AlkaidLab/foundation-sunshine')) && 'OFF' || (github.event_name != 'pull_request' && github.ref == 'refs/heads/master') && 'ON' || inputs.rtx_hdr || 'AUTO' }}
+          RTX_VIDEO_SDK_URL: ${{ (github.repository == 'TimeZone-LLC/foundation-sunshine-english' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'TimeZone-LLC/foundation-sunshine-english')) && secrets.RTX_VIDEO_SDK_URL || '' }}
+          RTX_VIDEO_SDK_TOKEN: ${{ (github.repository == 'TimeZone-LLC/foundation-sunshine-english' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'TimeZone-LLC/foundation-sunshine-english')) && secrets.DRIVER_DOWNLOAD_TOKEN || '' }}
+          RTX_VIDEO_NGX_APPLICATION_ID: ${{ (github.repository == 'TimeZone-LLC/foundation-sunshine-english' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'TimeZone-LLC/foundation-sunshine-english')) && secrets.RTX_VIDEO_NGX_APPLICATION_ID || '' }}
+          SUNSHINE_RTX_HDR: ${{ !(github.repository == 'TimeZone-LLC/foundation-sunshine-english' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == 'TimeZone-LLC/foundation-sunshine-english')) && 'OFF' || (github.event_name != 'pull_request' && github.ref == 'refs/heads/master') && 'ON' || inputs.rtx_hdr || 'AUTO' }}
           BRANCH: ${{ github.head_ref || github.ref_name }}
-          BUILD_VERSION: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
+          BUILD_VERSION: ${{ needs.setup_release.outputs.release_tag }}
           COMMIT: ${{ needs.setup_release.outputs.release_commit }}
           # Never expose the private driver credential to fork-controlled CMake code.
           GITHUB_TOKEN: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && secrets.DRIVER_DOWNLOAD_TOKEN || '' }}
@@ -273,8 +273,8 @@ jobs:
             -DSUNSHINE_ASSETS_DIR=assets \
             -DDRIVER_DEPS_REQUIRED=${DRIVER_DEPS_REQUIRED} \
             -DSUNSHINE_PUBLISHER_NAME='${{ github.repository_owner }}' \
-            -DSUNSHINE_PUBLISHER_WEBSITE='https://github.com/AlkaidLab/foundation-sunshine' \
-            -DSUNSHINE_PUBLISHER_ISSUE_URL='https://github.com/AlkaidLab/foundation-sunshine/issues'
+            -DSUNSHINE_PUBLISHER_WEBSITE='https://github.com/TimeZone-LLC/foundation-sunshine-english' \
+            -DSUNSHINE_PUBLISHER_ISSUE_URL='https://github.com/TimeZone-LLC/foundation-sunshine-english/issues'
           if grep -q '^SUNSHINE_RTX_HDR_AVAILABLE:INTERNAL=TRUE' build/CMakeCache.txt; then
             echo 'rtx_hdr=true' >> "$GITHUB_OUTPUT"
           else
@@ -372,7 +372,7 @@ jobs:
         shell: msys2 {0}
         env:
           RTX_VIDEO_ADAPTER_BUILT: ${{ steps.configure_windows.outputs.rtx_hdr }}
-          RTX_VIDEO_ADAPTER_REQUIRED: ${{ github.repository == 'AlkaidLab/foundation-sunshine' && github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
+          RTX_VIDEO_ADAPTER_REQUIRED: ${{ github.repository == 'TimeZone-LLC/foundation-sunshine-english' && github.event_name != 'pull_request' && github.ref == 'refs/heads/master' }}
         run: |
           set -o pipefail
           mkdir -p artifacts
@@ -505,7 +505,7 @@ jobs:
           allowUpdates: true
           body: ${{ needs.setup_release.outputs.release_body }}
           generateReleaseNotes: ${{ needs.setup_release.outputs.release_generate_release_notes }}
-          name: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
+          name: ${{ needs.setup_release.outputs.release_tag }}
           prerelease: true
-          tag: ${{ needs.setup_release.outputs.release_tag }}.杂鱼
+          tag: ${{ needs.setup_release.outputs.release_tag }}
           token: ${{ secrets.GH_BOT_TOKEN }}

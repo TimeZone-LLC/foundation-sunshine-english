@@ -1,75 +1,75 @@
-# Windows Sunshine 虚拟设备宿主实施方案
+# Windows Sunshine virtual-device host implementation plan
 
-## 1. 文档状态
+## 1. Document status
 
-- 状态：实施设计稿
-- 日期：2026-08-28
-- 目标平台：Windows 10/11 x64；ARM64 在首期完成接口设计但不承诺发布
-- 进程：Sunshine Core + 一个 Core 持有的虚拟设备宿主
-- 初期运行时：HIDMaestro 发布标签 `v1.6.2`（`HIDMaestro.Core.dll` 的 `AssemblyFileVersion = 1.6.2.0`）+ 未修改的已签名 usbip-win2 0.9.7.7
-- 首个新增设备：`Sunshine Virtual Microphone`
+- Status: implementation design
+- Date: 2026-08-28
+- Target platforms: Windows 10/11 x64; the first release will define ARM64 interfaces but does not promise an ARM64 build
+- Processes: Sunshine Core plus one Core-owned virtual-device host
+- Initial runtime: HIDMaestro release tag `v1.6.2` (`HIDMaestro.Core.dll` `AssemblyFileVersion = 1.6.2.0`) plus unmodified, signed usbip-win2 0.9.7.7
+- First new device: `Sunshine Virtual Microphone`
 
-本文把现有 `Sunshine.Ds5Sidecar` 从“虚拟 DualSense 的附属进程”演进为“Sunshine 虚拟设备宿主”。宿主继续隔离第三方 .NET 运行时，但同时管理彼此独立的虚拟 DS5、DS5 USB Audio 和 USB 虚拟麦克风。
+This design evolves the existing `Sunshine.Ds5Sidecar` from an accessory process for virtual DualSense devices into a Sunshine virtual-device host. The host continues to isolate the third-party .NET runtime while independently managing virtual DS5, DS5 USB Audio, and a USB virtual microphone.
 
-本文覆盖进程所有权、协议扩展、设备生命周期、麦克风数据面、代码落点、测试和发布闸门。它补充 `docs/windows_dualsense_component_lifecycle.md`；若两者对 Sidecar 进程生命周期的描述冲突，以本文的宿主模型为后续实现目标，现有 DS5 设备本身仍保持按会话管理。
+The document covers process ownership, protocol extensions, device lifecycles, the microphone data plane, code locations, tests, and release gates. It supplements `docs/windows_dualsense_component_lifecycle.md`. Where the two documents conflict about the Sidecar process lifecycle, this host model is the target for subsequent implementation; existing DS5 devices remain session-scoped.
 
-## 2. 目标与非目标
+## 2. Goals and non-goals
 
-### 2.1 目标
+### 2.1 Goals
 
-1. 一个宿主进程承载所有 HIDMaestro 虚拟设备，不为麦克风再创建第二个常驻进程。
-2. DS5 和虚拟麦克风具有独立生命周期；其中一个设备失败不能要求另一个设备一起销毁。
-3. 使用用户态标准 USB Audio Class 设备和 Windows inbox USB Audio 驱动，不编写新的 Windows 音频功能驱动。
-4. 允许 Sunshine 将客户端麦克风 PCM 直接提交到 USB Audio IN endpoint，绕过 VB-CABLE 的 render/capture cable 路由。
-5. 虚拟麦克风在 Moonlight 会话间保持稳定身份，客户端断开时输出静音而不是从 Windows 中消失。
-6. 保留 VB-CABLE 后端和明确回退路径，USB/IP 功能首期默认标记为实验性。
-7. 控制面可靠优先；高频音频不能阻塞手柄输入、设备 detach、状态回复或宿主关闭。
-8. 不修改 usbip-win2 内核驱动，从而保留上游签名和升级边界。
+1. Host every HIDMaestro virtual device in one process; do not create a second persistent process for the microphone.
+2. Give the DS5 and virtual microphone independent lifecycles. Failure of one device must not require destruction of the other.
+3. Use a user-mode standard USB Audio Class device and the Windows inbox USB Audio driver; do not write a new Windows audio function driver.
+4. Let Sunshine submit client microphone PCM directly to a USB Audio IN endpoint, bypassing VB-CABLE's render/capture cable route.
+5. Preserve a stable virtual-microphone identity across Moonlight sessions; emit silence instead of disappearing from Windows when the client disconnects.
+6. Retain the VB-CABLE backend and an explicit fallback. Mark the USB/IP feature experimental in the first release.
+7. Prioritize control-plane reliability. High-frequency audio must not block controller input, device detach, status replies, or host shutdown.
+8. Do not modify the usbip-win2 kernel driver, preserving its upstream signature and upgrade boundary.
 
-### 2.2 非目标
+### 2.2 Non-goals
 
-- 不让宿主脱离 Sunshine Core 成为系统服务或长期孤儿进程。
-- 不在首期自动修改 Windows 默认录音设备。
-- 不用虚拟麦克风承载 Dolby MAT、Atmos、IEC 61937 或其他压缩 bitstream。
-- 不在首期实现 USB Audio render endpoint；独立麦克风 profile 只暴露 capture endpoint。
-- 不在首期删除 VB-CABLE 代码或自动卸载已安装的 VB-CABLE。
-- 不在首期支持多个 Sunshine 虚拟麦克风实例。
-- 不把远程 USB/IP 暴露到网络；USB/IP device server 只允许本机回环使用。
-- 不在首期重写 HIDMaestro 的 USB/IP device framework，也不在 Sunshine 中宿主 CLR。
+- Do not turn the host into a system service or long-lived orphan independent of Sunshine Core.
+- Do not change the Windows default recording device automatically in the first release.
+- Do not carry Dolby MAT, Atmos, IEC 61937, or another compressed bitstream through the virtual microphone.
+- Do not implement a USB Audio render endpoint in the first release; the standalone microphone profile exposes only a capture endpoint.
+- Do not remove the VB-CABLE code or automatically uninstall an existing VB-CABLE installation in the first release.
+- Do not support multiple Sunshine virtual-microphone instances in the first release.
+- Do not expose remote USB/IP to the network; the USB/IP device server is loopback-only.
+- Do not rewrite HIDMaestro's USB/IP device framework or host the CLR inside Sunshine in the first release.
 
-## 3. 当前实现基线
+## 3. Current implementation baseline
 
 ### 3.1 DS5 Sidecar
 
-当前 `tools/sunshine-ds5-sidecar` 是 .NET helper：
+The current `tools/sunshine-ds5-sidecar` is a .NET helper that:
 
-- 加载经校验的 `HIDMaestro.Core.dll`。
-- 使用 `SDS5` v1 二进制 Named Pipe 协议。
-- 一个 pipe 连接只接受一个经验证的 elevated Sunshine owner。
-- owner EOF、broken pipe 或 Core Job Object 关闭时，Sidecar 销毁该连接创建的全部虚拟设备并退出。
-- 普通 DS5 使用 HIDMaestro UMDF2 后端；复合 DS5 使用 USB/IP 后端。
-- `dualsense-composite` 已定义 48 kHz、16-bit、双声道 UAC1 麦克风 IN endpoint，但当前 `ControllerSession` 只消费 USB Audio OUT 数据，没有向麦克风调用 `Submit()`。
+- loads the verified `HIDMaestro.Core.dll`;
+- uses the `SDS5` v1 binary Named Pipe protocol;
+- accepts only one verified, elevated Sunshine owner per pipe connection;
+- destroys every virtual device created by that connection and exits when it sees owner EOF, a broken pipe, or Core Job Object closure;
+- uses HIDMaestro's UMDF2 backend for a normal DS5 and its USB/IP backend for a composite DS5;
+- defines a 48 kHz, 16-bit, stereo UAC1 microphone IN endpoint in `dualsense-composite`, although `ControllerSession` currently consumes only USB Audio OUT data and never calls `Submit()` on the microphone.
 
-### 3.2 麦克风重定向
+### 3.2 Microphone redirection
 
-当前 Windows 路径由 `mic_write_wasapi_t`：
+The current Windows path is implemented by `mic_write_wasapi_t`:
 
-1. 寻找或引导安装 VB-CABLE。
-2. 打开 VB-CABLE render endpoint。
-3. 通过 `IAudioRenderClient` 写入 48 kHz、mono S16 PCM。
-4. 将 VB-CABLE capture endpoint 作为应用看到的麦克风。
-5. 在会话开始时初始化设备，在最后一个麦克风会话结束后释放并恢复默认端点。
+1. Locate VB-CABLE or guide the user through installation.
+2. Open the VB-CABLE render endpoint.
+3. Write 48 kHz, mono S16 PCM through `IAudioRenderClient`.
+4. Expose the VB-CABLE capture endpoint as the microphone seen by applications.
+5. Initialize the device when a session begins; release it and restore the default endpoint after the last microphone session ends.
 
-目标实现保留上游 PCM 解码、混音和 `write_mic_pcm()` 调用契约，只替换最终 sink。
+The target retains upstream PCM decoding, mixing, and the `write_mic_pcm()` call contract, replacing only the final sink.
 
-## 4. 核心架构决策
+## 4. Core architectural decisions
 
-### 4.1 一个宿主进程，而不是一个设备一个 Sidecar
+### 4.1 One host process, not one Sidecar per device
 
 ```text
 Sunshine Core
   |
-  | SDS5 v1 Named Pipe（控制 + 有界实时消息）
+  | SDS5 v1 Named Pipe (control + bounded real-time messages)
   v
 Sunshine Virtual Device Host
   |-- ControllerSession[0..N]
@@ -82,28 +82,28 @@ Sunshine Virtual Device Host
                     `-- Windows usbaudio.sys
 ```
 
-首期继续使用 `Sunshine.Ds5Sidecar.exe` 文件名和现有组件 manifest，避免一次改动同时触发下载资产、安装目录、摘要和 GUI 迁移。代码内部先引入通用 `VirtualDeviceHostServer`；待协议和组件升级路径稳定后，再单独迁移到 `Sunshine.DeviceSidecar.exe`。
+The first release keeps the `Sunshine.Ds5Sidecar.exe` filename and existing component manifest so one change does not also migrate download assets, installation paths, hashes, and the GUI. Introduce the generic `VirtualDeviceHostServer` internally first. After the protocol and component-upgrade path stabilize, migrate separately to `Sunshine.DeviceSidecar.exe`.
 
-### 4.2 宿主进程生命周期与设备生命周期分离
+### 4.2 Separate the host-process lifecycle from device lifecycles
 
-宿主进程由 Core 唯一持有，始终放入 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` 的 Job Object。宿主不得在 owner pipe 断开后继续运行。
+Core is the sole owner of the host process and always places it in a Job Object with `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`. The host must not survive loss of the owner pipe.
 
-启动规则：
+Startup rules:
 
-- USB 虚拟麦克风已由用户启用：Core 完成配置加载、组件校验和交互会话检查后启动宿主并创建麦克风。
-- 没有启用 USB 麦克风，但需要虚拟 DS5：首个 DS5 分配时按现有方式启动宿主。
-- 两种功能同时使用：复用同一个宿主和 owner pipe。
+- If the user enables the USB virtual microphone, Core starts the host and creates the microphone after configuration loading, component validation, and interactive-session checks complete.
+- If USB microphone support is disabled but a virtual DS5 is required, the first DS5 allocation starts the host as it does today.
+- If both features are in use, they share one host and owner pipe.
 
-停止规则：
+Stop rules:
 
-- USB 虚拟麦克风启用期间，Moonlight 会话结束不会停止宿主，也不会销毁麦克风。
-- DS5 仍可在最后一个 DS5 会话结束后的宽限期内 detach，不影响麦克风。
-- 用户明确关闭 USB 麦克风且不存在其他虚拟设备时，Core 可优雅关闭宿主。
-- Core 退出、owner pipe 断开或 Job Object 关闭时，宿主销毁全部设备并退出。
+- While the USB virtual microphone is enabled, ending a Moonlight session neither stops the host nor destroys the microphone.
+- DS5 devices may still detach after the grace period following the last DS5 session, without affecting the microphone.
+- When the user explicitly disables the USB microphone and no other virtual device exists, Core may stop the host gracefully.
+- Core exit, owner-pipe loss, or Job Object closure makes the host destroy every device and exit.
 
-### 4.3 保持 `SDS5` v1 帧格式并以 capability 扩展
+### 4.3 Keep the `SDS5` v1 frame format and extend it with capabilities
 
-不立即修改 16-byte header、magic 或 `Version = 1`。新 Core 只有在 `HelloReply` 包含对应 capability 后才发送麦克风消息：
+Do not immediately change the 16-byte header, magic, or `Version = 1`. A new Core sends microphone messages only when `HelloReply` advertises the corresponding capability:
 
 ```text
 VirtualMicrophone      = 1 << 10
@@ -111,124 +111,124 @@ PersistentDeviceHost   = 1 << 11
 MicrophoneStatus       = 1 << 12
 ```
 
-这样可以保证：
+This ensures that:
 
-- 旧 Core 面对新宿主仍只使用已有 DS5 消息。
-- 新 Core 面对旧 Sidecar 时识别到 capability 缺失，不发送未知消息。
-- 用户显式选择 USB 麦克风时返回“组件需要更新”，而不是静默创建错误设备。
+- an old Core uses only existing DS5 messages with a new host;
+- a new Core sees that an old Sidecar lacks the capability and does not send unknown messages;
+- explicitly selecting the USB microphone reports that the component needs an update rather than silently creating the wrong device.
 
-协议 magic 和可执行文件命名在后续版本中可以重命名，但不与麦克风第一阶段绑定。
+The protocol magic and executable name may change in a later release, but that rename is not coupled to the first microphone phase.
 
-### 4.4 设备故障域独立
+### 4.4 Independent device fault domains
 
-以下操作必须只影响目标设备：
+The following operations must affect only their target device:
 
-- DS5 attach/detach 不创建或销毁虚拟麦克风。
-- 麦克风 `flush`、远端断流或 endpoint pin 关闭不 detach DS5。
-- 麦克风提交失败先进入该设备的 fault/recreate 流程，不立即退出整个宿主。
-- 只有 pipe 协议损坏、owner 身份失效、HMContext 全局故障或宿主 shutdown 才清理全部设备。
+- DS5 attach/detach does not create or destroy the virtual microphone.
+- Microphone `flush`, remote-stream loss, or endpoint pin closure does not detach a DS5.
+- A microphone submission failure first enters that device's fault/recreate flow; it does not immediately exit the complete host.
+- Only pipe corruption, invalid owner identity, a global HMContext fault, or host shutdown cleans up every device.
 
-usbip-win2 的内核故障无法由用户态隔离；该风险通过版本固定、压测和发布闸门管理。
+A usbip-win2 kernel fault cannot be isolated in user mode. Manage that risk with a pinned version, stress tests, and release gates.
 
-## 5. 运行状态模型
+## 5. Runtime state model
 
-### 5.1 宿主状态
+### 5.1 Host states
 
 ```text
 stopped
-  -> starting          Core 创建进程并连接 pipe
-  -> negotiating       Hello/capability 协商
-  -> ready             可以管理设备
-  -> degraded          至少一个设备失败，其他设备仍可用
-  -> stopping          Core shutdown 或最后一个功能关闭
+  -> starting          Core creates process and connects pipe
+  -> negotiating       Hello/capability negotiation
+  -> ready             Devices can be managed
+  -> degraded          At least one device failed; others remain usable
+  -> stopping          Core shutdown or last feature disabled
   -> stopped
 
 starting/negotiating/ready/degraded
-  -> faulted           pipe、身份或 HMContext 全局故障
+  -> faulted           Pipe, identity, or global HMContext failure
   -> stopping
 ```
 
-### 5.2 虚拟麦克风状态
+### 5.2 Virtual-microphone states
 
 ```text
 absent
-  -> creating          加载 profile、创建 USB/IP 设备
-  -> enumerating       等待 Windows capture endpoint 稳定
-  -> idle              endpoint 存在，主机应用尚未打开
-  -> remote_active     capture pin 未打开但收到有效远端 PCM（is_host_streaming=false）
-  -> idle              capture pin 未打开且收到 STREAM_END 或 MicFlush（is_host_streaming=false）
-  -> host_capturing    Windows 应用已打开 UAC IN stream
-  -> remote_active     有有效客户端 PCM
-  -> host_capturing    客户端断流，继续提交静音
-  -> idle              主机应用关闭 capture pin
-  -> destroying        用户关闭功能或宿主退出
+  -> creating          Load profile and create USB/IP device
+  -> enumerating       Wait for stable Windows capture endpoint
+  -> idle              Endpoint exists; host application has not opened it
+  -> remote_active     Valid remote PCM arrives with capture pin closed (is_host_streaming=false)
+  -> idle              Capture pin is closed and STREAM_END or MicFlush arrives (is_host_streaming=false)
+  -> host_capturing    Windows application opened the UAC IN stream
+  -> remote_active     Valid client PCM is present
+  -> host_capturing    Client stream ends; continue submitting silence
+  -> idle              Host application closes capture pin
+  -> destroying        User disables feature or host exits
   -> absent
 
 creating/enumerating/idle/host_capturing/remote_active
   -> device_faulted
 ```
 
-`host_capturing` 和 `remote_active` 是两个正交事实。`state` 表示最重要的活动来源，`is_host_streaming` 独立表示 Windows capture pin 是否打开；Core 和 GUI 必须按下表解释组合，而不能只读取其中一个字段：
+`host_capturing` and `remote_active` are orthogonal facts. `state` expresses the most important activity source, while `is_host_streaming` independently reports whether the Windows capture pin is open. Core and the GUI must interpret their combination using this table, not either field alone:
 
-| 应用/capture pin | 远端 PCM | `state` | `is_host_streaming` | Core/GUI 解释 |
+| Application/capture pin | Remote PCM | `state` | `is_host_streaming` | Core/GUI interpretation |
 |---|---|---|---|---|
-| 已打开 | 无 | `host_capturing` | `true` | 应用正在采集，宿主提交静音 |
-| 已打开 | 有 | `remote_active` | `true` | 远端 PCM 正被主机应用消费 |
-| 已关闭 | 仍在发送 | `remote_active` | `false` | 远端仍活动，但没有主机消费者；pin close 会先清空已排队 PCM，后续数据仍受有界队列约束 |
-| 已关闭 | 无 | `idle` | `false` | endpoint 已枚举但双方均空闲 |
+| Open | None | `host_capturing` | `true` | Application is capturing; host submits silence |
+| Open | Present | `remote_active` | `true` | Host application is consuming remote PCM |
+| Closed | Still sending | `remote_active` | `false` | Remote remains active with no host consumer; pin closure first clears queued PCM, and later data remains bounded by the queue |
+| Closed | None | `idle` | `false` | Endpoint is enumerated and both sides are idle |
 
-应用关闭时若队列中仍有 PCM，宿主必须在发出状态前清空队列，因此不会向 Core 暴露“pin 已关闭但保留陈旧 buffered bytes”的稳态。没有远端 PCM 不表示 Windows 应用没有打开麦克风；此时必须输出静音。
+When the application closes, the host must clear any queued PCM before emitting status. Core therefore never observes a steady state where the pin is closed but stale buffered bytes remain. Absence of remote PCM does not mean that no Windows application has opened the microphone; in that case the host must submit silence.
 
-### 5.3 生命周期不变量
+### 5.3 Lifecycle invariants
 
-1. 同一宿主最多存在一个 `Sunshine Virtual Microphone`。
-2. Moonlight 会话计数从 1 变为 0 时只执行 `MicFlush`，不执行 `MicDestroy`。
-3. 只有配置关闭、显式修复流程或宿主退出可以销毁麦克风。
-4. `MicCreate` 是幂等操作；重复请求返回现有 generation 和 format。
-5. 每次重新枚举设备 generation 单调递增，旧 generation 的 PCM 必须丢弃。
-6. endpoint identity 由固定 serial/container identity 保持，不由 Moonlight session ID 派生。
+1. At most one `Sunshine Virtual Microphone` exists in one host.
+2. A Moonlight session-count transition from 1 to 0 sends only `MicFlush`, never `MicDestroy`.
+3. Only configuration disablement, an explicit repair flow, or host exit can destroy the microphone.
+4. `MicCreate` is idempotent; a duplicate request returns the existing generation and format.
+5. Every device re-enumeration monotonically increments its generation; PCM for an old generation must be dropped.
+6. A fixed serial/container identity preserves endpoint identity; it is not derived from a Moonlight session ID.
 
-## 6. 虚拟麦克风 USB Profile
+## 6. Virtual-microphone USB profile
 
-新增：
+Add:
 
 ```text
 tools/sunshine-ds5-sidecar/profiles/sunshine-virtual-microphone.json
 ```
 
-首期固定格式：
+Fixed first-release format:
 
-| 属性 | 值 |
+| Property | Value |
 |---|---|
 | USB class | Audio Class 1.0 |
-| 功能 | `audioControl` + `audioStreamingIn` |
-| endpoint | Isochronous IN |
-| 采样率 | 48,000 Hz |
-| 声道 | 1 |
-| 位深 | 16-bit signed little-endian PCM |
-| packet interval | 1 ms |
-| 常规 packet | 96 bytes |
-| 最大 packet | 98 bytes，允许 48/49 frame 调度 |
-| product string | `Sunshine Virtual Microphone` |
-| serial | 安装实例稳定，不使用会话随机值 |
+| Functions | `audioControl` + `audioStreamingIn` |
+| Endpoint | Isochronous IN |
+| Sample rate | 48,000 Hz |
+| Channels | 1 |
+| Bit depth | 16-bit signed little-endian PCM |
+| Packet interval | 1 ms |
+| Normal packet | 96 bytes |
+| Maximum packet | 98 bytes, permitting 48/49-frame scheduling |
+| Product string | `Sunshine Virtual Microphone` |
+| Serial | Stable for the installation instance; no random session value |
 
-Profile 不包含 HID interface、AudioStreamingOut 或扬声器 feature unit。Windows 只应创建 capture endpoint。
+The profile contains no HID interface, AudioStreamingOut, or speaker feature unit. Windows should create only a capture endpoint.
 
-原型可以使用内部测试 VID/PID，但发布构建必须取得合法且不会与真实硬件冲突的 VID/PID 分配。禁止复用 Sony VID/PID，也不能把随机 VID/PID 当成长期身份。
+A prototype may use an internal test VID/PID, but a release build must receive a legitimate assignment that cannot collide with real hardware. Do not reuse the Sony VID/PID or treat a random VID/PID as a durable identity.
 
-Profile 加载时必须进行静态和运行时校验：
+Perform static and runtime validation when loading the profile:
 
-- 只有一个 AudioStreamingIn alternate setting。
-- format 必须严格等于 mono/48 kHz/S16。
-- endpoint 必须是 IN、isochronous、1 ms。
-- `HMController.UsbAudio.Microphone` 存在。
-- `Channels`、`SampleRateHz` 和 `BitsPerSample` 与 profile 一致。
+- exactly one AudioStreamingIn alternate setting;
+- format exactly mono/48 kHz/S16;
+- endpoint is IN, isochronous, and 1 ms;
+- `HMController.UsbAudio.Microphone` exists;
+- `Channels`, `SampleRateHz`, and `BitsPerSample` match the profile.
 
-## 7. Core/宿主协议扩展
+## 7. Core/host protocol extensions
 
-### 7.1 消息编号
+### 7.1 Message numbers
 
-沿用现有消息区间：Core 请求使用低编号，宿主异步状态使用 `100+`。
+Keep the existing ranges: Core requests use low numbers; asynchronous host status uses `100+`.
 
 ```text
 MicCreate       = 12
@@ -242,11 +242,11 @@ HostStatus      = 106
 MicStatus       = 107
 ```
 
-`MicCreate`、`MicFlush`、`MicDestroy` 使用非零 `request_id` 并分别等待对应的 `Reply`。`MicPcm` 使用 `request_id = 0`，不逐包回复。
+`MicCreate`, `MicFlush`, and `MicDestroy` use a nonzero `request_id` and wait for their corresponding `Reply`. `MicPcm` uses `request_id = 0` and receives no per-packet reply.
 
 ### 7.2 `MicCreate`
 
-请求 payload：
+Request payload:
 
 ```text
 sample_rate_hz : u32 = 48000
@@ -255,7 +255,7 @@ bits_per_sample: u8  = 16
 flags          : u16
 ```
 
-回复 payload：
+Reply payload:
 
 ```text
 result          : i32
@@ -266,11 +266,11 @@ bits_per_sample : u8
 reserved        : u16
 ```
 
-宿主不做隐式格式协商。请求不是固定格式时返回稳定错误码。
+The host performs no implicit format negotiation. A request for any other format returns a stable error code.
 
 ### 7.3 `MicPcm`
 
-每条消息建议承载 10 ms、480 frame：
+Each message should carry 10 ms, or 480 frames:
 
 ```text
 generation      : u32
@@ -281,7 +281,7 @@ flags           : u16
 pcm_s16le       : frame_count * 2 bytes
 ```
 
-Flags：
+Flags:
 
 ```text
 STREAM_START    = 1 << 0
@@ -290,25 +290,25 @@ DISCONTINUITY   = 1 << 2
 SILENCE         = 1 << 3
 ```
 
-约束：
+Constraints:
 
-- `frame_count` 首期不超过 960 frame（20 ms）。
-- payload 长度必须精确匹配 header 和 frame_count。
-- generation 不等于当前设备 generation 时直接丢弃并计数。
-- sequence 不连续时清空旧 PCM，下一包带 discontinuity 语义。
-- `capture_time_us` 只用于诊断和未来漂移控制，不作为 USB packet 的绝对调度时间。
+- In the first release, `frame_count` is at most 960 frames (20 ms).
+- Payload length must exactly match the header and frame count.
+- If generation differs from the current device generation, drop the packet and increment a counter.
+- On a sequence gap, clear old PCM and give the next packet discontinuity semantics.
+- `capture_time_us` is diagnostic and reserved for future drift control; it is not an absolute USB-packet schedule.
 
 ### 7.4 `MicFlush`
 
-`MicFlush` 清空尚未提交的远端 PCM、重置 sequence，并让 host capture 继续收到静音。它不改变 USB device、alternate setting 或 Windows endpoint identity。
+`MicFlush` clears remote PCM that has not yet been submitted, resets the sequence, and continues sending silence to host capture. It does not change the USB device, alternate setting, or Windows endpoint identity.
 
 ### 7.5 `MicDestroy`
 
-只在用户关闭 USB 麦克风、组件修复/升级需要释放设备或宿主退出时使用。正常 Moonlight 断开不得发送该消息。
+Use this only when the user disables the USB microphone, component repair or upgrade must release the device, or the host exits. A normal Moonlight disconnect must not send it.
 
 ### 7.6 `MicStatus`
 
-状态改变时立即发送；持续活动期间最多每秒一次：
+Send immediately on a state change and at most once per second during sustained activity:
 
 ```text
 generation       : u32
@@ -322,13 +322,13 @@ submit_errors    : u32
 last_error       : i32
 ```
 
-状态消息进入可靠控制队列，不与每个 PCM packet 一一对应。
+Status uses the reliable control queue and is not paired with every PCM packet.
 
-## 8. 数据面与线程模型
+## 8. Data plane and threading model
 
-### 8.1 Core 侧
+### 8.1 Core side
 
-网络/混音线程不得直接执行可能阻塞的 pipe write。`usbip_mic_sink_t` 持有一个有界 SPSC PCM queue 和专用发送 worker：
+Network and mixing threads must not perform a potentially blocking pipe write. `usbip_mic_sink_t` owns a bounded SPSC PCM queue and a dedicated sender worker:
 
 ```text
 Moonlight receive/decode/mix
@@ -338,17 +338,17 @@ Moonlight receive/decode/mix
               -> Named Pipe
 ```
 
-队列策略：
+Queue policy:
 
-- 目标积压：20 ms。
-- 最大积压：60 ms。
-- 队列满时丢弃最旧 PCM，并在下一包设置 `DISCONTINUITY`。
-- 不允许通过等待 pipe 腾出空间来增加客户端麦克风延迟。
-- 控制消息优先于 PCM；`MicDestroy`、shutdown 和 DS5 detach 不能被 PCM 饿死。
+- Target backlog: 20 ms.
+- Maximum backlog: 60 ms.
+- When full, drop the oldest PCM and set `DISCONTINUITY` on the next packet.
+- Never add client microphone latency by waiting for pipe capacity.
+- Control messages take priority over PCM; PCM cannot starve `MicDestroy`, shutdown, or DS5 detach.
 
-### 8.2 宿主侧
+### 8.2 Host side
 
-Pipe read loop 只执行帧校验和快速入队。麦克风 pump 独立于 pipe loop：
+The pipe read loop performs only frame validation and fast enqueue. The microphone pump is independent of the pipe loop:
 
 ```text
 Pipe ReadLoop
@@ -358,28 +358,28 @@ Pipe ReadLoop
 Microphone Pump
   -> inspect IsStreaming / BufferedBytes
   -> Submit(PCM)
-  -> underrun 时 Submit(silence)
-  -> partial submit 时计数并丢弃未接受的旧尾部
+  -> Submit(silence) on underrun
+  -> count partial submit and drop unaccepted old tail
 ```
 
-生产实现使用 `ArrayPool<byte>` 或固定块池，避免每秒约 100 次持续分配。任何日志、JSON 序列化、磁盘访问或网络操作都不得出现在 pump 热路径。
+The production implementation uses `ArrayPool<byte>` or a fixed-block pool to avoid about 100 persistent allocations per second. No logging, JSON serialization, disk access, or network operation belongs in the pump's hot path.
 
-### 8.3 缓冲和漂移策略
+### 8.3 Buffering and drift policy
 
-首期不引入高质量重采样器，采用有界延迟优先策略：
+The first release avoids a high-quality resampler and prioritizes bounded latency:
 
-- `BufferedBytes` 小于约 10 ms：补静音并增加 underrun。
-- 大于约 60 ms：丢弃最旧数据回到约 20 ms，并标记 discontinuity。
-- `Submit()` 返回部分长度或 0：不阻塞重试旧数据，记录错误并让后续新 PCM 优先。
-- 连续提交失败达到阈值：设备进入 `device_faulted`，停止高频日志并通知 Core。
+- When `BufferedBytes` is below about 10 ms, add silence and increment underruns.
+- Above about 60 ms, drop the oldest data back to about 20 ms and mark a discontinuity.
+- If `Submit()` returns a partial length or 0, do not block retrying old data; record the error and prioritize newer PCM.
+- After the threshold of consecutive submission failures, place the device in `device_faulted`, stop high-frequency logs, and notify Core.
 
-后续只有在实测发现客户端时钟与 USB host clock 的长期漂移不可接受时，才加入窄范围自适应重采样。
+Add narrow adaptive resampling later only if measurement shows unacceptable long-term drift between the client clock and USB host clock.
 
-## 9. Sunshine Core 代码结构
+## 9. Sunshine Core code structure
 
-### 9.1 通用宿主客户端
+### 9.1 Generic host client
 
-建议新增：
+Proposed additions:
 
 ```text
 src/platform/windows/virtual_device_host/
@@ -390,20 +390,20 @@ src/platform/windows/virtual_device_host/
   process_owner.cpp
 ```
 
-职责：
+Responsibilities:
 
-- 固定路径和 component manifest 校验。
-- 创建随机 pipe、启动 elevated helper、加入 Job Object。
-- Hello/capability 协商。
-- 单一 reader 和优先级 writer。
-- request/reply 关联、超时、关闭和一次性恢复。
-- 宿主引用计数与设备 owner registry。
+- Validate fixed paths and the component manifest.
+- Create a random pipe, launch the elevated helper, and add it to the Job Object.
+- Negotiate Hello/capabilities.
+- Provide one reader and a priority writer.
+- Correlate requests and replies; handle timeouts, closure, and one-shot recovery.
+- Maintain host reference counts and the device-owner registry.
 
-现有 `ds5_sidecar_client_t` 第一阶段保持公共接口不变，内部委托给共享的 `host_client_t`。这样不会把宿主重构扩散到输入后端调用者。
+In phase one, preserve the public `ds5_sidecar_client_t` interface and delegate internally to the shared `host_client_t`. This prevents the host refactor from spreading to input-backend callers.
 
-### 9.2 麦克风 sink 抽象
+### 9.2 Microphone sink abstraction
 
-建议把当前 `mic_write_wasapi_t` 提升为后端之一：
+Promote the current `mic_write_wasapi_t` to one backend of a common interface:
 
 ```cpp
 class mic_sink_t {
@@ -417,39 +417,39 @@ public:
 };
 ```
 
-实现：
+Implementations:
 
 ```text
-wasapi_cable_mic_sink_t   现有 VB-CABLE 路径
-usbip_mic_sink_t          新宿主/UAC 路径
+wasapi_cable_mic_sink_t   Existing VB-CABLE path
+usbip_mic_sink_t          New host/UAC path
 ```
 
-现有 `write_mic_pcm(samples, frame_count)` 调用方无需提供时间戳。`usbip_mic_sink_t` 在将 PCM 放入发送队列时，以单调时钟生成仅用于诊断的 `capture_time_us`；未来若上游能提供源时间戳，可把它作为可选元数据传入适配层，但不得改变现有调用契约。
+Existing `write_mic_pcm(samples, frame_count)` callers need not supply a timestamp. `usbip_mic_sink_t` generates a diagnostic-only `capture_time_us` from a monotonic clock when it queues PCM for sending. If upstream later provides a source timestamp, pass it as optional adapter metadata without changing the existing call contract.
 
-`stop_stream()` 与 `shutdown()` 必须分开：前者对应远端会话结束，只 flush；后者才允许销毁 endpoint。
+`stop_stream()` and `shutdown()` must remain distinct: the former corresponds to the end of a remote session and only flushes; only the latter may destroy the endpoint.
 
-### 9.3 配置
+### 9.3 Configuration
 
-新增配置建议：
+Proposed new settings:
 
 ```text
 microphone_redirect_backend = vb_cable | usbip_experimental | auto | disabled
 microphone_set_default      = false
 ```
 
-行为：
+Behavior:
 
-- `vb_cable`：保持现状。
-- `usbip_experimental`：宿主或 UAC 创建失败时明确失败，不偷偷写入其他播放设备。
-- `auto`：优先尝试 USB/IP；失败时仅在 VB-CABLE capture/render 对均已可用时回退，并记录最终选中的后端。
-- `disabled`：不创建 sink。
-- `microphone_set_default=false`：只创建 endpoint，用户在游戏中显式选择。
+- `vb_cable`: preserve current behavior.
+- `usbip_experimental`: if host or UAC creation fails, fail explicitly; never silently write to another playback device.
+- `auto`: try USB/IP first. Fall back only when both VB-CABLE capture and render endpoints are already available, and log the selected backend.
+- `disabled`: create no sink.
+- `microphone_set_default=false`: create the endpoint only; the user selects it explicitly in the game.
 
-USB/IP 后端发布成熟前，已有用户配置的默认行为不得自动从 VB-CABLE 迁移到 USB/IP。
+Until the USB/IP backend is production-ready, existing configurations must not migrate automatically from VB-CABLE to USB/IP.
 
-## 10. 宿主代码结构
+## 10. Host code structure
 
-建议将 `SidecarServer` 逐步拆分为：
+Gradually split `SidecarServer` into:
 
 ```text
 tools/sunshine-ds5-sidecar/
@@ -464,49 +464,49 @@ tools/sunshine-ds5-sidecar/
     sunshine-virtual-microphone.json
 ```
 
-`DeviceRegistry` 负责：
+`DeviceRegistry` owns:
 
-- DS5 device ID 到 `ControllerSession` 的映射。
-- 唯一 `VirtualMicrophoneSession`。
-- 幂等 create/destroy。
-- shutdown 时按“停止 pump -> 解除事件 -> Dispose USB device -> Dispose HMContext”的顺序清理。
+- the mapping from DS5 device ID to `ControllerSession`;
+- the sole `VirtualMicrophoneSession`;
+- idempotent create/destroy;
+- shutdown cleanup in this order: stop pump → remove event handlers → dispose USB device → dispose HMContext.
 
-首期无需立即重命名 namespace、项目目录或发布资产。行为验证稳定后再执行纯命名迁移，避免与数据面改动混在同一个版本。
+The first release need not rename the namespace, project directory, or release asset. Perform a naming-only migration after behavior is stable, separate from data-plane changes.
 
-## 11. 安全边界
+## 11. Security boundary
 
-1. Named Pipe 继续使用 `CurrentUserOnly`、随机名称和单实例。
-2. Sidecar 在连接建立时校验 owner 进程 token/elevation；协议中的 PID、名称或 token 字符串不作为授权依据。
-3. Sidecar 必须位于固定、经 canonicalize 的 active component 目录，并由 Core 校验 manifest 和 SHA-256。产品启用前还必须验证目录及文件 owner/DACL、拒绝每个路径分量和 executable 上的 reparse point，并在摘要校验至 `CreateProcessW` 完成期间持有禁止写入/替换的已验证文件句柄或采用等效原子机制；当前按路径二次打开的实现存在 TOCTOU 风险，不能仅以摘要校验视为已关闭。
-4. Core 不向宿主传任意 profile 路径、DLL 路径、URL、命令行或 VID/PID。
-5. 麦克风 profile 是组件内受校验资产；宿主只接受内置 profile ID。
-6. `MicPcm` 做 checked arithmetic，拒绝长度溢出、非固定格式和超出 20 ms 的单包。
-7. 所有 PCM 队列有硬上限；远端客户端不能借音频流让 elevated sidecar 无限分配内存。
-8. USB/IP server 只绑定本机回环，不开放防火墙规则。
-9. GUI 无权直接连接运行时 pipe；GUI 通过 Core 获取状态和发起测试。
-10. 宿主日志不得记录 PCM 内容，也不得记录可复用 owner secret。
+1. The Named Pipe retains `CurrentUserOnly`, a random name, and a single instance.
+2. The Sidecar validates the owner process token and elevation when the connection is established. A PID, name, or token string in the protocol is not authorization.
+3. The Sidecar must reside in a fixed, canonicalized active-component directory whose manifest and SHA-256 Core validates. Before product enablement, also validate directory and file owner/DACL, reject reparse points on every path component and the executable, and hold a verified file handle that prevents writes or replacement from digest validation through completion of `CreateProcessW`, or use an equivalent atomic mechanism. The current path-based reopen has a TOCTOU risk; digest validation alone does not close it.
+4. Core does not pass an arbitrary profile path, DLL path, URL, command line, or VID/PID to the host.
+5. The microphone profile is a validated component asset; the host accepts only a built-in profile ID.
+6. `MicPcm` uses checked arithmetic and rejects length overflow, non-fixed formats, and packets longer than 20 ms.
+7. Every PCM queue has a hard limit; a remote client cannot make an elevated Sidecar allocate unbounded memory through the audio stream.
+8. The USB/IP server binds only to local loopback and adds no firewall rule.
+9. The GUI cannot connect directly to the runtime pipe. It queries status and requests tests through Core.
+10. Host logs contain neither PCM contents nor a reusable owner secret.
 
-## 12. 故障处理与回退
+## 12. Failure handling and fallback
 
-| 故障 | Core/宿主行为 | 用户可见结果 |
+| Failure | Core/host behavior | User-visible result |
 |---|---|---|
-| 组件缺失或摘要错误 | 不启动宿主 | 提示安装或修复组件 |
-| 旧 Sidecar 无麦克风 capability | DS5 可继续；USB 麦克风不可用 | 提示更新组件 |
-| usbip-win2 不可用 | 不循环安装；返回稳定错误码 | 实验后端失败；`auto` 可回退 VB-CABLE |
-| UAC endpoint 枚举超时 | 销毁本次麦克风对象，保留宿主 | 显示设备创建失败 |
-| PCM queue overflow | 丢最旧数据、标 discontinuity | 短暂缺音，不积累高延迟 |
-| PCM underrun | 提交静音 | 应用持续获得静音麦克风 |
-| `Submit()` 连续失败 | 麦克风进入 faulted | DS5 保持工作，提供重建操作 |
-| Pipe write 停滞 | 取消 I/O、关闭 owner、终止宿主 | 一次受控恢复；避免卡住音频线程 |
-| Sidecar 崩溃 | Core 每个退避窗口最多自动重启一次 | endpoint 会重新枚举并报告 generation 变化 |
-| Core 崩溃 | Job Object 终止宿主 | Windows 清理虚拟设备 |
-| usbip-win2 内核崩溃 | 用户态无法恢复 | 阻止默认启用和正式发布 |
+| Component missing or digest mismatch | Do not start host | Prompt to install or repair component |
+| Old Sidecar lacks microphone capability | DS5 can continue; USB microphone unavailable | Prompt to update component |
+| usbip-win2 unavailable | Do not loop installation; return stable error code | Experimental backend fails; `auto` may fall back to VB-CABLE |
+| UAC endpoint enumeration times out | Destroy this microphone object; retain host | Report device-creation failure |
+| PCM queue overflow | Drop oldest data and mark discontinuity | Brief missing audio without accumulated latency |
+| PCM underrun | Submit silence | Application continues receiving a silent microphone |
+| Repeated `Submit()` failure | Put microphone in faulted state | DS5 keeps working; offer rebuild action |
+| Pipe write stalls | Cancel I/O, close owner, terminate host | One controlled recovery; audio thread does not hang |
+| Sidecar crashes | Core restarts it automatically at most once per backoff window | Endpoint re-enumerates and reports a generation change |
+| Core crashes | Job Object terminates host | Windows cleans up virtual devices |
+| usbip-win2 kernel crash | User mode cannot recover | Prevent default enablement and production release |
 
-自动恢复必须有 circuit breaker。建议 30 秒内第二次宿主异常后停止自动重启，避免在有疑似内核生命周期问题时反复 attach/detach。
+Automatic recovery requires a circuit breaker. After a second host failure within 30 seconds, stop automatic restarts to avoid repeated attach/detach when a kernel-lifecycle problem is suspected.
 
-## 13. 可观测性
+## 13. Observability
 
-Core 结构化日志至少包含：
+Core structured logs include at least:
 
 ```text
 [virtual-device-host] state=ready protocol=1 capabilities=...
@@ -515,86 +515,86 @@ Core 结构化日志至少包含：
 [virtual-mic] fallback=vb_cable reason=transport_unavailable
 ```
 
-不在每个 PCM packet 打日志。活动期间每 10 秒输出一次聚合 debug 指标，状态改变和故障立即输出。
+Do not log every PCM packet. During activity, emit aggregate debug metrics once every ten seconds; emit state changes and faults immediately.
 
-GUI 状态至少拆分显示：
+The GUI separates at least these states:
 
-- 运行组件：缺失、已校验、需要更新、损坏。
-- USB/IP 传输：缺失、可用、版本不允许、需要重启。
-- 虚拟麦克风：未创建、枚举中、空闲、主机采集中、远端活动、故障。
-- 当前后端：USB/IP、VB-CABLE、禁用。
-- endpoint 名称和稳定 ID。
-- underrun、drop 和最近错误码的诊断详情。
+- Runtime component: missing, verified, update required, corrupt.
+- USB/IP transport: missing, available, disallowed version, restart required.
+- Virtual microphone: not created, enumerating, idle, host capturing, remote active, faulted.
+- Current backend: USB/IP, VB-CABLE, disabled.
+- Endpoint name and stable ID.
+- Diagnostic details for underruns, drops, and the latest error code.
 
-## 14. 分阶段实施
+## 14. Phased implementation
 
-### Phase 0：契约和风险基线
+### Phase 0: Contract and risk baseline
 
-- 固定当前 HIDMaestro、usbip-win2、Windows build 和 HVCI 测试组合。
-- 为现有 `SDS5` header、capability 和消息编解码补充 golden tests。
-- 记录 usbip-win2 已知内核稳定性问题和版本选择，不在实现过程中擅自升级。
-- 通过反射/运行时测试固定 `HMMicrophoneInput` 的 format、`Submit()`、`IsStreaming` 和 `BufferedBytes` 契约。
+- Pin the current HIDMaestro, usbip-win2, Windows build, and HVCI test combination.
+- Add golden tests for the current `SDS5` header, capabilities, and message codecs.
+- Record known usbip-win2 kernel-stability issues and version selection; do not upgrade opportunistically during implementation.
+- Freeze the `HMMicrophoneInput` format, `Submit()`, `IsStreaming`, and `BufferedBytes` contracts with reflection/runtime tests.
 
-完成标准：无需创建虚拟设备即可在 CI 中验证协议 ABI；一次性 Windows 测试机能执行 microphone API smoke test。
+Completion criteria: CI validates protocol ABI without creating a virtual device; a disposable Windows test machine can execute the microphone API smoke test.
 
-### Phase 1：通用宿主重构，行为不变
+### Phase 1: Generic host refactor with unchanged behavior
 
-- 从 `ds5_sidecar_client_t` 提取共享 process/pipe owner。
-- 将 `SidecarServer` 内部改为 `VirtualDeviceHostServer + DeviceRegistry`。
-- 保持现有 DS5 message、profile 和生命周期测试全部通过。
-- 验证一个宿主可同时持有多个 DS5 session，且控制队列不会被实时反馈饿死。
+- Extract the shared process/pipe owner from `ds5_sidecar_client_t`.
+- Refactor `SidecarServer` internally into `VirtualDeviceHostServer + DeviceRegistry`.
+- Keep all existing DS5 message, profile, and lifecycle tests passing.
+- Verify that one host can hold several DS5 sessions while the real-time feedback path cannot starve the control queue.
 
-完成标准：没有启用虚拟麦克风时，DS5 行为和现有发布物一致。
+Completion criteria: with the virtual microphone disabled, DS5 behavior and release artifacts match the current release.
 
-### Phase 2：USB 麦克风数据通路原型
+### Phase 2: USB microphone data-path prototype
 
-- 新增 capability 和 `MicCreate/MicPcm/MicFlush/MicDestroy/MicStatus`。
-- 先使用现有 composite profile 的 `UsbAudio.Microphone` 做仅限开发环境的链路验证。
-- 将 mono PCM 临时复制到双声道，验证 Windows 录音机能接收到测试音和 Moonlight 语音。
-- 不设置默认录音设备，不把该临时 DS5 endpoint 暴露为产品功能。
+- Add the capability and `MicCreate/MicPcm/MicFlush/MicDestroy/MicStatus` messages.
+- Use the existing composite profile's `UsbAudio.Microphone` first for development-only path validation.
+- Temporarily copy mono PCM into stereo to verify that Windows Recorder receives a test tone and Moonlight voice.
+- Do not set the default recording device or expose this temporary DS5 endpoint as a product feature.
 
-完成标准：`Sunshine PCM -> pipe -> HMMicrophoneInput.Submit -> Windows capture` 端到端通过，并有 sequence/drop/underrun 指标。
+Completion criteria: `Sunshine PCM -> pipe -> HMMicrophoneInput.Submit -> Windows capture` works end to end and reports sequence, drop, and underrun metrics.
 
-### Phase 3：独立 UAC1 capture-only profile
+### Phase 3: Standalone UAC1 capture-only profile
 
-- 完成 `sunshine-virtual-microphone.json` 和 descriptor tests。
-- 确认 Windows 只创建一个 capture endpoint，不创建 render/HID endpoint。
-- 固定 serial/container identity，验证重连和 Sunshine 会话切换不产生 `(2)`、`(3)` 重复设备。
-- 完成发布 VID/PID 决策前，只允许内部/实验构建。
+- Complete `sunshine-virtual-microphone.json` and descriptor tests.
+- Confirm that Windows creates only one capture endpoint and no render or HID endpoint.
+- Pin serial/container identity and verify that reconnects and Sunshine-session changes do not create duplicate `(2)` or `(3)` devices.
+- Permit only internal/experimental builds until a release VID/PID is selected.
 
-完成标准：应用可以稳定选择 `Sunshine Virtual Microphone`，100 次 Moonlight 重连不改变 endpoint ID。
+Completion criteria: applications can select `Sunshine Virtual Microphone` reliably, and 100 Moonlight reconnects do not change the endpoint ID.
 
-### Phase 4：Sunshine sink 和生命周期接入
+### Phase 4: Sunshine sink and lifecycle integration
 
-- 引入 `mic_sink_t`，把 VB-CABLE 变为一个明确后端。
-- 实现 `usbip_mic_sink_t` 的有界队列和 worker。
-- 把当前“最后一个会话结束即释放设备”拆成 `flush/stop_stream` 与 `shutdown`。
-- 当 USB 麦克风启用时，让宿主跨 Moonlight 会话存活。
-- 增加明确配置和后端选择日志。
+- Introduce `mic_sink_t` and make VB-CABLE an explicit backend.
+- Implement the bounded queue and worker in `usbip_mic_sink_t`.
+- Split the current "release device after last session" behavior into `flush/stop_stream` and `shutdown`.
+- Keep the host alive across Moonlight sessions while the USB microphone is enabled.
+- Add explicit configuration and backend-selection logs.
 
-完成标准：USB/IP 和 VB-CABLE 可以独立选择；`auto` 的最终路由可诊断；现有 VB-CABLE 测试不回归。
+Completion criteria: USB/IP and VB-CABLE can be selected independently; the final `auto` route is diagnosable; existing VB-CABLE tests do not regress.
 
-### Phase 5：GUI、安装和诊断
+### Phase 5: GUI, installation, and diagnostics
 
-- 在音频配置页加入后端选择、实验性警告、设备状态和测试按钮。
-- 组件管理页把 DS5 Sidecar 描述升级为虚拟设备组件，但暂不强制改资产名。
-- 只有用户明确选择 USB/IP 后端时才引导安装系统级传输。
-- 测试操作创建或复用麦克风、提交短测试音并验证 capture endpoint，而不是只判断设备枚举成功。
+- Add backend selection, an experimental warning, device status, and a test button to the audio configuration page.
+- Update the component-management description from DS5 Sidecar to virtual-device component without immediately forcing an asset rename.
+- Guide installation of the system-level transport only when the user explicitly selects the USB/IP backend.
+- The test action creates or reuses the microphone, submits a short test tone, and verifies the capture endpoint rather than merely checking enumeration.
 
-完成标准：用户总能看到当前后端、设备状态、失败原因和恢复操作。
+Completion criteria: the user can always see the current backend, device state, failure reason, and recovery action.
 
-### Phase 6：稳定性和发布闸门
+### Phase 6: Stability and release gates
 
-- 运行 pin open/close、音频服务重启、睡眠/唤醒、Core/Sidecar kill 和长时间音频压测。
-- 在隔离测试机中使用 Driver Verifier；不在日常开发机启用针对全系统的验证。
-- 覆盖 Secure Boot/HVCI、Windows build 和 usbip-win2 固定版本矩阵。
-- 只有 usbip-win2 的相关 kernel pool corruption/teardown 问题有可验证的已签名修复后，才讨论默认启用。
+- Stress pin open/close, audio-service restart, sleep/resume, Core/Sidecar kill, and long-running audio.
+- Use Driver Verifier only on an isolated test machine; do not enable system-wide verification on an everyday development system.
+- Cover the Secure Boot/HVCI, Windows build, and pinned usbip-win2 version matrix.
+- Discuss default enablement only after the relevant usbip-win2 kernel pool-corruption/teardown problems have a verifiable, signed fix.
 
-完成标准：满足第 16 节验收条件并通过发布闸门；否则保持实验性和 VB-CABLE 回退。
+Completion criteria: satisfy the acceptance criteria in §16 and pass the release gates. Otherwise, remain experimental with VB-CABLE fallback.
 
-## 15. 文件改动清单
+## 15. File-change inventory
 
-### 15.1 预计新增
+### 15.1 Proposed additions
 
 ```text
 docs/windows_virtual_device_host_implementation.md
@@ -611,7 +611,7 @@ tools/sunshine-ds5-sidecar/MicrophonePcmQueue.cs
 tools/sunshine-ds5-sidecar/profiles/sunshine-virtual-microphone.json
 ```
 
-### 15.2 预计修改
+### 15.2 Proposed modifications
 
 ```text
 src/platform/windows/ds5/ds5_sidecar_client.h
@@ -628,78 +628,78 @@ tools/sunshine-ds5-sidecar/SidecarServer.cs
 tools/sunshine-ds5-sidecar/ProtocolSelfTest.cs
 tools/sunshine-ds5-sidecar/README.md
 src_assets/common/assets/web/configs/tabs/AudioVideo.vue
-src_assets/common/assets/web/public/assets/locale/*.json
+src_assets/common/assets/web/public/assets/locale/en.json
 ```
 
-实际提交应按 Phase 拆分，禁止在一个提交中同时完成通用宿主重构、协议新增、profile descriptor、GUI 和组件资产重命名。
+Split actual changes by phase. Do not combine the generic host refactor, new protocol messages, profile descriptors, GUI, and component-asset rename in one commit.
 
-## 16. 测试矩阵与验收标准
+## 16. Test matrix and acceptance criteria
 
-### 16.1 自动化测试
+### 16.1 Automated tests
 
-| 测试 | 要求 |
+| Test | Requirement |
 |---|---|
-| Protocol golden test | 所有字段小端序、长度和最大值固定 |
-| capability compatibility | 新 Core + 旧 Sidecar 不发送麦克风消息；旧 Core + 新宿主 DS5 正常 |
-| queue overflow | 丢最旧帧、设置 discontinuity、内存有界 |
-| sequence gap | 清空旧数据，不重放陈旧 PCM |
-| generation mismatch | 丢弃旧设备 PCM |
-| partial `Submit()` | 不阻塞，不无限重试旧尾部 |
-| owner EOF | 停止 pump 后释放所有 USB 对象 |
-| DS5/mic isolation | 任一设备 destroy 不影响另一设备 |
-| config migration | 旧配置保持 VB-CABLE 行为 |
+| Protocol golden test | Fix all fields' little-endian encoding, lengths, and maxima |
+| Capability compatibility | New Core + old Sidecar sends no microphone messages; old Core + new host retains normal DS5 behavior |
+| Queue overflow | Drop oldest frame, set discontinuity, keep memory bounded |
+| Sequence gap | Clear old data; do not replay stale PCM |
+| Generation mismatch | Drop PCM for an old device |
+| Partial `Submit()` | Do not block or retry an old tail indefinitely |
+| Owner EOF | Release every USB object after stopping the pump |
+| DS5/microphone isolation | Destroying either device does not affect the other |
+| Configuration migration | Old configurations retain VB-CABLE behavior |
 
-### 16.2 本机功能验收
+### 16.2 Local functional acceptance
 
-- Windows 只出现一个 `Sunshine Virtual Microphone` capture endpoint。
-- endpoint format 是 48 kHz、mono、S16；没有新增 render endpoint。
-- Windows 录音机、Discord、浏览器 WebRTC 和至少两个实际游戏能采集远端语音。
-- 无远端 PCM 时录制结果为静音，不重复最后一段音频。
-- Moonlight 断开和重连不 detach 麦克风，endpoint ID 保持不变。
-- DS5 attach/detach 和 HD Haptics 工作时，麦克风持续正常。
-- 麦克风创建失败时，已有 DS5 不被销毁。
-- VB-CABLE 后端仍能通过现有测试音和重定向测试。
+- Windows shows exactly one `Sunshine Virtual Microphone` capture endpoint.
+- The endpoint format is 48 kHz, mono, S16, with no new render endpoint.
+- Windows Recorder, Discord, browser WebRTC, and at least two real games can capture remote voice.
+- With no remote PCM, recordings contain silence rather than repeating the last audio segment.
+- Moonlight disconnect/reconnect does not detach the microphone, and endpoint ID remains stable.
+- The microphone remains healthy while DS5 attach/detach and HD Haptics operate.
+- A microphone-creation failure does not destroy an existing DS5.
+- The VB-CABLE backend still passes its existing test-tone and redirection tests.
 
-### 16.3 稳定性验收
+### 16.3 Stability acceptance
 
-- 连续运行 72 小时，无持续内存/handle/queue 增长。
-- Moonlight 麦克风会话连接/断开 1,000 次，虚拟麦克风不重新枚举。
-- Windows 应用 capture pin 打开/关闭 10,000 次，无 BSOD、pool corruption 或宿主失控。
-- `audiosrv`/`audiodg` 重启 100 次后可以自动恢复或给出明确可恢复错误。
-- 睡眠/唤醒、Fast Startup、用户注销/登录和 Sunshine 重启均有确定结果。
-- 强制结束 Sidecar 后，自动恢复不超过一次；circuit breaker 生效。
-- HVCI/Secure Boot 开启时通过同样压测。
+- Run continuously for 72 hours with no sustained memory, handle, or queue growth.
+- Connect/disconnect a Moonlight microphone session 1,000 times without re-enumerating the virtual microphone.
+- Open/close the Windows application capture pin 10,000 times without BSOD, pool corruption, or loss of host control.
+- After 100 `audiosrv`/`audiodg` restarts, recover automatically or report an explicit recoverable error.
+- Produce deterministic outcomes for sleep/resume, Fast Startup, user logout/login, and Sunshine restart.
+- After forcibly terminating the Sidecar, recover automatically no more than once and engage the circuit breaker.
+- Pass the same stress tests with HVCI/Secure Boot enabled.
 
-### 16.4 性能目标
+### 16.4 Performance targets
 
-- Core PCM queue 常态约 20 ms，硬上限 60 ms。
-- `write_mic_pcm()` 不等待 pipe 或 USB 请求完成。
-- 音频数据不导致 DS5 input/feedback 的可观测延迟尖峰。
-- 端到端新增延迟以实测记录；第一阶段目标是不因排队产生超过 60 ms 的额外延迟。
+- Core PCM queue normally stays near 20 ms and has a hard 60 ms limit.
+- `write_mic_pcm()` never waits for pipe or USB completion.
+- Audio data produces no observable latency spike in DS5 input/feedback.
+- Record measured end-to-end added latency. The first-phase goal is no more than 60 ms of additional queueing latency.
 
-## 17. 发布闸门
+## 17. Release gates
 
-USB 虚拟麦克风从“实验性”升级为默认候选前，必须同时满足：
+Before promoting the USB virtual microphone from experimental to a default candidate, all of the following must be true:
 
-1. 使用未修改、签名有效且版本固定的 usbip-win2。
-2. 与本机 UAC1 attach/detach、pin close 和 endpoint purge 相关的已知内核崩溃问题已在该签名版本中修复并完成复现回归。
-3. 第 16 节的 HVCI/Secure Boot 和长期稳定性矩阵通过。
-4. 发布 VID/PID、产品字符串和设备身份策略完成法律与兼容性审查。
-5. 组件 manifest、来源、SHA-256、许可证和回滚版本固定；manifest 使用明确的 `hidmaestro_file_version = 1.6.2.0` 字段，并与 `HasPinnedMicrophoneRuntime` 的 `AssemblyFileVersion` 检查一致。
-6. active 组件目录的受保护 owner/DACL、全路径 reparse point 拒绝及 Sidecar 校验—启动 TOCTOU 防护通过专门安全回归。
-7. 用户可以显式选择 VB-CABLE 回退，升级不会强制迁移现有配置。
-8. GUI 明确区分用户级宿主组件与系统级 USB/IP 传输，安装和卸载影响在 UAC 前说明。
+1. Use an unmodified, validly signed, pinned usbip-win2 version.
+2. Known kernel crashes involving local UAC1 attach/detach, pin close, and endpoint purge are fixed in that signed version and covered by reproduction regression tests.
+3. Pass the HVCI/Secure Boot and long-duration stability matrix in §16.
+4. Complete legal and compatibility review of the release VID/PID, product string, and device-identity policy.
+5. Pin the component manifest, source, SHA-256, license, and rollback version. The manifest uses an explicit `hidmaestro_file_version = 1.6.2.0` field that matches the `AssemblyFileVersion` check in `HasPinnedMicrophoneRuntime`.
+6. Pass dedicated security regression for protected owner/DACL on the active-component directory, rejection of full-path reparse points, and Sidecar validation-to-launch TOCTOU protection.
+7. Let the user explicitly select VB-CABLE fallback; upgrades must not forcibly migrate existing configurations.
+8. The GUI clearly distinguishes the user-level host component from the system-level USB/IP transport and explains installation/uninstallation effects before UAC.
 
-在上述条件未全部满足时：
+Until every condition is met:
 
-- 配置项继续显示“实验性”。
-- 不把现有用户自动切换到 USB/IP。
-- 不删除 VB-CABLE 后端。
-- 不因 PoC 音频成功就宣称生产可靠。
+- keep the configuration marked experimental;
+- do not switch existing users to USB/IP automatically;
+- do not remove the VB-CABLE backend;
+- do not claim production reliability merely because PoC audio works.
 
-## 18. 实施顺序和提交边界
+## 18. Implementation order and commit boundaries
 
-推荐提交序列：
+Recommended commit sequence:
 
 1. `test: freeze virtual device host protocol contracts`
 2. `refactor: share the DS5 sidecar process owner`
@@ -712,24 +712,24 @@ USB 虚拟麦克风从“实验性”升级为默认候选前，必须同时满�
 9. `feat: expose virtual microphone configuration and diagnostics`
 10. `test: add USB audio lifecycle stress coverage`
 
-每一步必须可以单独回滚。descriptor、内核传输版本、进程生命周期和默认后端选择不得在同一个提交中同时变化。
+Every step must be independently revertible. Do not change the descriptor, kernel transport version, process lifecycle, and default backend selection in the same commit.
 
-## 19. 实施前待确认事项
+## 19. Questions to resolve before implementation
 
-1. HIDMaestro 是否完整支持没有 HID interface 的 audio-only profile；若不支持，优先推动上游增加 audio-only device 支持，不把伪 HID endpoint 带入产品设计。
-2. 发布用 VID/PID 的取得方式和稳定 serial/container identity 生成规则。
-3. Sunshine 服务模式下，宿主所在 Windows session 与用户音频 endpoint 的可见性。
-4. 当前固定 usbip-win2 版本在 UAC IN-only 设备上的 attach、pin close 和 teardown 稳定性。
-5. `HMMicrophoneInput.Submit()` 的部分提交、buffer ownership 和线程安全契约是否需要上游书面固定。
-6. 组件名称从 DS5 Sidecar 迁移为 Virtual Device Host 时的 manifest、active 目录和 GUI 升级兼容策略。
+1. Does HIDMaestro fully support an audio-only profile with no HID interface? If not, first add audio-only device support upstream; do not add a fake HID endpoint to the product design.
+2. How will the release VID/PID be obtained, and how will a stable serial/container identity be generated?
+3. In Sunshine service mode, how does the Windows session that hosts the process affect visibility of the user's audio endpoint?
+4. How stable is the pinned usbip-win2 version when an IN-only UAC device attaches, closes its pin, and tears down?
+5. Does the partial-submission, buffer-ownership, and thread-safety contract of `HMMicrophoneInput.Submit()` need to be fixed in writing upstream?
+6. What manifest, active-directory, and GUI upgrade compatibility is required when renaming DS5 Sidecar to Virtual Device Host?
 
-这些事项不会阻止 Phase 0/1，但第 1、2、4 项必须在独立 UAC profile 进入面向用户的实验版本前关闭。
+These questions do not block phases 0 or 1, but items 1, 2, and 4 must be resolved before the standalone UAC profile enters a user-facing experimental release.
 
-## 20. 参考资料
+## 20. References
 
-- [HIDMaestro](https://github.com/hifihedgehog/HIDMaestro)：当前用户态虚拟设备运行时及 `HMMicrophoneInput.Submit()` API 来源。
-- [usbip-win2](https://github.com/vadimgrn/usbip-win2)：当前已签名 UDE bus 的上游项目。
-- [usbip-win2 #181](https://github.com/vadimgrn/usbip-win2/issues/181)：与本机模拟 UAC endpoint teardown 接近的 kernel pool corruption 风险记录。
-- [usbip-win2 #180](https://github.com/vadimgrn/usbip-win2/issues/180)：同版本的另一项 kernel pool corruption 风险记录。
-- [Microsoft USB Audio Class system driver (Usbaudio.sys)](https://learn.microsoft.com/en-us/windows-hardware/drivers/audio/usb-audio-class-system-driver--usbaudio-sys-)：当前 UAC1 profile 使用的 Windows inbox 驱动；UAC2/`usbaudio2.sys` 仅作为未来路径考虑。
-- [Microsoft UDE client driver](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/writing-a-ude-client-driver)：UDE bus/client driver 边界和签名责任。
+- [HIDMaestro](https://github.com/hifihedgehog/HIDMaestro): source of the current user-mode virtual-device runtime and `HMMicrophoneInput.Submit()` API.
+- [usbip-win2](https://github.com/vadimgrn/usbip-win2): upstream project for the currently signed UDE bus.
+- [usbip-win2 #181](https://github.com/vadimgrn/usbip-win2/issues/181): record of a kernel pool-corruption risk similar to local emulated UAC endpoint teardown.
+- [usbip-win2 #180](https://github.com/vadimgrn/usbip-win2/issues/180): another kernel pool-corruption risk in the same version.
+- [Microsoft USB Audio Class system driver (Usbaudio.sys)](https://learn.microsoft.com/en-us/windows-hardware/drivers/audio/usb-audio-class-system-driver--usbaudio-sys-): Windows inbox driver used by the current UAC1 profile; UAC2/`usbaudio2.sys` is only a possible future path.
+- [Microsoft UDE client driver](https://learn.microsoft.com/en-us/windows-hardware/drivers/usbcon/writing-a-ude-client-driver): UDE bus/client-driver boundary and signing responsibilities.

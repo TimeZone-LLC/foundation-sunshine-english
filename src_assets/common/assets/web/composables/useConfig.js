@@ -727,7 +727,7 @@ export function useConfig() {
     if (targetTab) {
       currentTab.value = targetTab.id
       setTimeout(() => {
-        document.getElementById(hash)?.scrollIntoView({ behavior: 'smooth' })
+        document.getElementById(hash)?.scrollIntoView({ behavior: 'auto' })
       }, 100)
     }
   }

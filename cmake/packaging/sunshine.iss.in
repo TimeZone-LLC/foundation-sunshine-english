@@ -6,6 +6,7 @@
 #define MyAppVersion "@CPACK_PACKAGE_VERSION@"
 #define MyAppPublisher "@CPACK_PACKAGE_VENDOR@"
 #define MyAppURL "@CMAKE_PROJECT_HOMEPAGE_URL@"
+#define MyAppSupportURL "@SUNSHINE_PUBLISHER_ISSUE_URL@"
 #define MyAppExeName "@CMAKE_PROJECT_NAME@.exe"
 #define MyAppGUIExeName "sunshine-gui.exe"
 #define MySourceDir "@INNO_STAGING_DIR@"
@@ -22,7 +23,7 @@ AppVersion={#MyAppVersion}
 AppVerName=Foundation Sunshine Game Streaming Server v{#MyAppVersion}
 AppPublisher={#MyAppPublisher}
 AppPublisherURL={#MyAppURL}
-AppSupportURL={#MyAppURL}/support
+AppSupportURL={#MyAppSupportURL}
 AppUpdatesURL={#MyAppURL}
 DefaultDirName={code:GetPreviousInstallDir|{autopf}\{#MyAppName}}
 ; Always show the directory page so users can recover from a bad remembered path.
@@ -278,8 +279,6 @@ Filename: "{app}\scripts\vmouse\install-vmouse.bat"; StatusMsg: "{cm:StatusInsta
 ; stranded in Manual with nothing starting Sunshine at boot.
 Filename: "{app}\scripts\install-service.bat"; Parameters: "{code:GetServiceInstallParameters}"; StatusMsg: "{cm:StatusInstallService}"; Flags: runhidden waituntilterminated; AfterInstall: VerifyServiceInstalled
 
-; Finish page actions - user selectable
-Filename: "https://docs.qq.com/aio/DSGdQc3htbFJjSFdO?p=DXpTjzl2kZwBjN7jlRMkRJ"; Description: "{cm:FinishOpenDocs}"; Flags: postinstall shellexec runasoriginaluser unchecked nowait skipifsilent
 ; Launch the user-session agent with the original desktop token. The GUI then
 ; owns and reconciles its HKCU autostart entry from the correct user context.
 ;

@@ -43,8 +43,7 @@ if(NOT DEFINED FFMPEG_PREPARED_BINARIES)
     if(NOT EXISTS "${FFMPEG_PREPARED_BINARIES}")
         message(FATAL_ERROR
                 "FFmpeg pre-compiled binaries not found at ${FFMPEG_PREPARED_BINARIES}. \
-                Please consider contributing to the LizardByte/build-deps repository. \
-                Optionally, you can use the FFMPEG_PREPARED_BINARIES option to specify the path to the \
+                Use the FFMPEG_PREPARED_BINARIES option to specify the path to the \
                 system-installed FFmpeg libraries")
     endif()
 

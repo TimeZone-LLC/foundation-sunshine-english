@@ -3,7 +3,7 @@ param(
     [string]$PackageDirectory = "build/ds5-sidecar-package",
     [string]$ManifestPath = "build/ds5-sidecar-package.json",
     [string]$ReleaseTag = "",
-    [string]$Repository = "AlkaidLab/foundation-sunshine",
+    [string]$Repository = "TimeZone-LLC/foundation-sunshine-english",
     [ValidateSet('GPL-3.0-only')]
     [string]$License = 'GPL-3.0-only'
 )

@@ -86,11 +86,9 @@ Webhook 的唯一有效配置位于所选 `sunshine.conf` 同目录下的
 测试接口发送相同的 payload 外层结构，固定使用 `event_id=-1` 和
 `event_type=webhook_test`。`webhook_retries` 表示失败后的额外重试次数，
 默认 0，允许 0–3；该参数只用于当前测试，不会写入配置文件。
-测试通知与正式通知使用相同的运行时语言规则：`locale=zh` 或 `zh_TW`
-时使用中文，其他语言使用英文。修改主配置中的 `locale` 后，需要重启
-Sunshine 才会影响 Webhook 内容。
+Test and production notifications always use English.
 
-英文 Markdown 测试 payload：
+Markdown test payload:
 
 ```json
 {
@@ -98,19 +96,6 @@ Sunshine 才会影响 Webhook 内容。
   "event_type": "webhook_test",
   "markdown": {
     "content": "**Sunshine Webhook Test**\n\n<font color=\"info\">**Test Notification**</font>\n\n>Result: <font color=\"comment\">Webhook endpoint reached</font>\n>Hostname: <font color=\"comment\">sunshine-host</font>\n>Event Type: <font color=\"comment\">webhook_test</font>\n>Sample Application: <font color=\"comment\">Sunshine Test Application</font>\n>Sample Client: <font color=\"comment\">Sunshine Test Client</font>\n>Sample Stream: <font color=\"comment\">1920x1080, 60 FPS, Audio Enabled</font>\n>Time: <font color=\"comment\">2026-07-27 09:20:29.979</font>\n"
-  },
-  "msgtype": "markdown"
-}
-```
-
-中文 Markdown 测试 payload 的协议字段保持不变，仅翻译展示内容：
-
-```json
-{
-  "event_id": -1,
-  "event_type": "webhook_test",
-  "markdown": {
-    "content": "**Sunshine Webhook 测试**\n\n<font color=\"info\">**测试通知**</font>\n\n>结果: <font color=\"comment\">Webhook 接收地址已收到测试请求</font>\n>主机名: <font color=\"comment\">sunshine-host</font>\n>事件类型: <font color=\"comment\">webhook_test</font>\n>示例应用: <font color=\"comment\">Sunshine 测试应用</font>\n>示例客户端: <font color=\"comment\">Sunshine 测试客户端</font>\n>示例串流: <font color=\"comment\">1920x1080，60 FPS，音频已启用</font>\n>时间: <font color=\"comment\">2026-07-27 09:20:29.979</font>\n"
   },
   "msgtype": "markdown"
 }

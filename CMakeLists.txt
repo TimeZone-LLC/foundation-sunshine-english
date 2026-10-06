@@ -16,7 +16,7 @@ unset(ENV{DRIVER_DOWNLOAD_TOKEN})
 
 project(Sunshine VERSION 0.0.0
         DESCRIPTION "Self-hosted game stream host for Moonlight"
-        HOMEPAGE_URL "https://alkaidlab.com/sunshine")
+        HOMEPAGE_URL "https://github.com/TimeZone-LLC/foundation-sunshine-english")
 
 set(PROJECT_LICENSE "GPL-3.0-only")
 

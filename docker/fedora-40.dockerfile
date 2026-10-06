@@ -30,9 +30,9 @@ RUN <<_BUILD
 set -e
 chmod +x ./scripts/linux_build.sh
 ./scripts/linux_build.sh \
-  --publisher-name='LizardByte' \
-  --publisher-website='https://app.lizardbyte.dev' \
-  --publisher-issue-url='https://app.lizardbyte.dev/support' \
+  --publisher-name='TimeZone LLC' \
+  --publisher-website='https://github.com/TimeZone-LLC/foundation-sunshine-english' \
+  --publisher-issue-url='https://github.com/TimeZone-LLC/foundation-sunshine-english/issues' \
   --sudo-off
 dnf clean all
 rm -rf /var/cache/yum

@@ -1,12 +1,8 @@
 # Changelog
 
-@htmlonly
-<script type="module" src="https://md-block.verou.me/md-block.js"></script>
-<md-block
-  hmin="2"
-  src="https://raw.githubusercontent.com/LizardByte/Sunshine/changelog/CHANGELOG.md">
-</md-block>
-@endhtmlonly
+Release history for this fork is recorded in its Git tags and
+[GitHub releases](https://github.com/TimeZone-LLC/foundation-sunshine-english/releases).
+Upstream release notes describe different product and packaging choices and are not embedded here.
 
 <div class="section_buttons">
 

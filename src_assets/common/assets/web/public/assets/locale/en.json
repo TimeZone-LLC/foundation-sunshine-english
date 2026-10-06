@@ -214,7 +214,7 @@
     "adapter_name_desc_linux_2": "to find all devices capable of VAAPI",
     "adapter_name_desc_linux_3": "Replace ``renderD129`` with the device from above to lists the name and capabilities of the device. To be supported by Sunshine, it needs to have at the very minimum:",
     "adapter_name_desc_windows": "Manually specify a GPU to use for capture. If unset, the GPU is chosen automatically. Note: This GPU must have a display connected and powered on. If your laptop cannot enable direct GPU output, please set this to automatic.",
-    "adapter_name_desc_windows_vdd_hint": "If the latest version of the virtual display is installed, it can automatically associate with the GPU binding",
+    "adapter_name_desc_windows_vdd_hint": "The virtual display driver can automatically use this GPU binding when it is installed.",
     "adapter_name_placeholder_windows": "Radeon RX 580 Series",
     "add": "Add",
     "address_family": "Address Family",
@@ -456,9 +456,9 @@
     "lan_encryption_mode_1": "Enabled for supported clients",
     "lan_encryption_mode_2": "Required for all clients",
     "lan_encryption_mode_desc": "This determines when encryption will be used when streaming over your local network. Encryption can reduce streaming performance, particularly on less powerful hosts and clients.",
-    "lan_fec_percentage": "LAN FEC Percentage",
+    "lan_fec_percentage": "LAN FEC percentage",
     "lan_fec_percentage_desc": "Error correcting packets per data packet for clients on your local network. Wired links rarely lose packets, so a low value leaves more of the bitrate for actual video. 0 disables parity on the LAN; frames of fewer than four packets never carry parity.",
-    "lan_video_pacing": "LAN Video Pacing",
+    "lan_video_pacing": "LAN video pacing",
     "lan_video_pacing_desc": "Spread each frame's packets over time for clients on your local network, as is always done for remote clients. Disabled sends every frame at line rate, which removes a few milliseconds of latency per frame on wired networks. Enable it if a Wi-Fi client on your LAN shows packet loss.",
     "log_level": "Log Level",
     "log_level_0": "Verbose",
@@ -591,7 +591,7 @@
     "output_name_desc_unix": "During Sunshine startup, you should see the list of detected displays. Note: You need to use the id value inside the parenthesis.",
     "output_name_desc_windows": "Manually specify a display device id to use for capture. If unset, the primary display is captured.\nNote: If you specified a GPU above, this display must be connected to that GPU.\n\nDuring Sunshine startup, you should see the list of detected display devices and their ids, e.g.:",
     "output_name_unix": "Display number",
-    "output_name_vdd_option": "Just gimme VDD~",
+    "output_name_vdd_option": "Use the virtual display",
     "output_name_windows": "Display Device Specify",
     "pair_max_attempts": "PIN Pairing Retry Limit",
     "pair_max_attempts_desc": "Max PIN pairing attempts per client IP within 60 seconds. Range 0-50, 0 disables the limit. Default is 10.",
@@ -951,7 +951,7 @@
     "input_only_summary": "New connections carry input and host audio plus a 16×16 black heartbeat. No display capture or live video encoding.",
     "startup_errors": "<b>Attention!</b> Sunshine detected these errors during startup. We <b>STRONGLY RECOMMEND</b> fixing them before streaming.",
     "version_unavailable": "Version unavailable",
-    "welcome": "Hello, Foundation Sunshine!"
+    "welcome": "System overview"
   },
   "navbar": {
     "applications": "Applications",
@@ -1016,7 +1016,7 @@
   "password": {
     "confirm_password": "Confirm Password",
     "current_creds": "Current Credentials",
-    "new_creds": "New Credentials",
+    "new_creds": "New credentials",
     "new_username_desc": "If not specified, the username will not change",
     "password_change": "Password Change",
     "success_msg": "Password has been changed successfully! This page will reload soon, your browser will ask you for the new credentials."
@@ -1277,11 +1277,11 @@
   },
   "welcome": {
     "confirm_password": "Confirm password",
-    "create_creds": "Before Getting Started, we need you to make a new username and password for accessing the Web UI.",
+    "create_creds": "Create a username and password to access the Web UI.",
     "create_creds_alert": "The credentials below are needed to access Sunshine's Web UI. Keep them safe, since you will never see them again!",
     "creds_local_only": "Your credentials are stored locally offline and will never be uploaded to any server.",
     "error": "Error!",
-    "greeting": "Welcome to Foundation Sunshine!",
+    "greeting": "Web UI credentials",
     "hide_password": "Hide password",
     "login": "Login",
     "network_error": "Network error, please check your connection",

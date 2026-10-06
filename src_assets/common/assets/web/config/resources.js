@@ -64,7 +64,7 @@ export const CLIENT_RESOURCES = [
 export const LEGAL_RESOURCES = [
   {
     id: 'license',
-    href: 'https://github.com/AlkaidLab/foundation-sunshine/blob/master/LICENSE',
+    href: 'https://github.com/TimeZone-LLC/foundation-sunshine-english/blob/master/LICENSE',
     icon: 'fas fa-file-alt',
     titleKey: 'resource_card.license',
     descriptionKey: 'resource_card.view_license',
@@ -72,7 +72,7 @@ export const LEGAL_RESOURCES = [
   },
   {
     id: 'third-party-notice',
-    href: 'https://github.com/AlkaidLab/foundation-sunshine/blob/master/NOTICE',
+    href: 'https://github.com/TimeZone-LLC/foundation-sunshine-english/blob/master/NOTICE',
     icon: 'fas fa-exclamation-triangle',
     titleKey: 'resource_card.third_party_notice',
     descriptionKey: 'resource_card.third_party_desc',

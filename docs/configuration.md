@@ -26,94 +26,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
 
 ## [General](https://localhost:47990/config/#general)
 
-### [locale](https://localhost:47990/config/#locale)
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            The locale used for Sunshine's user interface.
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            en
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            locale = en
-            @endcode</td>
-    </tr>
-    <tr>
-        <td rowspan="20">Choices</td>
-        <td>bg</td>
-        <td>Bulgarian</td>
-    </tr>
-    <tr>
-        <td>cs</td>
-        <td>Czech</td>
-    </tr>
-    <tr>
-        <td>de</td>
-        <td>German</td>
-    </tr>
-    <tr>
-        <td>en</td>
-        <td>English</td>
-    </tr>
-    <tr>
-        <td>en_GB</td>
-        <td>English (UK)</td>
-    </tr>
-    <tr>
-        <td>en_US</td>
-        <td>English (United States)</td>
-    </tr>
-    <tr>
-        <td>es</td>
-        <td>Spanish</td>
-    </tr>
-    <tr>
-        <td>fr</td>
-        <td>French</td>
-    </tr>
-    <tr>
-        <td>it</td>
-        <td>Italian</td>
-    </tr>
-    <tr>
-        <td>ja</td>
-        <td>Japanese</td>
-    </tr>
-    <tr>
-        <td>pt</td>
-        <td>Portuguese</td>
-    </tr>
-    <tr>
-        <td>ru</td>
-        <td>Russian</td>
-    </tr>
-    <tr>
-        <td>sv</td>
-        <td>Swedish</td>
-    </tr>
-    <tr>
-        <td>tr</td>
-        <td>Turkish</td>
-    </tr>
-    <tr>
-        <td>zh</td>
-        <td>Chinese (Simplified)</td>
-    </tr>
-    <tr>
-        <td>zh_TW</td>
-        <td>Chinese (Traditional)</td>
-    </tr>
-</table>
-
 ### [sunshine_name](https://localhost:47990/config/#sunshine_name)
 
 <table>
@@ -209,29 +121,6 @@ editing the `conf` file in a text editor. Use the examples as reference.
         <td>Example</td>
         <td colspan="2">@code{}
             global_prep_cmd = [{"do":"nircmd.exe setdisplay 1280 720 32 144","undo":"nircmd.exe setdisplay 2560 1440 32 144"}]
-            @endcode</td>
-    </tr>
-</table>
-
-### [notify_pre_releases](https://localhost:47990/config/#notify_pre_releases)
-
-<table>
-    <tr>
-        <td>Description</td>
-        <td colspan="2">
-            Whether to be notified of new pre-release versions of Sunshine.
-        </td>
-    </tr>
-    <tr>
-        <td>Default</td>
-        <td colspan="2">@code{}
-            disabled
-            @endcode</td>
-    </tr>
-    <tr>
-        <td>Example</td>
-        <td colspan="2">@code{}
-            notify_pre_releases = disabled
             @endcode</td>
     </tr>
 </table>

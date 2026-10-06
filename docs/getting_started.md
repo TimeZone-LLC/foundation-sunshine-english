@@ -3,7 +3,7 @@
 The recommended method for running Sunshine is to use the [binaries](#binaries) included in the
 [latest release][latest-release], unless otherwise specified.
 
-[Pre-releases](https://github.com/LizardByte/Sunshine/releases) are also available. These should be considered beta,
+[Pre-releases](https://github.com/TimeZone-LLC/foundation-sunshine-english/releases) are also available. These should be considered beta,
 and release artifacts may be missing when merging changes on a faster cadence.
 
 ## Binaries
@@ -20,8 +20,7 @@ No support will be provided for third party packages!}
 ### Docker
 @warning{The Docker images are not recommended for most users.}
 
-Docker images are available on [Dockerhub.io](https://hub.docker.com/repository/docker/lizardbyte/sunshin)
-and [ghcr.io](https://github.com/orgs/LizardByte/packages?repo_name=sunshine).
+Container definitions are provided for local builds.
 
 See [Docker](../DOCKER_README.md) for more information.
 
@@ -95,11 +94,11 @@ According to AppImageLint the supported distro matrix of the AppImage is below.
 - ✖ CentOS 7
 
 ##### Install
-1. Download [sunshine.AppImage](https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine.AppImage)
+1. Download [sunshine.AppImage](https://github.com/TimeZone-LLC/foundation-sunshine-english/releases/latest/download/sunshine.AppImage)
    into your home directory.
    ```bash
    cd ~
-   wget https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine.AppImage
+   wget https://github.com/TimeZone-LLC/foundation-sunshine-english/releases/latest/download/sunshine.AppImage
    ```
 2. Open terminal and run the following command.
    ```bash
@@ -120,8 +119,7 @@ According to AppImageLint the supported distro matrix of the AppImage is below.
 @warning{We do not provide support for any AUR packages.}
 
 ##### Install Prebuilt Packages
-Follow the instructions at LizardByte's [pacman-repo](https://github.com/LizardByte/pacman-repo) to add
-the repository. Then run the following command.
+Download the package from the current Foundation Sunshine release, then run the following command.
 ```bash
 pacman -S sunshine
 ```
@@ -129,7 +127,7 @@ pacman -S sunshine
 ##### Install PKGBUILD Archive
 Open terminal and run the following command.
 ```bash
-wget https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine.pkg.tar.gz
+wget https://github.com/TimeZone-LLC/foundation-sunshine-english/releases/latest/download/sunshine.pkg.tar.gz
 tar -xvf sunshine.pkg.tar.gz
 cd sunshine
 
@@ -284,7 +282,7 @@ This package requires that you have [MacPorts](https://www.macports.org/install.
    ```bash
    mkdir -p ~/ports/multimedia/sunshine
    cd ~/ports/multimedia/sunshine
-   curl -OL https://github.com/LizardByte/Sunshine/releases/latest/download/Portfile
+   curl -OL https://github.com/TimeZone-LLC/foundation-sunshine-english/releases/latest/download/Portfile
    cd ~/ports
    portindex
    sudo port install sunshine
@@ -305,7 +303,7 @@ sudo port uninstall sunshine
 #### Installer (recommended)
 
 1. Download and install
-   [sunshine-windows-installer.exe](https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-windows-installer.exe)
+   [sunshine-windows-installer.exe](https://github.com/TimeZone-LLC/foundation-sunshine-english/releases/latest/download/sunshine-windows-installer.exe)
 
 @attention{You should carefully select or unselect the options you want to install. Do not blindly install or
 enable features.}
@@ -319,7 +317,7 @@ overflow menu. Different versions of Windows may provide slightly different step
 recommended for most users. No support will be provided!}
 
 1. Download and extract
-   [sunshine-windows-portable.zip](https://github.com/LizardByte/Sunshine/releases/latest/download/sunshine-windows-portable.zip)
+   [sunshine-windows-portable.zip](https://github.com/TimeZone-LLC/foundation-sunshine-english/releases/latest/download/sunshine-windows-portable.zip)
 2. Open command prompt as administrator
 3. Firewall rules
 
@@ -565,9 +563,6 @@ Tutorial videos are available [here](https://www.youtube.com/playlist?list=PLMYr
 
 Guides are available [here](guides.md).
 
-@admonition{Community! |
-Tutorials and Guides are community generated. Want to contribute? Reach out to us on our discord server.}
-
 <div class="section_buttons">
 
 | Previous                 |                      Next |
@@ -576,4 +571,4 @@ Tutorials and Guides are community generated. Want to contribute? Reach out to u
 
 </div>
 
-[latest-release]: https://github.com/LizardByte/Sunshine/releases/latest
+[latest-release]: https://github.com/TimeZone-LLC/foundation-sunshine-english/releases/latest

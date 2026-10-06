@@ -1,32 +1,22 @@
-## What's Changed
+## Functional changes
 
-### ✨ New Features
-* **feat:** 功能描述 by [@用户名](https://github.com/用户名) in [#PR号](https://github.com/qiin2333/Sunshine-Foundation/pull/PR号)
+-
 
-### 🔧 Improvements & Refactors
-* **refactor:** 改进描述 by [@用户名](https://github.com/用户名) in [#PR号](https://github.com/qiin2333/Sunshine-Foundation/pull/PR号)
-* **chore:** 任务描述 by [@用户名](https://github.com/用户名) in [#PR号](https://github.com/qiin2333/Sunshine-Foundation/pull/PR号)
+## Correctness and security
 
-### 🐛 Bug Fixes
-* **fix:** 修复描述 by [@用户名](https://github.com/用户名) in [#PR号](https://github.com/qiin2333/Sunshine-Foundation/pull/PR号)
+-
 
----
+## Compatibility and build support
 
-## ⚠️ 注意事项
-* 版本特定的注意事项，例如驱动更新要求、配置变更等
+-
 
----
+## Upgrade notes
 
-## 🎉 New Contributors
-* [@用户名](https://github.com/用户名) made their first contribution in [#PR号](https://github.com/qiin2333/Sunshine-Foundation/pull/PR号)
+- None.
 
----
+## Validation
 
-**Full Changelog**: https://github.com/qiin2333/Sunshine-Foundation/compare/PREVIOUS_TAG...CURRENT_TAG
-
----
-
-## 👥 Contributors
-
-| <a href="https://github.com/用户名"><img src="https://avatars.githubusercontent.com/用户名?s=80" width="80" height="80" alt="用户名"/><br/><sub><b>用户名</b></sub></a><br/><sub>合并次数 merges</sub> |
-| :---: |
+- [ ] Native host build and tests
+- [ ] Web UI lint, tests, and build
+- [ ] Control-panel renderer build and tests
+- [ ] Control-panel Rust build and tests

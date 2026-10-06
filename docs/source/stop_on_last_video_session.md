@@ -1,150 +1,150 @@
-# 最后一个视频会话结束时停止串流
+# Stop streaming when the last video session ends
 
-## 目标
+## Goal
 
-Sunshine 目前在最后一个视频会话结束后，默认保留应用和串流上下文，以便客户端在短暂断线后通过 `Resume` 继续使用。这是当前默认行为，不能改变。
+Sunshine currently keeps the application and streaming context after the last video session ends so that a client can resume after a brief disconnection. This is the current default and must not change.
 
-本设计增加一个可选的全局策略：当最后一个非控制视频会话结束时，主动结束本次串流并清理应用。用户可以在容易断网、希望离开电脑后自动收尾的场景启用它；不启用时，现有的断线恢复行为完全不变。
+This design adds an optional global policy: when the last non-control video session ends, actively end the stream and clean up the application. Users can enable it when their network is unreliable or when they want automatic cleanup after leaving the computer. When disabled, the existing disconnect-recovery behavior remains unchanged.
 
-设计目标是提供一个简单的用户开关，而不是重新设计会话管理：不新增 HTTP 接口、不增加等待计时器、不引入每个应用的独立配置，也不复制一套新的清理流程。
+The goal is a simple user switch, not a session-management redesign. It adds no HTTP endpoint, wait timer, or per-application configuration, and it does not duplicate the cleanup flow.
 
-## 用户入口
+## User entry point
 
-设置位置：WebUI → 常规。
+Location: WebUI → General.
 
-在常规页现有的全局串流设置区域增加一个复选框：
+Add a checkbox to the existing global streaming settings on the General page:
 
-> 所有客户端断开后结束串流
+> End streaming after all clients disconnect
 
-说明文字：
+Description:
 
-> 开启后，所有客户端断开时会结束应用并恢复显示状态；关闭时保留现有的断线恢复行为。自动清理会结束仍在保留的控制专用会话。
+> When enabled, Sunshine ends the application and restores display state after all clients disconnect. When disabled, it keeps the existing disconnect-recovery behavior. Automatic cleanup also ends any retained control-only sessions.
 
-该选项：
+This option:
 
-- 默认关闭；
-- 属于 Sunshine 全局设置，不属于某个应用；
-- 与系统托盘、预览版通知等全局选项放在同一设置区域；
-- 通过现有 `/api/config` 读取和保存，不增加新的前端 API；
-- 保存后沿用 WebUI 现有的“应用”操作重启 Sunshine，重启后对后续会话生效；
-- 不在 AppEditor、`apps.json` 或客户端配置中增加字段。
+- is disabled by default;
+- is a global Sunshine setting, not an application setting;
+- appears with global options such as system-tray and preview-build notifications;
+- is read and saved through the existing `/api/config`, with no new frontend API;
+- uses the WebUI's existing Apply action to restart Sunshine after saving, and affects subsequent sessions after that restart;
+- adds no field to AppEditor, `apps.json`, or client configuration.
 
-这样普通用户只需勾选一个选项即可使用；希望手动控制的用户仍可继续调用现有 `/cancel`。
+An ordinary user only needs to select one option. Users who prefer manual control can continue to call the existing `/cancel`.
 
-## 配置模型
+## Configuration model
 
-配置键：`stop_on_last_video_session`。
+Configuration key: `stop_on_last_video_session`.
 
-该键属于 `stream_t`，因为它描述的是 Sunshine 的会话生命周期策略，而不是某个应用的启动参数。配置文件仍由 Sunshine 的配置层负责读写，Sunshine WebUI 只通过现有配置 API 修改完整配置对象；控制面板不需要新增一套重复设置。
+The key belongs to `stream_t` because it describes Sunshine's session-lifecycle policy, not an application's launch arguments. Sunshine's configuration layer continues to read and write the configuration. The Sunshine WebUI changes the complete configuration object through the existing API; the control panel does not need a duplicate setting.
 
-兼容规则：
+Compatibility rules:
 
-- 配置键缺失时按 `false` 处理；
-- `false` 保持当前行为；
-- `true` 只改变“最后一个视频会话结束”的处理分支；
-- 配置保存失败时不改变内存中的旧策略，并沿用现有错误提示。
+- treat a missing key as `false`;
+- `false` preserves current behavior;
+- `true` changes only the branch that handles the end of the last video session;
+- if configuration saving fails, preserve the old in-memory policy and use the existing error message.
 
-## 生命周期逻辑
+## Lifecycle logic
 
-现有会话管理已经维护视频会话计数，并区分控制专用会话。实现只需要在视频会话计数从 1 变为 0 的边沿检查配置：
+Existing session management already tracks the video-session count and distinguishes control-only sessions. The implementation checks the setting only on the edge where the video-session count changes from 1 to 0:
 
 ```mermaid
 flowchart TD
-    A[视频会话结束] --> B[原子减少视频会话计数]
-    B --> C{剩余视频会话 > 0?}
-    C -- 是 --> D[保留应用和现有串流状态]
-    C -- 否 --> E{stop_on_last_video_session?}
-    E -- 否 --> F[沿用当前行为：暂停并等待 Resume]
-    E -- 是 --> G[异步重新检查会话状态]
-    G --> H{重新检查时已有新视频会话?}
-    H -- 是 --> D
-    H -- 否 --> I{Sunshine 正在退出或已有终止任务?}
-    I -- 是 --> J[不重复提交终止]
-    I -- 否 --> K[复用现有 terminate_sessions_async]
-    K --> L[执行现有 cancel 清理链路]
-    L --> M[结束应用、执行清理命令、恢复显示状态]
-    M --> N[Sunshine 进程继续运行，可接受新的 Launch]
+    A[Video session ends] --> B[Atomically decrement video-session count]
+    B --> C{Remaining video sessions > 0?}
+    C -- Yes --> D[Keep application and existing stream state]
+    C -- No --> E{stop_on_last_video_session?}
+    E -- No --> F[Keep current behavior: pause and wait for Resume]
+    E -- Yes --> G[Asynchronously recheck session state]
+    G --> H{A new video session exists at recheck?}
+    H -- Yes --> D
+    H -- No --> I{Sunshine exiting or termination already pending?}
+    I -- Yes --> J[Do not submit duplicate termination]
+    I -- No --> K[Reuse existing terminate_sessions_async]
+    K --> L[Run existing cancel cleanup chain]
+    L --> M[End application, run cleanup commands, restore display state]
+    M --> N[Sunshine process remains available for a new Launch]
 ```
 
-### 为什么必须异步重新检查
+### Why an asynchronous recheck is required
 
-最后一个旧会话结束和自动终止任务真正执行之间可能有很短的间隔。此时客户端可能已经发起新的 `Launch`。因此不能在视频线程中直接调用进程终止，也不能只根据第一次看到的计数做决定。
+A short interval can exist between the end of the last old session and execution of the automatic termination task. A client may already have started a new `Launch` during that interval. The video thread therefore must not terminate the process directly, and the decision cannot rely only on the first observed count.
 
-自动终止任务执行前需要再次确认：
+Before the automatic task runs, it must confirm again that:
 
-1. 视频会话计数仍为零；
-2. Sunshine 没有进入全局退出流程；
-3. 没有其他终止任务已经在执行。
+1. the video-session count is still zero;
+2. Sunshine has not entered global shutdown;
+3. no other termination task is running.
 
-任一条件不满足，都直接结束本次自动任务，不影响新会话。
+If any condition fails, the automatic task exits without affecting the new session.
 
-### 并发与幂等
+### Concurrency and idempotence
 
-- 视频会话计数继续使用现有原子操作；只有一个会话可以观察到“从 1 变为 0”。
-- 自动终止请求使用一次性提交标记，两个会话几乎同时结束时最多提交一次；它只负责去重，不等同于 Launch/Resume 准入锁。
-- 已经由手动 `/cancel` 或主机关机触发的清理不会再次重复执行。
-- 不在视频/音频线程中等待，不新增轮询线程和固定延迟。
+- The video-session count continues to use existing atomic operations. Only one session can observe the transition from 1 to 0.
+- An automatic termination request uses a one-shot submission flag, so when two sessions end almost simultaneously, at most one task is submitted. This flag only deduplicates requests; it is not a Launch/Resume admission lock.
+- Cleanup already triggered by manual `/cancel` or host shutdown is not run again.
+- Video and audio threads never wait, and the change adds no polling thread or fixed delay.
 
-控制专用会话不会减少视频会话计数，也不会单独触发此选项。若最后一个视频会话结束后已经决定执行整场串流清理，仍由现有的全局终止链路统一收尾相关控制会话。
+A control-only session does not decrement the video-session count and cannot trigger this option by itself. Once the last video session has selected full-stream cleanup, the existing global termination flow also finishes the related control sessions.
 
-## 清理语义
+## Cleanup semantics
 
-开启选项后的自动退出必须复用现有 `/cancel` 使用的终止协调器，而不是另写一套清理代码。这样可以保持以下行为一致：
+Automatic exit with this option enabled must reuse the termination coordinator used by the existing `/cancel`, not implement another cleanup path. This preserves consistent behavior for:
 
-- 终止当前串流应用；
-- 执行应用的 undo/清理命令；
-- 恢复显示配置和虚拟显示器状态；
-- 更新托盘和 WebUI 中的运行状态；
-- Sunshine 主进程继续运行。
+- terminating the current streaming application;
+- running the application's undo and cleanup commands;
+- restoring display configuration and virtual-display state;
+- updating running state in the tray and WebUI;
+- keeping the Sunshine process running.
 
-自动退出只改变触发条件，不改变清理顺序。对于已经处于全局关闭流程的情况，不再发起自动退出请求。
+Automatic exit changes only the trigger, not the cleanup order. If global shutdown is already in progress, do not submit an automatic-exit request.
 
-## 停止原因处理
+## Stop-reason handling
 
-| 最后一个视频会话的结束原因 | 开关开启时的处理 |
+| Reason the last video session ended | Behavior when enabled |
 | --- | --- |
-| 客户端主动断开、控制超时 | 触发自动清理 |
-| RTSP/协议错误 | 触发自动清理 |
-| 视频线程结束或设备异常 | 触发自动清理 |
-| 已经执行手动 `/cancel` | 复用已存在的清理，不重复提交 |
-| Sunshine 正在退出 | 跳过自动提交，由关闭流程负责 |
+| Client disconnect or control timeout | Trigger automatic cleanup |
+| RTSP/protocol error | Trigger automatic cleanup |
+| Video thread exit or device fault | Trigger automatic cleanup |
+| Manual `/cancel` already running | Reuse existing cleanup; do not submit again |
+| Sunshine is shutting down | Skip automatic submission; shutdown owns cleanup |
 
-这不是“任何网络波动立即杀进程”的新默认策略。只有用户明确打开开关后，最后一个视频会话的结束才会触发它；关闭开关仍可使用原有 Resume 或手动 `/cancel`。
+This is not a new default that kills the process on every network disturbance. It activates only when the user explicitly enables the option and the last video session ends. With the option disabled, existing Resume behavior and manual `/cancel` remain available.
 
-## 验证范围
+## Validation scope
 
-### 配置和界面
+### Configuration and interface
 
-- 常规页默认显示关闭；
-- 切换并保存后重新打开页面，状态保持一致；
-- 点击“应用”并完成重启后，下一次会话结束即可读取新策略；
-- 中英文文案不改变现有控件布局；
-- 配置键缺失时仍按关闭处理。
+- The General page shows the option disabled by default.
+- After toggling and saving, reopening the page preserves the state.
+- After selecting Apply and completing the restart, the next session end reads the new policy.
+- Text labels do not alter the existing control layout.
+- A missing configuration key is still treated as disabled.
 
-### 会话生命周期
+### Session lifecycle
 
-- 默认关闭时，最后一个客户端断开仍可按原逻辑 Resume；
-- 开启后，最后一个视频会话结束时应用退出、清理命令执行、显示状态恢复；
-- 两个视频会话同时存在时，先断开的客户端不会触发退出；
-- 最后一个视频会话断开后立即发起新 Launch，不会被旧会话的自动任务误终止；
-- 控制专用会话单独连接或断开不会触发开关；
-- 手动 `/cancel` 的行为不受影响，且不会产生重复清理；
-- 覆盖物理显示器、VDD、锁屏和 SYSTEM RDP 等现有显示恢复场景。
+- With the default disabled, the last client can still Resume after disconnecting.
+- When enabled, ending the last video session exits the application, runs cleanup commands, and restores display state.
+- With two video sessions present, the first client to disconnect does not trigger exit.
+- A new Launch immediately after the last video session disconnects is not terminated by the old session's automatic task.
+- A control-only session connecting or disconnecting alone does not trigger the option.
+- Manual `/cancel` behavior remains unchanged and produces no duplicate cleanup.
+- Cover existing display-restoration cases: physical displays, VDD, lock screen, and SYSTEM RDP.
 
-## 非目标与取舍
+## Non-goals and tradeoffs
 
-本阶段明确不做以下扩展：
+This phase explicitly excludes:
 
-- 不增加“断开后等待 N 秒再退出”的第二个时间参数；
-- 不增加每个应用单独的开关；
-- 不增加新的 `/cancel` 变体或远程控制接口；
-- 不把控制专用会话计入视频会话计数；
-- 不改变默认 Resume 语义。
+- a second parameter that waits N seconds after disconnect before exit;
+- per-application switches;
+- a new `/cancel` variant or remote-control endpoint;
+- counting control-only sessions as video sessions;
+- changing the default Resume semantics.
 
-如果用户需要更细粒度的策略，仍可以关闭该选项并使用现有 `/cancel`。保持这一范围可以避免把一个简单的生命周期偏好扩展成新的会话策略系统。
+Users who need a finer-grained policy can leave the option disabled and use the existing `/cancel`. Keeping this scope avoids turning a simple lifecycle preference into a new session-policy system.
 
-## 影响与风险
+## Impact and risk
 
-主要影响是：开启后，短暂网络抖动导致最后一个视频会话结束时，应用会退出而不是等待 Resume。这是选项本身的预期取舍，默认关闭可避免影响现有用户。
+The primary impact is intentional: when enabled, a brief network disruption that ends the last video session exits the application instead of waiting for Resume. Keeping the option disabled by default protects existing users.
 
-实现不新增高频锁、网络请求或后台轮询；只在视频会话计数归零这一低频边沿提交一次异步终止请求，并在执行前重新确认状态。一次性标记可以避免重复清理，但不能原子地覆盖“检查条件到清理开始”的整个 Launch/Resume 准入窗口。完整协调留在独立的后续设计中，见 `stream_lifecycle_coordinator_design.md`。
+The implementation adds no high-frequency lock, network request, or background polling. It submits one asynchronous termination request only on the low-frequency edge where the video-session count reaches zero, then confirms state again before execution. The one-shot flag prevents duplicate cleanup but cannot atomically cover the complete Launch/Resume admission interval between checking the conditions and starting cleanup. Full coordination is deferred to the separate design in `stream_lifecycle_coordinator_design.md`.

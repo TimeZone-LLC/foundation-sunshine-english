@@ -20,7 +20,7 @@ Version: %{build_version}
 Release: 1%{?dist}
 Summary: Self-hosted game stream host for Moonlight.
 License: GPLv3-only
-URL: https://alkaidlab.com/sunshine
+URL: https://github.com/TimeZone-LLC/foundation-sunshine-english
 Source0: tarball.tar.gz
 
 # Common BuildRequires

@@ -1,129 +1,170 @@
-# Dolby Vision Profile 8.4 串流实施方案
+# Dolby Vision Profile 8.4 streaming implementation plan
 
-## 1. 定位
+## 1. Positioning
 
-DV Profile 8.4 与已落地的 8.1 通道（docs/dolby_vision_profile81.md）结构相同：单层 BL+RPU，
-UNSPEC 62 NAL 注入 HEVC AU，客户端经 `video/dolby-vision` MediaCodec 直渲染。
-唯一区别是基层 EOTF：
+DV Profile 8.4 has the same structure as the implemented 8.1 path
+(`docs/dolby_vision_profile81.md`): a single BL plus RPU, an UNSPEC 62 NAL
+injected into the HEVC AU, and direct rendering through the client's
+`video/dolby-vision` MediaCodec. The only difference is the base-layer EOTF:
 
 | | 8.1 | 8.4 |
 |---|---|---|
-| 基层 | PQ (ST 2084) | HLG (ARIB STD-B67) |
-| 客户端 dynamicRangeMode | 1 | 2 |
-| 目标设备 | 主流 DV 设备 | 不接受 PQ-BL RPU、仅认 HLG-BL 的设备（部分 LG 等） |
+| Base layer | PQ (ST 2084) | HLG (ARIB STD-B67) |
+| Client `dynamicRangeMode` | 1 | 2 |
+| Target devices | Mainstream DV devices | Devices that reject a PQ-BL RPU and accept only an HLG BL, including some LG devices |
 
-复用资产：`video_dolby_vision` RPU 写入器、`staged_rpu_queue_t`、`video_hdr_bitstream`
-strip/inject、`dynamic_hdr_selection` 协商框架、NVENC/AMF 注入链路、HLG 编码管线
-（bt2020hlg P010 已存在）。**不新增编码器代码。**
+Reusable components include the `video_dolby_vision` RPU writer,
+`staged_rpu_queue_t`, `video_hdr_bitstream` strip/inject logic, the
+`dynamic_hdr_selection` negotiation framework, the NVENC/AMF injection path,
+and the existing HLG encoding path (`bt2020hlg` P010). **No new encoder code is
+required.**
 
-优先级规则（已确认）：客户端同时报 8.1 与 8.4 时**只协商 8.1**；仅当客户端只报 8.4
-（且请求 HLG）时才协商 8.4。
+Confirmed priority rule: when a client advertises both 8.1 and 8.4, negotiate
+**8.1 only**. Negotiate 8.4 only when the client advertises only 8.4 and
+requests HLG.
 
-## 2. 与 RTX HDR 的互斥
+## 2. Mutual exclusion with RTX HDR
 
-RTX HDR 管线固定 PQ 编码输出：TrueHDR 滤镜输出 FP16 linear scRGB，由后续
-RGB→PQ/P010 编码阶段产生 PQ 码流（HLG 会话不激活滤镜，rtsp.cpp 守卫
-`dynamicRange == 1`）。因此：
+The RTX HDR pipeline always produces PQ-encoded output. The TrueHDR filter
+outputs FP16 linear scRGB, and the later RGB-to-PQ/P010 encoding stage produces
+the PQ bitstream. HLG sessions do not activate the filter because `rtsp.cpp`
+guards it with `dynamicRange == 1`. Therefore:
 
-- app 开启 `rtx-hdr` 时，8.4 **不参与协商**（8.1 不受影响，其会话本就锁 PQ）。
-- 实现位置：`select_dynamic_hdr` 的 host gate `synthetic_hdr_enabled` —— 跟随
-  **应用特性**（`session.synthetic_hdr.enabled`）而非会话 filter 状态，因为
-  HLG 请求下 filter 恒为关闭，用 filter 状态做 gate 会让 RTX HDR 应用在 HLG
-  路径漏排除。gate 可在 ANNOUNCE 响应头里给客户端明确 fallback 原因
-  （`colorspace_unsupported`）。
-- `rtx_hdr`、`synthetic_hdr`、`pre_encode_filter` 分别表示应用策略、会话快照和实际
-  编码前处理状态，不用后一个阶段的状态反向改变前一阶段的协商结果。
+- When an app enables `rtx-hdr`, 8.4 **does not participate in negotiation**.
+  This does not affect 8.1, whose sessions already require PQ.
+- Implement this in the `select_dynamic_hdr` host gate
+  `synthetic_hdr_enabled`. The gate must follow the **application feature**
+  (`session.synthetic_hdr.enabled`), not the session's filter state. The filter
+  is always disabled for an HLG request, so gating on filter state would fail
+  to exclude RTX HDR apps on the HLG path. The gate can return an explicit
+  `colorspace_unsupported` fallback reason in the ANNOUNCE response header.
+- `rtx_hdr`, `synthetic_hdr`, and `pre_encode_filter` represent application
+  policy, the session snapshot, and the actual pre-encode processing state,
+  respectively. State from a later stage must not change an earlier
+  negotiation result.
 
-## 3. 主机端改动
+## 3. Host changes
 
-### 3.1 协商层（src/hdr/dynamic_hdr_selection.h/.cpp）
+### 3.1 Negotiation layer (`src/hdr/dynamic_hdr_selection.h/.cpp`)
 
-- 新能力位：`DYNAMIC_HDR_CAPS_DOLBY_VISION_84 = 1u << 4`（wire 稳定，旧客户端不会上报）。
-- 新格式枚举：`dynamic_hdr_format_e::dolby_vision_profile_84 = 5`（X-SS-Dynamic-HDR wire 值 5，
-  不重排现有 0-4）；`to_string` 加 `"dolby_vision_profile_84"`。
-- `dynamic_hdr_fallback_e` 不新增值：`colorspace_unsupported` 语义扩展为
-  "要求 PQ 但会话为 HLG / 要求 HLG 但会话为 PQ"。
-- 选择规则（preference 为 automatic 或 dolby_vision 时，按序判定）：
-  1. HEVC 门失败 → codec_unsupported（不变）
-  2. `dynamic_range_mode == 1` 且 caps 有 8.1 → **8.1**（现状优先级不变）
-  3. `dynamic_range_mode == 2` 且 caps 有 8.4 且无 8.1 → **8.4**
-     （caps 同时有 8.1/8.4 且 HLG：属客户端矛盾上报，按 colorspace_unsupported
-     落回 —— 8.1 报位意味着客户端应预期 PQ，与 HLG 请求冲突；客户端应自己在
-     请求 HLG 时不报 8.1）
-  4. RTX HDR per-app 激活 → 8.4 门失败，reason `colorspace_unsupported`
-  5. direct surface 门不变
-- `dynamic_hdr_selection_t::dolby_vision_active()` 改为 8.1 或 8.4。
-- 已知位掩码 `known_bits` 加入 1u<<4。
+- Add capability bit `DYNAMIC_HDR_CAPS_DOLBY_VISION_84 = 1u << 4`. Its wire
+  value is stable, and old clients will not advertise it.
+- Add `dynamic_hdr_format_e::dolby_vision_profile_84 = 5`. The
+  `X-SS-Dynamic-HDR` wire value is 5; do not renumber the existing values 0-4.
+  Add `"dolby_vision_profile_84"` to `to_string`.
+- Do not add a `dynamic_hdr_fallback_e` value. Extend
+  `colorspace_unsupported` to mean "PQ required for an HLG session, or HLG
+  required for a PQ session."
+- For `automatic` or `dolby_vision` preference, evaluate these selection rules
+  in order:
+  1. A failed HEVC gate returns `codec_unsupported`, unchanged.
+  2. `dynamic_range_mode == 1` with the 8.1 capability selects **8.1**,
+     preserving current priority.
+  3. `dynamic_range_mode == 2` with the 8.4 capability and without the 8.1
+     capability selects **8.4**. Advertising both 8.1 and 8.4 while requesting
+     HLG is contradictory and falls back with `colorspace_unsupported`: the
+     8.1 bit means the client should expect PQ. A client requesting HLG must
+     omit the 8.1 bit.
+  4. Active per-app RTX HDR fails the 8.4 gate with
+     `colorspace_unsupported`.
+  5. The direct-surface gate is unchanged.
+- Make `dynamic_hdr_selection_t::dolby_vision_active()` true for either 8.1 or
+  8.4.
+- Add `1u << 4` to the `known_bits` mask.
 
-### 3.2 编码会话（video.cpp / video_dolby_vision）
+### 3.2 Encoding session (`video.cpp` / `video_dolby_vision`)
 
-- 注入门控现状：`协商为 DV && 分析器可用 && PQ`。改为按协商格式分派：
-  - 8.1 → colorspace 必须 PQ（现状）
-  - 8.4 → colorspace 必须 HLG（dynamicRange=2 的 bt2020hlg P010）
-- RPU 写入器零改动：L1（场景光域 min/mid/max）、L5、L6 与基层 EOTF 无关；
-  主机显示原始 mastering 元数据配 L6 的路径直接复用。
-- 注入位置不变：编码输出侧按 encoder frame_index 注入 UNSPEC 62。
-- 会话日志：`NVENC: Dolby Vision Profile 8.4 active (HLG base layer, mastering peak N nits)`。
+- The current injection gate requires negotiated DV, an available analyzer,
+  and PQ. Dispatch by negotiated format instead:
+  - 8.1 requires a PQ colorspace, as it does now.
+  - 8.4 requires an HLG colorspace: `dynamicRange=2` with `bt2020hlg` P010.
+- The RPU writer does not change. L1 scene-light min/mid/max, L5, and L6 are
+  independent of the base-layer EOTF. Reuse the path that configures L6 from
+  the host display's original mastering metadata.
+- Keep the injection position unchanged: inject the UNSPEC 62 NAL on the
+  encoder output side using the encoder `frame_index`.
+- Session log example:
+  `NVENC: Dolby Vision Profile 8.4 active (HLG base layer, mastering peak N nits)`.
 
-### 3.3 信号
+### 3.3 Signaling
 
-8.4 会话 colorspace = bt2020hlg、10-bit，走现有 HLG 编码路径；
-HDR10+/Vivid SEI：8.4 时 HDR10+ 需 PQ 不再并行发送（Dual Carry 决策仅适用 8.1/PQ），
-Vivid HLG 可保留（vivid_hlg 枚举已存在，若分析器可用）。
+An 8.4 session uses the existing 10-bit `bt2020hlg` encoding path. HDR10+ and
+Vivid SEI handling differs: HDR10+ requires PQ and must not be sent in parallel
+for 8.4. The Dual Carry decision applies only to 8.1/PQ. Vivid HLG may remain
+available through the existing `vivid_hlg` enum when the analyzer is available.
 
-## 4. 客户端侧（moonlight-common-c fork + moonlight-vplus）
+## 4. Client side (`moonlight-common-c` fork and `moonlight-vplus`)
 
-- common-c（mic 分支续）：能力位常量 `DYNAMIC_HDR_CAPS_DOLBY_VISION_84 = 1<<4` 透传；
-  `LiGetNegotiatedDynamicHdrFormat()` 无需感知语义（int 直传）。
-- vplus：
-  - 能力探测：在现有 DvheSt 严格探测外，追加 HLG-BL 判定 —— 设备 DV 解码器接受
-    dvhe.08.04（MediaCodec `video/dolby-vision` + HLG signaled 内容）。探测结果驱动
-    只报 8.4 位还是同时报 8.1。
-  - 请求 HLG 的 DV 选项被用户选中时：dynamicRangeMode=2 + 只报 8.4 位。
-  - HDR 模式 UI：DV 8.1 条目旁新增 "DV 8.4"（仅探测通过时显示，沿用
-    StreamSettings 动态重建 list_hdr_mode 的既有逻辑，注意 foundDolbyVision 分支）。
-  - 解码器路由 #538 逻辑复用：协商 5 时同样配 `video/dolby-vision` + DvheSt。
-- 合并顺序：common-c → vplus（与 8.1 相同）。
+- In the continuing common-c microphone branch, pass through the capability
+  bit `DYNAMIC_HDR_CAPS_DOLBY_VISION_84 = 1 << 4`.
+  `LiGetNegotiatedDynamicHdrFormat()` can continue passing the integer without
+  interpreting it.
+- In V+:
+  - Extend the strict existing `DvheSt` capability probe with an HLG-BL check:
+    verify that the device's DV decoder accepts `dvhe.08.04` through
+    `video/dolby-vision` with HLG-signaled content. The result determines
+    whether the client advertises only 8.4 or both 8.1 and 8.4.
+  - When the user selects the HLG DV option, request `dynamicRangeMode=2` and
+    advertise only the 8.4 bit.
+  - Add "DV 8.4" beside DV 8.1 in the HDR-mode UI, visible only when the probe
+    succeeds. Reuse the existing `StreamSettings` logic that rebuilds
+    `list_hdr_mode`, including the `foundDolbyVision` branch.
+  - Reuse the decoder routing from issue 538: negotiated format 5 also uses
+    `video/dolby-vision` plus `DvheSt`.
+- Merge in the same order as 8.1: common-c, then V+.
 
-## 5. 阶段与判定
+## 5. Phases and gates
 
-| 阶段 | 内容 | Go/No-Go 判定 |
+| Phase | Work | Go/No-Go gate |
 |---|---|---|
-| 0 | RPU 8.4 变体 dovi_tool 2.3.3 验证：HLG BL 会话参数生成 RPU bin，`info -s`/`info -f` 解析 + CRC 往返通过；确认 RPU 头无需按基层改写 | 通过才进 Phase 1 |
-| 1 | 主机协商层 + 单测（优先级/矛盾上报/RTX HDR 互斥/旧客户端兼容） | CI 绿 |
-| 2 | 主机编码注入 + 全量 test_sunshine | CI 绿 |
-| 3 | common-c + vplus 客户端 | 编译 + 探测日志 |
-| 4 | 真机端到端：仅 8.4 设备点亮，logcat `negotiated:5` + DV 解码器路由生效；8.1 设备回归不受影响 | 里程碑 |
+| 0 | Validate an RPU 8.4 variant with dovi_tool 2.3.3: generate an RPU binary for HLG-BL session parameters, parse it with `info -s` and `info -f`, verify CRC round-trip, and confirm that the RPU header does not require base-layer-specific rewriting | Proceed to Phase 1 only if this passes |
+| 1 | Host negotiation layer and unit tests for priority, contradictory advertisements, RTX HDR exclusion, and old-client compatibility | CI passes |
+| 2 | Host encoder injection and full `test_sunshine` suite | CI passes |
+| 3 | common-c and V+ client changes | Build succeeds and probe logs are correct |
+| 4 | Device end-to-end test: activate DV on an 8.4-only device, observe `negotiated:5` in logcat and the DV decoder route, and verify no regression on 8.1 devices | Milestone |
 
-### Phase 0 结论（2026-09-01，Go ✅）
+### Phase 0 result (2026-09-01: Go)
 
-用现有写入器（golden 配置：peak 1000/min 1/cll 800/fall 320/l5 16,16 + L1 9,3200,1500，
-scene_refresh 两变体）生成 RPU bin，dovi_tool 2.3.3 验证：
+The existing writer generated RPU binaries with the golden configuration
+(peak 1000, min 1, CLL 800, FALL 320, L5 16/16, and L1 9/3200/1500) for both
+`scene_refresh` variants. dovi_tool 2.3.3 verified the following:
 
-- `info -s` 两变体均解析通过：Profile 8 / CM v2.9 / L1+L5+L6 完整。RPU 本身不含
-  基层 EOTF 信息，"Profile: 8" 不区分 8.1/8.4。
-- `editor` mode 4（dovi_tool 的 8.1→8.4 转换）逐字段对比：**只重写 rpu_data_mapping
-  曲线（PQ 恒等映射 → HLG 域 8 段补偿曲线）与 CRC，L1/L5/L6 逐位不变** —— 该转换
-  面向"PQ 素材转码为 HLG"的场景，补偿的是像素域转换。
-- 我们的场景是**原生 HLG 编码**（分析器统计直接经 HLG OETF 出片），不存在需要补偿
-  的域转换，恒等映射 + L1/L5/L6 正是原生 8.4 RPU 的正确形态。
-- **结论：RPU 写入器零改动**；8.4 会话直接复用 `rpu_generator_t` 与注入链路。
-  最终正确性由 Phase 4 真机（DV 引擎实际映射行为）收口。
+- `info -s` parsed both variants as complete Profile 8 / CM v2.9 RPUs with
+  L1, L5, and L6. The RPU itself contains no base-layer EOTF information;
+  "Profile: 8" does not distinguish 8.1 from 8.4.
+- A field-by-field comparison after `editor` mode 4, dovi_tool's 8.1-to-8.4
+  conversion, showed that it **only rewrites the `rpu_data_mapping` curve**
+  from a PQ identity mapping to an eight-segment HLG-domain compensation curve,
+  plus the CRC. L1, L5, and L6 remain bit-identical. That conversion targets
+  PQ-source transcoding to HLG and compensates for the pixel-domain conversion.
+- This implementation uses **native HLG encoding**: analyzer statistics pass
+  directly through the HLG OETF. There is no domain conversion to compensate,
+  so the identity mapping plus L1, L5, and L6 is the correct native 8.4 RPU.
+- **Conclusion: the RPU writer does not change.** An 8.4 session reuses
+  `rpu_generator_t` and the injection path directly. Phase 4 device testing
+  closes final correctness by observing actual DV-engine mapping behavior.
 
-## 6. 风险
+## 6. Risks
 
-- **RPU 对 HLG BL 的兼容性**（Phase 0 消解）：手写模板基于 8.1 实测 golden；
-  若 dovi_tool 显示 HLG 源需要不同的 mapping 头，Phase 0 即停，重新评估。
-- **客户端矛盾上报**（8.1/8.4 同报 + 请求 HLG）：主机按 colorspace_unsupported
-  拒绝 8.4，HLG 会话直落**无动态元数据的普通 HLG**（HDR10+ 需 PQ，无中转），
-  行为保守不炸。
-- **旧主机 + 新客户端**：新客户端报 1<<4 位，旧主机 mask off，协商行为同现状。
-- **真机覆盖**：Phase 4 需要一台"仅支持 8.4"的目标设备做正例；8.1 设备回归只需现有
-  OPPO PKJ110 / Sony 电视。
+- **RPU compatibility with an HLG BL**, resolved by Phase 0: the handwritten
+  template was based on a verified 8.1 golden stream. If dovi_tool had shown
+  that an HLG source required a different mapping header, Phase 0 would have
+  stopped and forced a redesign.
+- **Contradictory client advertisement**, meaning both 8.1 and 8.4 plus an HLG
+  request: the host rejects 8.4 with `colorspace_unsupported`, leaving the HLG
+  session as ordinary HLG without dynamic metadata. HDR10+ requires PQ, so
+  there is no intermediate fallback. This conservative behavior avoids invalid
+  output.
+- **Old host with a new client**: the client advertises bit `1 << 4`; an old
+  host masks it off and retains current negotiation behavior.
+- **Device coverage**: Phase 4 requires an 8.4-only target device as a positive
+  case. Existing OPPO PKJ110 and Sony TV coverage is sufficient for the 8.1
+  regression case.
 
-## 7. 首发规格
+## 7. Initial release specification
 
-- 协商格式：`dolby_vision_profile_84`（wire 5）
-- 编码：HEVC Main10、bt2020hlg、P010、RPU 注入同 8.1 链路
-- 互斥：app rtx-hdr=on 时 8.4 不协商
-- 降级链：任一门失败直落当前 HLG 无动态元数据状态（HLG 会话无 HDR10+ 中转）
+- Negotiated format: `dolby_vision_profile_84`, wire value 5.
+- Encoding: HEVC Main10, `bt2020hlg`, P010, with the 8.1 RPU injection path.
+- Exclusion: do not negotiate 8.4 when per-app `rtx-hdr=on`.
+- Fallback: any failed gate falls directly to the current HLG session without
+  dynamic metadata. An HLG session has no HDR10+ intermediate fallback.

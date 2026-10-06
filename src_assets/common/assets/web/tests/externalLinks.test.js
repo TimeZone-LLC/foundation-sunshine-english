@@ -12,16 +12,16 @@ test('legal resources target the current Foundation repository', () => {
 
   assert.equal(
     resources.license,
-    'https://github.com/AlkaidLab/foundation-sunshine/blob/master/LICENSE',
+    'https://github.com/TimeZone-LLC/foundation-sunshine-english/blob/master/LICENSE',
   )
   assert.equal(
     resources['third-party-notice'],
-    'https://github.com/AlkaidLab/foundation-sunshine/blob/master/NOTICE',
+    'https://github.com/TimeZone-LLC/foundation-sunshine-english/blob/master/NOTICE',
   )
 })
 
 test('external URL allowlist matches the control panel command', () => {
-  assert.equal(isAllowedExternalUrl('https://www.alkaidlab.com/'), true)
+  assert.equal(isAllowedExternalUrl('https://github.com/TimeZone-LLC/foundation-sunshine-english'), true)
   assert.equal(isAllowedExternalUrl('http://127.0.0.1/'), true)
   assert.equal(isAllowedExternalUrl('ms-windows-store://pdp/?productid=example'), true)
   assert.equal(isAllowedExternalUrl('file:///C:/Windows/System32'), false)
@@ -42,8 +42,14 @@ test('opens external URLs through the current Tauri command', async () => {
     },
   }
 
-  assert.equal(await openExternalUrl('https://www.alkaidlab.com/', windowObject), true)
-  assert.deepEqual(calls, [['open_external_url', { url: 'https://www.alkaidlab.com/' }]])
+  assert.equal(
+    await openExternalUrl('https://github.com/TimeZone-LLC/foundation-sunshine-english', windowObject),
+    true,
+  )
+  assert.deepEqual(calls, [[
+    'open_external_url',
+    { url: 'https://github.com/TimeZone-LLC/foundation-sunshine-english' },
+  ]])
 })
 
 test('rejects unsupported URLs before invoking Tauri', async () => {
@@ -69,7 +75,7 @@ test('routes external anchor clicks through the Tauri command', async () => {
   let prevented = false
   const calls = []
   const anchor = {
-    href: 'https://www.alkaidlab.com/',
+    href: 'https://github.com/TimeZone-LLC/foundation-sunshine-english',
     hasAttribute: () => false,
   }
   const documentObject = {
@@ -103,7 +109,10 @@ test('routes external anchor clicks through the Tauri command', async () => {
   await Promise.resolve()
 
   assert.equal(prevented, true)
-  assert.deepEqual(calls, [['open_external_url', { url: 'https://www.alkaidlab.com/' }]])
+  assert.deepEqual(calls, [[
+    'open_external_url',
+    { url: 'https://github.com/TimeZone-LLC/foundation-sunshine-english' },
+  ]])
   dispose()
 })
 

@@ -7,7 +7,7 @@ Sunshine binaries are built using [CMake](https://cmake.org) and requires `cmake
 
 #### Linux
 Dependencies vary depending on the distribution. You can reference our
-[linux_build.sh](https://github.com/LizardByte/Sunshine/blob/master/scripts/linux_build.sh) script for a list of
+[linux_build.sh](https://github.com/TimeZone-LLC/foundation-sunshine-english/blob/master/scripts/linux_build.sh) script for a list of
 dependencies we use in Debian-based and Fedora-based distributions. Please submit a PR if you would like to extend the
 script to support other distributions.
 
@@ -108,8 +108,8 @@ binding required by Rolldown.
 Ensure [git](https://git-scm.com) is installed on your system, then clone the repository using the following command:
 
 ```bash
-git clone https://github.com/AlkaidLab/foundation-sunshine.git --recurse-submodules
-cd foundation-sunshine
+git clone https://github.com/TimeZone-LLC/foundation-sunshine-english.git --recurse-submodules
+cd foundation-sunshine-english
 mkdir build
 ```
 
@@ -121,7 +121,7 @@ ninja -C build
 ```
 
 @tip{Available build options can be found in
-[options.cmake](https://github.com/LizardByte/Sunshine/blob/master/cmake/prep/options.cmake).}
+[options.cmake](https://github.com/TimeZone-LLC/foundation-sunshine-english/blob/master/cmake/prep/options.cmake).}
 
 ### Package
 

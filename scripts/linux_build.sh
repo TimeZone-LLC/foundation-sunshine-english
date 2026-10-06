@@ -3,9 +3,9 @@ set -e
 
 # Default value for arguments
 appimage_build=0
-publisher_name="qiin2333"
-publisher_website="https://alkaidlab.com"
-publisher_issue_url="https://github.com/qiin2333/Sunshine/issues"
+publisher_name="TimeZone LLC"
+publisher_website="https://github.com/TimeZone-LLC/foundation-sunshine-english"
+publisher_issue_url="https://github.com/TimeZone-LLC/foundation-sunshine-english/issues"
 skip_cleanup=0
 skip_cuda=0
 skip_libva=0

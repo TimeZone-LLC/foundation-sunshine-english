@@ -65,7 +65,7 @@
 
         <!-- 步骤内容 -->
         <div class="step-content">
-          <!-- 步骤 1: 选择显卡 -->
+          <!-- Step 1: Select the graphics adapter -->
           <div v-if="currentStep === 1">
             <h3 class="mb-4">{{ $t('setup.step2_description') }}</h3>
             
@@ -93,7 +93,7 @@
               <div class="form-text mt-3 adapter-hint-box" v-html="$t('config.adapter_name_desc_windows')"></div>
           </div>
 
-          <!-- 步骤 2: 选择串流显示器 -->
+          <!-- Step 2: Select the streaming display -->
           <div v-else-if="currentStep === 2">
             <h3 class="mb-4">{{ $t('setup.step1_description') }}</h3>
             <p class="vdd-intro-text mb-4">{{ $t('setup.step1_vdd_intro') }}</p>
@@ -154,7 +154,7 @@
             </div>
           </div>
 
-          <!-- 步骤 3: 选择显示器组合策略 -->
+          <!-- Step 3: Select the display arrangement policy -->
           <div v-else-if="currentStep === 3">
             <h3 class="mb-4">{{ $t('setup.step3_description') }}</h3>
             
@@ -210,7 +210,7 @@
               </div>
           </div>
 
-          <!-- 步骤 4: 完成 -->
+          <!-- Step 4: Finish -->
           <div v-else-if="currentStep === 4">
             <div>
               <div class="alert alert-danger" v-if="saveError">

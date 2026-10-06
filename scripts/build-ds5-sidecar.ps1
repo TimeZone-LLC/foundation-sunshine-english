@@ -2,7 +2,7 @@ param(
     [string]$OutputDirectory = "build/ds5-sidecar-runtime",
     [string]$PackageCache = "build/ds5-sidecar-cache",
     [string]$ReleaseTag = "",
-    [string]$Repository = "AlkaidLab/foundation-sunshine"
+    [string]$Repository = "TimeZone-LLC/foundation-sunshine-english"
 )
 
 $ErrorActionPreference = 'Stop'

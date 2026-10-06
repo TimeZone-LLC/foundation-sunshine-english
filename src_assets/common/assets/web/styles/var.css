@@ -62,20 +62,16 @@
   --border-radius-pill: 0;
   --border-radius-circle: 0;
 
-  /* Only colour and border may animate, and only briefly. */
+  /* Only background, text and border colour may animate, and only briefly. */
   --transition-default: background-color 120ms ease, color 120ms ease,
-    border-color 120ms ease, outline-color 120ms ease;
+    border-color 120ms ease;
 
   /* ---------------------------------------------------------------------
-   * Typography - self-hosted Geist, with the full fallback stack. The CJK
-   * faces stay in the sans stack because the UI is localised.
+   * Typography - self-hosted Geist with the canonical system fallback stack.
    * ------------------------------------------------------------------- */
-  --font-family-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Noto Sans SC',
-    'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
+  --font-family-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-family-base: var(--font-family-sans);
-  --font-family-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
-    'Cascadia Mono', 'Liberation Mono', monospace;
+  --font-family-mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-mono: var(--font-family-mono);
   --font-sans: var(--font-family-sans);
   --bs-body-font-family: var(--font-family-base);
@@ -179,14 +175,14 @@
    * Signal colours. Muted, not neon - colour appears only where it carries
    * meaning a user must not miss.
    * ------------------------------------------------------------------- */
-  --ui-success: #2e7d55;
-  --ui-success-rgb: 46, 125, 85;
+  --ui-success: var(--text-muted);
+  --ui-success-rgb: 92, 92, 102;
   --ui-warning: #a06022;
   --ui-warning-rgb: 160, 96, 34;
   --ui-danger: #b3352c;
   --ui-danger-rgb: 179, 53, 44;
-  --ui-info: #0b6bb0;
-  --ui-info-rgb: 11, 107, 176;
+  --ui-info: var(--text-muted);
+  --ui-info-rgb: 92, 92, 102;
 
   /* Foreground on a solid signal fill: in light mode every signal is dark. */
   --ui-success-contrast: #ffffff;
@@ -299,14 +295,14 @@
   --ui-accent-secondary: var(--text-muted);
 
   /* Signal hues are lifted so they read on a near-black surface. */
-  --ui-success: #4ea87b;
-  --ui-success-rgb: 78, 168, 123;
+  --ui-success: var(--text-muted);
+  --ui-success-rgb: 154, 154, 164;
   --ui-warning: #d0a054;
   --ui-warning-rgb: 208, 160, 84;
   --ui-danger: #e05a52;
   --ui-danger-rgb: 224, 90, 82;
-  --ui-info: #4a9ede;
-  --ui-info-rgb: 74, 158, 222;
+  --ui-info: var(--text-muted);
+  --ui-info-rgb: 154, 154, 164;
 
   /* On a lifted hue the readable foreground is the page black. */
   --ui-success-contrast: #0a0a0b;

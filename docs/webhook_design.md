@@ -183,8 +183,7 @@ Content-Type: application/json
 - `webhook_retries` 可省略，默认 0，范围 0–3，表示失败后的额外重试次数。
 - 测试使用生产 transport 和相同 payload 外层结构。
 - 测试事件固定为 `event_id=-1`、`event_type=webhook_test`。
-- 测试内容与正式通知使用相同的语言规则：`zh`、`zh_TW` 使用中文，
-  其他 Sunshine locale 使用英文。
+- Test and production notifications always use English.
 - 配置服务线程只保留异步响应，不同步等待远端网络。
 
 响应：
@@ -297,9 +296,7 @@ X-Component: Sunshine_Foundation_Component
 Markdown 内容最大 4096 字节。超长内容在 UTF-8 字符边界处截断并追加省略号。
 时间使用 Sunshine 主机的系统时区，格式固定为 `YYYY-MM-DD HH:mm:ss.xxx`。
 
-测试按钮使用相同外层结构。语言读取 Sunshine 本次启动时加载的
-`config::sunshine.locale`；修改主配置语言后需要重启 Sunshine 才会影响
-Webhook。英文 Markdown payload 为：
+The test button uses the same outer structure. Webhook content is always English. The Markdown payload is:
 
 ```json
 {
@@ -307,20 +304,6 @@ Webhook。英文 Markdown payload 为：
   "event_type": "webhook_test",
   "markdown": {
     "content": "**Sunshine Webhook Test**\n\n<font color=\"info\">**Test Notification**</font>\n\n>Result: <font color=\"comment\">Webhook endpoint reached</font>\n>Hostname: <font color=\"comment\">sunshine-host</font>\n>Event Type: <font color=\"comment\">webhook_test</font>\n>Sample Application: <font color=\"comment\">Sunshine Test Application</font>\n>Sample Client: <font color=\"comment\">Sunshine Test Client</font>\n>Sample Stream: <font color=\"comment\">1920x1080, 60 FPS, Audio Enabled</font>\n>Time: <font color=\"comment\">2026-07-27 09:20:29.979</font>\n"
-  },
-  "msgtype": "markdown"
-}
-```
-
-中文 payload 保持 `event_id`、`event_type`、`msgtype` 等协议字段不变，
-仅翻译接收端展示的文本：
-
-```json
-{
-  "event_id": -1,
-  "event_type": "webhook_test",
-  "markdown": {
-    "content": "**Sunshine Webhook 测试**\n\n<font color=\"info\">**测试通知**</font>\n\n>结果: <font color=\"comment\">Webhook 接收地址已收到测试请求</font>\n>主机名: <font color=\"comment\">sunshine-host</font>\n>事件类型: <font color=\"comment\">webhook_test</font>\n>示例应用: <font color=\"comment\">Sunshine 测试应用</font>\n>示例客户端: <font color=\"comment\">Sunshine 测试客户端</font>\n>示例串流: <font color=\"comment\">1920x1080，60 FPS，音频已启用</font>\n>时间: <font color=\"comment\">2026-07-27 09:20:29.979</font>\n"
   },
   "msgtype": "markdown"
 }

@@ -165,7 +165,7 @@ jobs:
 
       - name: Verify HDR build source
         id: hdr_source
-        if: github.repository == 'AlkaidLab/foundation-sunshine'
+        if: github.repository == 'TimeZone-LLC/foundation-sunshine-english'
         shell: bash
         run: |
           git fetch --no-tags origin master
@@ -179,9 +179,9 @@ jobs:
           RTX_VIDEO_SDK_URL: ${{ steps.hdr_source.outputs.trusted == 'true' && secrets.RTX_VIDEO_SDK_URL || '' }}
           RTX_VIDEO_SDK_TOKEN: ${{ steps.hdr_source.outputs.trusted == 'true' && secrets.DRIVER_DOWNLOAD_TOKEN || '' }}
           RTX_VIDEO_NGX_APPLICATION_ID: ${{ steps.hdr_source.outputs.trusted == 'true' && secrets.RTX_VIDEO_NGX_APPLICATION_ID || '' }}
-          SUNSHINE_RTX_HDR: ${{ github.repository == 'AlkaidLab/foundation-sunshine' && 'ON' || 'OFF' }}
+          SUNSHINE_RTX_HDR: ${{ github.repository == 'TimeZone-LLC/foundation-sunshine-english' && 'ON' || 'OFF' }}
           BRANCH: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.ref }}
-          BUILD_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.release-tag }}.杂鱼
+          BUILD_VERSION: ${{ github.event_name == 'release' && github.event.release.tag_name || github.event.inputs.release-tag }}
           COMMIT: ${{ steps.source.outputs.commit }}
         run: |
           # add Rust to PATH for Tauri GUI build
@@ -198,8 +198,8 @@ jobs:
             -DSUNSHINE_RTX_HDR="$SUNSHINE_RTX_HDR" \
             -DSUNSHINE_ASSETS_DIR=assets \
             -DSUNSHINE_PUBLISHER_NAME='${{ github.repository_owner }}' \
-            -DSUNSHINE_PUBLISHER_WEBSITE='https://github.com/qiin2333/Sunshine-Foundation' \
-            -DSUNSHINE_PUBLISHER_ISSUE_URL='https://github.com/qiin2333/Sunshine-Foundation/issues'
+            -DSUNSHINE_PUBLISHER_WEBSITE='https://github.com/TimeZone-LLC/foundation-sunshine-english' \
+            -DSUNSHINE_PUBLISHER_ISSUE_URL='https://github.com/TimeZone-LLC/foundation-sunshine-english/issues'
 
       - name: Build Windows
         shell: msys2 {0}

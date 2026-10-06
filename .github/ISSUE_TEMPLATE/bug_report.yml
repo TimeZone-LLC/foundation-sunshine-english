@@ -1,0 +1,75 @@
+name: Bug report
+description: Report a reproducible host or control-panel defect
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. Include enough detail to reproduce the problem and remove secrets from logs before attaching them.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Video or encoding
+        - HDR or display management
+        - Audio or microphone
+        - Controller or input
+        - Pairing or networking
+        - Web UI or control panel
+        - Build or packaging
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem
+      description: Describe what happened and what you expected.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Configure ...
+        2. Connect ...
+        3. Observe ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Foundation Sunshine version or commit
+    validations:
+      required: true
+
+  - type: input
+    id: platform
+    attributes:
+      label: Host operating system and hardware
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste the smallest useful excerpt or attach a sanitized log file.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I searched for an existing report of this problem.
+          required: true
+        - label: I removed passwords, tokens, addresses, and other sensitive data from the attached material.
+          required: true

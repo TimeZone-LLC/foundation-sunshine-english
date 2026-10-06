@@ -22,8 +22,8 @@
 # doxygen -x_noenv [configFile]
 
 # project metadata
-DOCSET_BUNDLE_ID = dev.lizardbyte.Sunshine
-DOCSET_PUBLISHER_ID = dev.lizardbyte.Sunshine.documentation
+DOCSET_BUNDLE_ID = com.timezone.FoundationSunshine
+DOCSET_PUBLISHER_ID = com.timezone.FoundationSunshine.documentation
 PROJECT_BRIEF = "Self-hosted game stream host for Moonlight."
 PROJECT_ICON = ../sunshine.ico
 PROJECT_LOGO = ../sunshine.png

@@ -527,7 +527,7 @@ sh -c "displayplacer "id:&lt;screenId&gt; res:${SUNSHINE_CLIENT_WIDTH}x${SUNSHIN
             </div>
             <div class="modal-footer">
               <a
-                href="https://docs.lizardbyte.dev/projects/sunshine/latest/md_docs_2app__examples.html"
+                href="https://github.com/TimeZone-LLC/foundation-sunshine-english/blob/master/docs/app_examples.md"
                 target="_blank"
                 rel="noopener noreferrer"
                 class="btn btn-outline-primary"

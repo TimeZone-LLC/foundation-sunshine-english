@@ -63,8 +63,8 @@
                   <!-- New Credentials Section -->
                   <div class="col-12">
                     <div class="section-header d-flex align-items-center mb-3">
-                      <div class="section-icon section-icon-success me-2">
-                        <Icon name="star" :size="20" icon-class="text-success" />
+                      <div class="section-icon me-2">
+                        <Icon name="key" :size="20" icon-class="text-muted" />
                       </div>
                       <h6 class="mb-0 fw-semibold">{{ $t('password.new_creds') }}</h6>
                     </div>

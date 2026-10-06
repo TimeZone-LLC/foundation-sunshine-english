@@ -243,7 +243,7 @@ onBeforeUnmount(() => {
         class="alert alert-warning mt-2 mb-0"
         role="note"
       >
-        <i class="fas fa-info-circle me-2" aria-hidden="true"></i>
+        <i class="fas fa-exclamation-triangle me-2" aria-hidden="true"></i>
         {{ $t('config.gamepad_ds5_component_hint_windows') }}
       </div>
     </div>

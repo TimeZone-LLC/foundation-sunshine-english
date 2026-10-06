@@ -7,11 +7,11 @@ Sunshine 包含一个现代化的 Web 控制界面，基于 Vue 3 和 Compositio
 ## 🛠️ 技术栈
 
 - **前端框架**: Vue 3 + Composition API
-- **运行环境**: Node.js 26.7+
-- **构建工具**: Vite 8
-- **打包器**: Rolldown
+- **Runtime**: Node.js 26.7+
+- **Build tool**: Vite 8
+- **Bundler**: Rolldown
 - **UI 组件**: Bootstrap 5
-- **图标库**: Font Awesome 7
+- **Icon library**: Font Awesome 7
 - **国际化**: Vue-i18n 11 (Composition API 模式)
 - **拖拽功能**: Vuedraggable 4
 - **模块系统**: ES Modules (`"type": "module"`)
@@ -22,7 +22,7 @@ Sunshine 包含一个现代化的 Web 控制界面，基于 Vue 3 和 Compositio
 
 ### 1. 安装依赖
 
-请先安装 `.node-version` 中指定的 Node.js 版本，再执行：
+Install the Node.js version specified in `.node-version`, then run:
 
 ```bash
 npm install
@@ -53,7 +53,7 @@ npm run preview:build
 npm run lint:webui
 ```
 
-> **注意**: Vite 8 默认使用 Rolldown 打包器。所有构建命令都沿用同一套配置。
+> **Note**: Vite 8 uses Rolldown by default. All build commands share the same configuration.
 
 ### 3. 代码静态检查
 
