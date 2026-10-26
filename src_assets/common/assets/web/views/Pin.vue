@@ -1,81 +1,77 @@
 <template>
   <div class="pin-page">
     <Navbar />
-    <div id="content" class="container">
-      <h1 class="mt-2 mb-4 text-center page-title">{{ $t('pin.pin_pairing') }}</h1>
+    <main id="content" class="pin-content">
+      <h1 class="pin-page-title page-title">{{ $t('pin.pin_pairing') }}</h1>
 
-      <!-- QR Code Pairing -->
-      <div class="card mb-4 qr-pair-card">
-        <div class="card-body text-center">
-          <h5 class="card-title mb-3">
-            <i class="fas fa-qrcode me-2"></i>{{ $t('pin.qr_pairing') }}
-          </h5>
-          <p class="text-muted mb-3">{{ $t('pin.qr_pairing_desc') }}</p>
-          <div class="alert alert-danger d-flex align-items-start mb-3" style="font-size: 0.85rem;">
-            <i class="fas fa-exclamation-triangle me-2 mt-1"></i>
+      <div class="pairing-methods">
+        <!-- QR Code Pairing -->
+        <section class="pairing-section qr-pairing-section" aria-labelledby="qr-pairing-title">
+          <div class="pairing-section-heading">
+            <div>
+              <h2 id="qr-pairing-title"><i class="fas fa-qrcode" aria-hidden="true"></i>{{ $t('pin.qr_pairing') }}</h2>
+              <p>{{ $t('pin.qr_pairing_desc') }}</p>
+            </div>
+          </div>
+
+          <div class="pairing-notice pairing-notice--danger" role="note">
+            <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
             <span>{{ $t('pin.qr_pairing_warning') }}</span>
           </div>
 
           <!-- QR Code Display -->
           <div v-if="qrActive" class="qr-display">
-            <div class="qr-image-wrapper mb-3">
+            <div class="qr-image-wrapper">
               <img :src="qrDataUrl" alt="QR Code" class="qr-image" />
             </div>
             <div class="qr-info">
-              <div class="mb-2">
-                <span class="text-muted">PIN:</span>
-                <span class="fw-bold fs-4 ms-2 font-monospace">{{ qrPin }}</span>
+              <div class="qr-pin-row">
+                <span>{{ $t('navbar.pin') }}</span>
+                <strong>{{ qrPin }}</strong>
               </div>
-              <div class="mb-3">
-                <span class="badge" :class="qrRemaining <= 30 ? 'bg-warning text-dark' : 'bg-info'">
-                  <i class="fas fa-clock me-1"></i>
-                  {{ $t('pin.qr_expires_in', { seconds: qrRemaining }) }}
-                </span>
+              <div class="qr-expiry" :class="{ 'is-expiring': qrRemaining <= 30 }">
+                <i class="fas fa-clock" aria-hidden="true"></i>
+                {{ $t('pin.qr_expires_in', { seconds: qrRemaining }) }}
               </div>
-            </div>
-            <div class="d-flex gap-2 justify-content-center">
-              <button class="btn btn-outline-primary btn-sm" @click="generateQrCode" :disabled="qrLoading">
-                <i class="fas fa-sync-alt me-1"></i>{{ $t('pin.qr_refresh') }}
-              </button>
-              <button class="btn btn-outline-secondary btn-sm" @click="cancelQrCode">
-                <i class="fas fa-times me-1"></i>{{ $t('_common.cancel') }}
-              </button>
+              <div class="pairing-actions">
+                <button class="btn btn-outline-primary btn-sm" @click="generateQrCode" :disabled="qrLoading">
+                  <i class="fas fa-sync-alt me-1" aria-hidden="true"></i>{{ $t('pin.qr_refresh') }}
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" @click="cancelQrCode">
+                  <i class="fas fa-times me-1" aria-hidden="true"></i>{{ $t('_common.cancel') }}
+                </button>
+              </div>
             </div>
           </div>
 
           <!-- Pairing Success -->
-          <div v-else-if="qrPaired" class="qr-success">
-            <div class="mb-3">
-              <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
-            </div>
-            <h5 class="text-success mb-3">{{ $t('pin.qr_paired_success') }}</h5>
+          <div v-else-if="qrPaired" class="pairing-status-row pairing-status-row--success" role="status">
+            <i class="fas fa-check-circle" aria-hidden="true"></i>
+            <span>{{ $t('pin.qr_paired_success') }}</span>
             <button class="btn btn-outline-primary btn-sm" @click="qrPaired = false">
               {{ $t('_common.ok') }}
             </button>
           </div>
 
           <!-- Generate Button -->
-          <div v-else>
-            <div v-if="qrError" class="alert alert-danger mb-3">{{ qrError }}</div>
+          <div v-else class="qr-generate-row">
+            <div v-if="qrError" class="pairing-status-row pairing-status-row--danger" role="alert">
+              <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+              <span>{{ qrError }}</span>
+            </div>
             <button class="btn btn-primary" @click="generateQrCode" :disabled="qrLoading">
               <span v-if="qrLoading" class="spinner-border spinner-border-sm me-2"></span>
-              <i v-else class="fas fa-qrcode me-2"></i>
+              <i v-else class="fas fa-qrcode me-2" aria-hidden="true"></i>
               {{ $t('pin.qr_generate') }}
             </button>
           </div>
-        </div>
-      </div>
+        </section>
 
-      <div class="divider-text mb-4">
-        <span>{{ $t('pin.or_manual_pin') }}</span>
-      </div>
-
-      <section class="card manual-pairing-card mb-4" aria-labelledby="manual-pairing-title">
-        <div class="card-body">
+        <section class="pairing-section manual-pairing-section" aria-labelledby="manual-pairing-title">
           <div class="pairing-section-heading">
             <div>
-              <h2 id="manual-pairing-title" class="h5 mb-1">{{ $t('pin.pending_requests') }}</h2>
-              <p class="text-muted mb-0">{{ $t('pin.pending_requests_desc') }}</p>
+              <h2 id="manual-pairing-title">{{ $t('pin.pending_requests') }}</h2>
+              <p>{{ $t('pin.pending_requests_desc') }}</p>
             </div>
             <button
               type="button"
@@ -153,73 +149,72 @@
             </div>
           </form>
 
-          <div class="alert alert-warning mt-3 mb-0">
-            <b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}
+          <div class="pairing-notice pairing-notice--warning" role="note">
+            <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+            <span><b>{{ $t('_common.warning') }}</b> {{ $t('pin.warning_msg') }}</span>
           </div>
-          <div v-if="pairingStatus === 'success'" class="alert alert-success mt-3 mb-0" role="status">
-            {{ $t('pin.pairing_success') }}
+          <div v-if="pairingStatus === 'success'" class="pairing-status-row pairing-status-row--success" role="status">
+            <i class="fas fa-check-circle" aria-hidden="true"></i><span>{{ $t('pin.pairing_success') }}</span>
           </div>
-          <div v-else-if="pairingStatus === 'cancelled'" class="alert alert-secondary mt-3 mb-0" role="status">
-            {{ $t('pin.pairing_cancelled') }}
+          <div v-else-if="pairingStatus === 'cancelled'" class="pairing-status-row" role="status">
+            <i class="fas fa-ban" aria-hidden="true"></i><span>{{ $t('pin.pairing_cancelled') }}</span>
           </div>
-          <div v-else-if="pairingStatus === 'invalid'" class="alert alert-danger mt-3 mb-0" role="alert">
-            {{ $t('pin.pairing_invalid') }}
+          <div v-else-if="pairingStatus === 'invalid'" class="pairing-status-row pairing-status-row--danger" role="alert">
+            <i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>{{ $t('pin.pairing_invalid') }}</span>
           </div>
-          <div v-else-if="pairingStatus === 'failed'" class="alert alert-danger mt-3 mb-0" role="alert">
-            {{ $t('pin.pairing_failed') }}
+          <div v-else-if="pairingStatus === 'failed'" class="pairing-status-row pairing-status-row--danger" role="alert">
+            <i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>{{ $t('pin.pairing_failed') }}</span>
           </div>
-          <div v-else-if="pairingStatus === 'missing'" class="alert alert-danger mt-3 mb-0" role="alert">
-            {{ $t('pin.pairing_missing') }}
+          <div v-else-if="pairingStatus === 'missing'" class="pairing-status-row pairing-status-row--danger" role="alert">
+            <i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>{{ $t('pin.pairing_missing') }}</span>
           </div>
-          <div v-else-if="pairingStatus === 'network'" class="alert alert-danger mt-3 mb-0" role="alert">
-            {{ $t('pin.pairing_network_error') }}
+          <div v-else-if="pairingStatus === 'network'" class="pairing-status-row pairing-status-row--danger" role="alert">
+            <i class="fas fa-exclamation-triangle" aria-hidden="true"></i><span>{{ $t('pin.pairing_network_error') }}</span>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <!-- Unpair all Clients -->
-      <div class="card my-4">
-        <div class="card-body">
-          <div class="p-2">
-            <div class="d-flex justify-content-end align-items-center mb-3">
-              <h2 id="unpair" class="text-center me-auto mb-0">{{ $t('troubleshooting.unpair_title') }}</h2>
-              <button class="btn btn-danger" :disabled="unpairAllPressed || loading" @click="handleUnpairAll">
-                <span v-if="unpairAllPressed" class="spinner-border spinner-border-sm me-2" role="status"></span>
-                {{ $t('troubleshooting.unpair_all') }}
-              </button>
-            </div>
-            <div
-              id="apply-alert"
-              class="alert alert-success d-flex align-items-center mt-3"
-              :style="{ display: showApplyMessage ? 'flex !important' : 'none !important' }"
-            >
-              <div class="me-2">
-                <b>{{ $t('_common.success') }}</b> {{ $t('troubleshooting.unpair_single_success') }}
-              </div>
-              <button class="btn btn-secondary ms-auto apply" @click="clickedApplyBanner">
-                {{ $t('_common.dismiss') }}
-              </button>
-            </div>
-            <div class="alert alert-success" v-if="unpairAllStatus === true">
-              {{ $t('troubleshooting.unpair_all_success') }}
-            </div>
-            <div class="alert alert-danger" v-if="unpairAllStatus === false">
-              {{ $t('troubleshooting.unpair_all_error') }}
-            </div>
-            <p class="mb-3 text-muted">{{ $t('pin.remove_paired_devices_desc') }}</p>
+      <section class="paired-clients-section" aria-labelledby="unpair">
+        <div class="paired-clients-heading">
+          <div>
+            <h2 id="unpair">{{ $t('troubleshooting.unpair_title') }}</h2>
+            <p>{{ $t('pin.remove_paired_devices_desc') }}</p>
           </div>
+          <button class="btn btn-danger" :disabled="unpairAllPressed || loading" @click="handleUnpairAll">
+            <span v-if="unpairAllPressed" class="spinner-border spinner-border-sm me-2" role="status"></span>
+            {{ $t('troubleshooting.unpair_all') }}
+          </button>
+        </div>
+        <div
+          id="apply-alert"
+          class="pairing-status-row pairing-status-row--success"
+          :style="{ display: showApplyMessage ? 'flex !important' : 'none !important' }"
+        >
+          <i class="fas fa-check-circle" aria-hidden="true"></i>
+          <span><b>{{ $t('_common.success') }}</b> {{ $t('troubleshooting.unpair_single_success') }}</span>
+          <button class="btn btn-secondary ms-auto apply" @click="clickedApplyBanner">
+            {{ $t('_common.dismiss') }}
+          </button>
+        </div>
+        <div v-if="unpairAllStatus === true" class="pairing-status-row pairing-status-row--success" role="status">
+          <i class="fas fa-check-circle" aria-hidden="true"></i>
+          <span>{{ $t('troubleshooting.unpair_all_success') }}</span>
+        </div>
+        <div v-if="unpairAllStatus === false" class="pairing-status-row pairing-status-row--danger" role="alert">
+          <i class="fas fa-exclamation-triangle" aria-hidden="true"></i>
+          <span>{{ $t('troubleshooting.unpair_all_error') }}</span>
+        </div>
 
-          <!-- 加载状态 -->
-          <div v-if="loading && clients.length === 0" class="text-center py-5">
-            <div class="spinner-border text-primary" role="status">
-              <span class="visually-hidden">{{ $t('pin.loading') }}</span>
-            </div>
-            <p class="mt-3 text-muted">{{ $t('pin.loading_clients') }}</p>
-          </div>
+        <!-- 加载状态 -->
+        <div v-if="loading && clients.length === 0" class="paired-clients-loading" role="status">
+          <div class="spinner-border spinner-border-sm" aria-hidden="true"></div>
+          <span>{{ $t('pin.loading_clients') }}</span>
+        </div>
 
-          <!-- 客户端列表 -->
-          <div id="client-list" v-else-if="clients && clients.length > 0" class="client-list-container">
-            <div class="brightness-guidance mx-3 mt-3 mb-2" role="note">
+        <!-- 客户端列表 -->
+        <div id="client-list" v-else-if="clients && clients.length > 0" class="client-list-container">
+            <div class="brightness-guidance" role="note">
               <i class="fas fa-wand-magic-sparkles" aria-hidden="true"></i>
               <span>{{ $t('pin.hdr_brightness_auto_info') }}</span>
             </div>
@@ -396,18 +391,12 @@
                 </tbody>
               </table>
             </div>
-          </div>
-          <!-- 空状态 -->
-          <div v-else-if="!loading" class="list-group list-group-flush list-group-item-light">
-            <div class="list-group-item p-5 text-center">
-              <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-              <p class="mb-0">
-                <em>{{ $t('troubleshooting.unpair_single_no_devices') }}</em>
-              </p>
-            </div>
-          </div>
         </div>
-      </div>
+        <!-- 空状态 -->
+        <div v-else-if="!loading" class="paired-clients-empty">
+          {{ $t('troubleshooting.unpair_single_no_devices') }}
+        </div>
+      </section>
 
       <!-- 删除确认对话框 -->
       <Transition name="fade">
@@ -437,7 +426,7 @@
           </div>
         </div>
       </Transition>
-    </div>
+    </main>
   </div>
 </template>
 
@@ -576,108 +565,6 @@ watch(clients, initTooltips, { deep: true })
     font-weight: var(--ui-label-weight);
   }
 
-  .manual-pairing-card {
-    width: min(100%, 640px);
-    margin-inline: auto;
-  }
-
-  .pairing-section-heading {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid var(--ui-border);
-  }
-
-  .pairing-empty {
-    padding: 1rem;
-    color: var(--ui-text-secondary);
-    background: var(--ui-surface-strong);
-    border: 1px solid var(--ui-border);
-    border-top: 0;
-  }
-
-  .pairing-request-list {
-    border: 1px solid var(--ui-border);
-    border-top: 0;
-  }
-
-  .pairing-request {
-    display: flex;
-    align-items: center;
-    width: 100%;
-    gap: 0.75rem;
-    padding: 0.625rem;
-    color: var(--ui-text-primary);
-    text-align: left;
-    background: var(--ui-surface);
-    border: 0;
-    border-left: 3px solid transparent;
-    border-bottom: 1px solid var(--ui-border);
-    border-radius: 0;
-    transition: background-color 100ms, color 100ms, border-color 100ms;
-
-    &:last-child {
-      border-bottom: 0;
-    }
-
-    &:hover,
-    &.is-selected {
-      background: var(--ui-surface-strong);
-    }
-
-    &.is-selected {
-      border-left-color: var(--ui-border-strong);
-    }
-
-    &:focus-visible {
-      outline: 2px solid var(--ui-border-strong);
-      outline-offset: -2px;
-    }
-  }
-
-  .pairing-request-token {
-    flex: 0 0 auto;
-    padding: 0.25rem 0.375rem;
-    color: var(--ui-text-secondary);
-    font-family: var(--font-mono);
-    font-size: 0.75rem;
-    line-height: 1;
-    border: 1px solid var(--ui-border-strong);
-  }
-
-  .pairing-request-details {
-    display: grid;
-    min-width: 0;
-
-    span {
-      overflow: hidden;
-      color: var(--ui-text-secondary);
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
-
-  .pairing-approval-form {
-    display: grid;
-    gap: 0.5rem;
-    margin-top: 1rem;
-
-    .form-label:not(:first-child) {
-      margin-top: 0.5rem;
-    }
-  }
-
-  .pairing-actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-    margin-top: 0.75rem;
-  }
-
   .table {
     --bs-table-bg: transparent;
     --bs-table-color: var(--ui-text-primary);
@@ -693,20 +580,211 @@ watch(clients, initTooltips, { deep: true })
   }
 }
 
+.pin-content {
+  width: 100%;
+  max-width: var(--ui-content-max);
+  margin-inline: auto;
+  padding-inline: var(--ui-space-4);
+}
+
+.pin-page-title {
+  margin: var(--ui-space-4) 0 var(--ui-space-3);
+}
+
+.pairing-methods {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.72fr) minmax(520px, 1.28fr);
+  align-items: start;
+  gap: var(--ui-space-3);
+}
+
+.pairing-section,
+.paired-clients-section {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+}
+
+.paired-clients-section {
+  margin-top: var(--ui-space-3);
+}
+
+.pairing-section-heading,
+.paired-clients-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 52px;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  background: var(--ui-panel-soft);
+  border-bottom: 1px solid var(--ui-border);
+
+  h2 {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-2);
+    margin: 0;
+    color: var(--ui-text-primary);
+    font-size: var(--ui-font-size-base);
+    font-weight: var(--ui-label-weight);
+  }
+
+  p {
+    margin: 2px 0 0;
+    color: var(--ui-text-secondary);
+    font-size: var(--font-size-xs);
+    line-height: 1.3;
+  }
+}
+
+.pairing-empty,
+.paired-clients-empty,
+.paired-clients-loading {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  color: var(--ui-text-secondary);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.paired-clients-empty {
+  border-bottom: 0;
+}
+
+.pairing-request-list {
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.pairing-request {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 52px;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  color: var(--ui-text-primary);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-left: 3px solid transparent;
+  border-bottom: 1px solid var(--ui-border);
+  transition: background-color 100ms, color 100ms, border-color 100ms;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  &:hover,
+  &.is-selected {
+    background: var(--ui-surface-strong);
+  }
+
+  &.is-selected {
+    border-left-color: var(--ui-border-strong);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--ui-border-strong);
+    outline-offset: -2px;
+  }
+}
+
+.pairing-request-token {
+  flex: 0 0 4rem;
+  color: var(--ui-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: 1;
+}
+
+.pairing-request-details {
+  display: grid;
+  min-width: 0;
+
+  span {
+    overflow: hidden;
+    color: var(--ui-text-secondary);
+    font-family: var(--font-mono);
+    font-size: var(--font-size-xs);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.pairing-approval-form {
+  display: grid;
+  grid-template-columns: auto minmax(72px, 96px) auto minmax(140px, 1fr) auto;
+  align-items: center;
+  gap: var(--ui-space-2) var(--ui-space-3);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-border);
+
+  .form-label {
+    margin: 0;
+  }
+}
+
+.pairing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+
+.pairing-notice,
+.pairing-status-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  color: var(--ui-text-secondary);
+  border-bottom: 1px solid var(--ui-border);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+
+  > i {
+    flex: 0 0 auto;
+    margin-top: 2px;
+  }
+}
+
+.pairing-notice--warning {
+  color: var(--ui-warning-text);
+  background: var(--ui-warning-soft);
+}
+
+.pairing-notice--danger,
+.pairing-status-row--danger {
+  color: var(--ui-danger-text);
+  background: var(--ui-danger-soft);
+}
+
+.pairing-status-row--success {
+  color: var(--ui-success-text);
+  background: var(--ui-success-soft);
+}
+
+.paired-clients-heading {
+  h2 {
+    font-size: var(--ui-font-size-base);
+  }
+}
+
 .client-list-container {
-  margin-top: 1rem;
+  margin-top: 0;
 
   .brightness-guidance {
     display: flex;
     align-items: flex-start;
-    gap: 0.65rem;
-    padding: 0.7rem 0.85rem;
+    gap: var(--ui-space-2);
+    padding: var(--ui-space-2) var(--ui-space-3);
     color: var(--ui-text-secondary);
     background: var(--ui-surface-strong);
-    border-left: 3px solid var(--ui-border-strong);
+    border-bottom: 1px solid var(--ui-border);
     border-radius: 0;
-    font-size: 0.875rem;
-    line-height: 1.45;
+    font-size: var(--font-size-xs);
+    line-height: 1.4;
 
     i {
       margin-top: 0.2rem;
@@ -1005,48 +1083,105 @@ watch(clients, initTooltips, { deep: true })
   }
 }
 
-/*
- * QR code pairing. The code itself is functional imagery: it keeps its white
- * quiet zone so scanners still read it, framed by a hairline instead of a
- * rounded, shadowed card.
- */
-.qr-pair-card {
-  max-width: 480px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
 .qr-image-wrapper {
-  display: inline-block;
-  padding: 12px;
-  background: #fff;
+  display: block;
+  padding: var(--ui-space-1);
+  background: var(--ui-functional-image-bg);
   border: 1px solid var(--ui-border-strong);
   border-radius: 0;
 }
 
 .qr-image {
   display: block;
-  width: 280px;
-  height: 280px;
+  width: 176px;
+  height: 176px;
   border-radius: 0;
 }
 
-.divider-text {
-  display: flex;
+.qr-display {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  text-align: center;
-  color: var(--ui-text-muted);
-  font-size: 0.875rem;
+  gap: var(--ui-space-3);
+  padding: var(--ui-space-3);
+  border-bottom: 1px solid var(--ui-border);
+}
 
-  &::before,
-  &::after {
-    content: '';
-    flex: 1;
-    border-bottom: 1px solid var(--ui-border);
-  }
+.qr-info {
+  display: grid;
+  gap: var(--ui-space-2);
+  align-content: center;
+}
+
+.qr-pin-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ui-space-2);
 
   span {
-    padding: 0 1rem;
+    color: var(--ui-text-secondary);
+  }
+
+  strong {
+    color: var(--ui-text-primary);
+    font-family: var(--font-family-mono);
+    font-size: var(--font-size-lg);
+    letter-spacing: 0;
+  }
+}
+
+.qr-expiry {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+  color: var(--ui-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+
+  &.is-expiring {
+    color: var(--ui-warning-text);
+  }
+}
+
+.qr-generate-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2) var(--ui-space-3);
+
+  .pairing-status-row {
+    flex: 1;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+}
+
+@media (max-width: 960px) {
+  .pairing-methods {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .pairing-approval-form {
+    grid-template-columns: auto minmax(0, 1fr);
+
+    .pairing-actions {
+      grid-column: 1 / -1;
+    }
+  }
+
+  .qr-display {
+    grid-template-columns: 1fr;
+    justify-items: start;
+  }
+
+  .paired-clients-heading,
+  .pairing-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 </style>

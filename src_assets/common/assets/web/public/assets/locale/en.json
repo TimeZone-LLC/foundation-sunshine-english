@@ -365,7 +365,7 @@
     "display_mode_remapping_received_resolution_windows": "Received resolution",
     "display_mode_remapping_resolution_only_mode_desc_windows": "Note: if \"Optimize game settings\" option is not enabled on the Moonlight client, the remapping is disabled.",
     "display_mode_remapping_windows": "Remap display modes",
-    "display_modes": "Display Modes",
+    "display_modes": "Display modes",
     "display_refresh": "Refresh displays",
     "display_refresh_desc": "Re-enables every connected display and clears the saved display state. Use this if a stream left one of your monitors switched off.",
     "display_refresh_failed": "Could not refresh the displays. Check the Sunshine log for details.",
@@ -857,7 +857,7 @@
     "vigem_uninstall": "Uninstall Driver",
     "vigem_uninstalling": "Uninstalling...",
     "vigem_update": "Update Driver",
-    "virtual_display": "Virtual Display",
+    "virtual_display": "Virtual display",
     "virtual_mouse": "Virtual Mouse Driver",
     "virtual_mouse_desc": "When enabled, Sunshine will use the Zako Virtual Mouse driver (if installed) to simulate mouse input at the HID level. This allows games using Raw Input to receive mouse events. When disabled or driver not installed, falls back to SendInput.",
     "virtual_sink": "Virtual Sink",
@@ -950,7 +950,6 @@
     "input_only_saved": "Saved. The next connection will use this mode.",
     "input_only_summary": "New connections carry input and host audio plus a 16×16 black heartbeat. No display capture or live video encoding.",
     "startup_errors": "<b>Attention!</b> Sunshine detected these errors during startup. We <b>STRONGLY RECOMMEND</b> fixing them before streaming.",
-    "version_unavailable": "Version unavailable",
     "welcome": "System overview"
   },
   "navbar": {
@@ -1173,18 +1172,19 @@
   },
   "tabs": {
     "advanced": "Advanced",
-    "amd": "AMD AMF Encoder",
-    "av": "Audio/Video",
+    "amd": "AMD AMF encoder",
+    "av": "Audio/video",
     "encoders": "Encoders",
-    "files": "Config Files",
+    "files": "Config files",
     "general": "General",
     "input": "Input",
     "network": "Network",
-    "nv": "NVIDIA NVENC Encoder",
-    "qsv": "Intel QuickSync Encoder",
-    "sw": "Software Encoder",
-    "vaapi": "VAAPI Encoder",
-    "vt": "VideoToolbox Encoder"
+    "nv": "NVIDIA NVENC encoder",
+    "qsv": "Intel QuickSync encoder",
+    "sw": "Software encoder",
+    "vaapi": "VA-API encoder",
+    "vk": "Vulkan Video encoder",
+    "vt": "VideoToolbox encoder"
   },
   "troubleshooting": {
     "ai_analyzing": "Analyzing...",

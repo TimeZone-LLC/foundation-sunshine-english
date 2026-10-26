@@ -28,6 +28,7 @@ test('decorative backgrounds, update checking, and promotional setup cards stay 
   assert.equal(existsSync(new URL('../components/common/VersionCard.vue', import.meta.url)), false)
   assert.doesNotMatch(navbar, /useBackground|addDragListeners|loadBackground/)
   assert.doesNotMatch(home, /useVersion|VersionCard|fetchVersions|stableBuildAvailable/)
+  assert.doesNotMatch(home, /hostConfig(?:\.value)?\?*\.version|config\.version|versionLabel/)
   assert.doesNotMatch(setup, /FEATURED_RESOURCES|promo-service|featured_services/)
   assert.doesNotMatch(constants, /Desktop Pet/)
   assert.match(constants, /name: 'Toolbar'/)

@@ -1,7 +1,7 @@
 <template>
   <div class="apps-page">
     <Navbar />
-    <div class="container-fluid px-3">
+    <div class="apps-content">
       <div class="my-4">
         <h1 class="page-title">{{ $t('apps.applications_title') }}</h1>
         <p class="page-subtitle">{{ $t('apps.applications_desc') }}</p>
@@ -320,9 +320,6 @@
 
         <!-- 空状态 - 无应用 -->
         <div v-if="!searchQuery && apps.length === 0 && isLoaded" class="empty-state">
-          <div class="empty-icon">
-            <i class="fas fa-rocket"></i>
-          </div>
           <h3 class="empty-title">No applications yet</h3>
           <p class="empty-subtitle">Add your first application with the button below</p>
           <button class="btn btn-primary" @click="newApp">

@@ -320,41 +320,32 @@ onBeforeUnmount(() => {
       :display-mode-remapping="displayModeRemapping"
     />
 
-    <!-- Display Modes Tab Navigation -->
-    <div class="mb-3">
-      <ul class="nav nav-tabs audio-video-tabs">
-        <li class="nav-item">
-          <a
-            class="nav-link"
-            :class="{ active: currentSubTab === 'display-modes' }"
-            href="#"
-            @click.prevent="currentSubTab = 'display-modes'"
-          >
-            {{ $t('config.display_modes') || 'Display Modes' }}
-          </a>
-        </li>
-        <li class="nav-item">
-          <a
-            class="nav-link"
-            :class="{ active: currentSubTab === 'virtual-display' }"
-            href="#"
-            @click.prevent="currentSubTab = 'virtual-display'"
-          >
-            {{ $t('config.virtual_display') || 'Virtual Display' }}
-          </a>
-        </li>
-      </ul>
+    <div class="audio-video-sections">
+      <div class="settings-section-selector settings-section-selector--nested audio-video-section-selector">
+        <label for="audio-video-section-selector" class="settings-section-selector__label">
+          {{ $t('tabs.av') }}
+        </label>
+        <select
+          id="audio-video-section-selector"
+          v-model="currentSubTab"
+          class="form-select settings-section-selector__control"
+          :aria-controls="`${currentSubTab}-section`"
+        >
+          <option value="display-modes">{{ $t('config.display_modes') || 'Display Modes' }}</option>
+          <option value="virtual-display">{{ $t('config.virtual_display') || 'Virtual Display' }}</option>
+        </select>
+      </div>
 
-      <!-- Display Modes Tab Content -->
-      <div class="tab-content">
+      <div class="audio-video-section-content">
         <DisplayModesSettings
           v-if="currentSubTab === 'display-modes'"
+          id="display-modes-section"
           :config="config"
         />
-        
-        <!-- Virtual Display Tab Content -->
+
         <VirtualDisplaySettings
           v-if="currentSubTab === 'virtual-display'"
+          id="virtual-display-section"
           :platform="platform"
           :config="config"
           :resolutions="resolutions"
@@ -383,62 +374,117 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.nav-tabs {
-  gap: 0.25rem;
-  padding: 0.3rem;
-  border: 1px solid var(--ui-border);
+.audio-video-sections {
+  margin-top: var(--ui-space-3);
+}
+
+.audio-video-section-selector {
+  min-height: 44px;
   border-radius: 0;
-  background: var(--ui-surface);
-  margin-bottom: 0.75rem;
 }
 
-.nav-tabs .nav-link {
-  border: none;
+.audio-video-section-selector .settings-section-selector__control {
+  height: var(--ui-control-height);
+  min-height: var(--ui-control-height);
   border-radius: 0;
-  color: var(--ui-text-secondary);
-  padding: 0.65rem 1rem;
-  transition: var(--transition-default);
 }
 
-.nav-tabs .nav-link:hover {
-  background: var(--ui-surface-hover);
-  color: var(--ui-text-primary);
+.audio-video-section-content {
+  min-width: 0;
 }
 
-.nav-tabs .nav-link.active {
-  color: var(--ui-accent);
-  background: var(--ui-surface-strong);
-  font-weight: 600;
+.audio-video-section-content :deep(.display-modes-card) {
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
-.tab-content {
-  padding-top: 0;
+.audio-video-section-content :deep(.vrr-setting),
+.audio-video-section-content :deep(.stream-limit-field) {
+  min-height: 44px;
+  padding: var(--ui-space-2) 0 var(--ui-space-3);
+  border: 0;
+  border-bottom: 1px solid var(--ui-border-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+.audio-video-section-content :deep(.virtual-display-settings > .description-text),
+.audio-video-section-content :deep(.virtual-display-settings > .settings-section) {
+  margin-bottom: var(--ui-space-3);
+  padding: var(--ui-space-2) 0 var(--ui-space-3);
+  border: 0;
+  border-bottom: 1px solid var(--ui-border-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+#audio-video :deep(.display-options-note),
+#audio-video :deep(.display-recovery),
+#audio-video :deep(.display-mode-remapping),
+#audio-video :deep(.hdr-feature-card),
+#audio-video :deep(.vulkan-hdr-card) {
+  padding: var(--ui-space-2) 0 var(--ui-space-3);
+  border: 0;
+  border-bottom: 1px solid var(--ui-border-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+#audio-video :deep(.display-rule-grid) {
+  gap: 0 var(--ui-space-4);
+}
+
+#audio-video :deep(.display-setting-card) {
+  min-height: 44px;
+  padding: var(--ui-space-2) 0 var(--ui-space-3);
+  border: 0;
+  border-bottom: 1px solid var(--ui-border-soft);
+  border-radius: 0;
+  background: transparent;
+}
+
+#audio-video :deep(.nested-setting) {
+  padding: var(--ui-space-2) 0 0;
+  border: 0;
+  border-top: 1px solid var(--ui-border-soft);
+  border-radius: 0;
+  background: transparent;
 }
 
 .stream-encoding-limit {
-  padding: 1rem;
-  border: 1px solid var(--ui-border);
+  min-height: 44px;
+  padding: var(--ui-space-2) 0 var(--ui-space-3);
+  border: 0;
+  border-bottom: 1px solid var(--ui-border-soft);
   border-radius: 0;
-  background: var(--ui-surface);
+  background: transparent;
 }
 
 .stream-mic-helper {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: var(--ui-space-3);
   flex-wrap: wrap;
-  padding: 0.75rem;
-  background: var(--ui-surface);
+  min-height: 44px;
+  margin-top: var(--ui-space-2) !important;
+  padding: var(--ui-space-2) 0 0;
+  background: transparent;
   border-radius: 0;
-  border: 1px solid var(--ui-border);
+  border: 0;
+  border-top: 1px solid var(--ui-border-soft);
 }
 
 .stream-mic-backend,
 .stream-mic-status {
-  padding: 1rem;
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius-md);
+  min-height: 44px;
+  margin-top: var(--ui-space-2) !important;
+  padding: var(--ui-space-3) 0 0;
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--ui-border-soft);
+  border-radius: 0;
 }
 
 .stream-mic-status__header {
@@ -451,7 +497,7 @@ onBeforeUnmount(() => {
 .stream-mic-status__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
-  gap: 0.75rem;
+  gap: 0 var(--ui-space-4);
 }
 
 .stream-mic-status__grid > div {
@@ -459,6 +505,9 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 0.2rem;
   min-width: 0;
+  min-height: 44px;
+  padding-block: var(--ui-space-2);
+  border-bottom: 1px solid var(--ui-border-soft);
 }
 
 .stream-mic-status__grid span {
@@ -497,19 +546,9 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 575.98px) {
-  .audio-video-tabs .nav-item {
-    flex: 1 1 0;
-  }
-
-  .audio-video-tabs .nav-link {
-    width: 100%;
-    padding-inline: 0.75rem;
-    text-align: center;
-  }
-
   .stream-mic-helper {
     align-items: stretch;
-    gap: 0.75rem;
+    gap: var(--ui-space-2);
   }
 
   .stream-mic-download-btn,

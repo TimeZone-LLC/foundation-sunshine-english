@@ -46,6 +46,7 @@
   --ui-space-5: 20px;
   --ui-transition: 120ms ease;
   --ui-rail-width: 240px;
+  --ui-content-max: 1120px;
   --ui-hairline: 1px;
 
   /* Square corners everywhere - no pills, no circles, no exceptions. */
@@ -126,6 +127,9 @@
   --text-faint: #85858f;
   --accent: #15151a;
   --accent-fg: #ffffff;
+  /* Functional black-on-white imagery, such as QR codes, needs a stable
+     white field in both themes so machine readers keep their contrast. */
+  --ui-functional-image-bg: #ffffff;
 
   /* Neutral elevation. Never a glow, never a coloured shadow. */
   --ui-shadow-xs: 0 1px 2px rgb(20 20 24 / 0.04);

@@ -130,10 +130,9 @@
       <h1 class="mt-2 mb-4 page-title">{{ $t('config.configuration') }}</h1>
 
       <div v-if="!config" class="form card config-skeleton">
-        <div class="card-header skeleton-header">
-          <div class="skeleton-tabs">
-            <div v-for="n in 6" :key="n" class="skeleton-tab"></div>
-          </div>
+        <div class="skeleton-selector" aria-hidden="true">
+          <div class="skeleton-selector-label"></div>
+          <div class="skeleton-selector-control"></div>
         </div>
         <div class="config-page skeleton-body">
           <div class="skeleton-section">
@@ -154,82 +153,65 @@
       </div>
 
       <div v-else class="form card">
-        <div class="config-tabs-shell">
-          <ul ref="configTabsRef" class="nav nav-tabs config-tabs">
+        <div class="settings-section-selector settings-section-selector--primary">
+          <label for="config-section-selector" class="settings-section-selector__label">
+            {{ $t('config.configuration') }}
+          </label>
+          <select
+            id="config-section-selector"
+            v-model="currentTab"
+            class="form-select settings-section-selector__control"
+            aria-controls="config-section-content"
+          >
             <template v-for="tab in tabs" :key="tab.id">
-              <li
+              <optgroup
                 v-if="tab.type === 'group' && tab.children"
-                class="nav-item dropdown"
-                :class="{ active: isEncoderTabActive(tab), show: expandedDropdown === tab.id }"
+                :label="$t(`tabs.${tab.id}`) || tab.name"
               >
-                <a
-                  class="nav-link dropdown-toggle"
-                  :class="{ active: isEncoderTabActive(tab) }"
-                  href="#"
-                  role="button"
-                  :aria-expanded="expandedDropdown === tab.id"
-                  @click.prevent="toggleEncoderDropdown(tab.id, $event)"
-                >
-                  {{ $t(`tabs.${tab.id}`) || tab.name }}
-                </a>
-                <ul class="dropdown-menu" :class="{ show: expandedDropdown === tab.id }">
-                  <li v-for="childTab in tab.children" :key="childTab.id">
-                    <a
-                      class="dropdown-item"
-                      :class="[{ active: currentTab === childTab.id }, `encoder-item-${childTab.id}`]"
-                      href="#"
-                      @click.prevent="selectEncoderTab(childTab.id, $event)"
-                    >
-                      {{ $t(`tabs.${childTab.id}`) || childTab.name }}
-                    </a>
-                  </li>
-                </ul>
-              </li>
-              <li v-else class="nav-item">
-                <a
-                  class="nav-link"
-                  :class="{ active: tab.id === currentTab }"
-                  href="#"
-                  @click.prevent="currentTab = tab.id"
-                >
-                  {{ $t(`tabs.${tab.id}`) || tab.name }}
-                </a>
-              </li>
+                <option v-for="childTab in tab.children" :key="childTab.id" :value="childTab.id">
+                  {{ $t(`tabs.${childTab.id}`) || childTab.name }}
+                </option>
+              </optgroup>
+              <option v-else :value="tab.id">
+                {{ $t(`tabs.${tab.id}`) || tab.name }}
+              </option>
             </template>
-          </ul>
+          </select>
         </div>
 
-        <General
-          v-if="currentTab === 'general'"
-          :config="config"
-          :global-prep-cmd="global_prep_cmd"
-          :platform="platform"
-        />
-        <Inputs v-if="currentTab === 'input'" :config="config" :platform="platform" />
-        <AudioVideo
-          v-if="currentTab === 'av'"
-          :config="config"
-          :platform="platform"
-          :resolutions="resolutions"
-          :fps="fps"
-          :display-mode-remapping="display_mode_remapping"
-        />
-        <Network v-if="currentTab === 'network'" :config="config" :platform="platform" />
-        <Files v-if="currentTab === 'files'" :config="config" :platform="platform" />
-        <Advanced v-if="currentTab === 'advanced'" :config="config" :platform="platform" />
-        <ContainerEncoders
-          v-if="isEncoderCurrentTab"
-          :current-tab="currentTab"
-          :config="config"
-          :platform="platform"
-        />
+        <div id="config-section-content" class="config-section-content">
+          <General
+            v-if="currentTab === 'general'"
+            :config="config"
+            :global-prep-cmd="global_prep_cmd"
+            :platform="platform"
+          />
+          <Inputs v-if="currentTab === 'input'" :config="config" :platform="platform" />
+          <AudioVideo
+            v-if="currentTab === 'av'"
+            :config="config"
+            :platform="platform"
+            :resolutions="resolutions"
+            :fps="fps"
+            :display-mode-remapping="display_mode_remapping"
+          />
+          <Network v-if="currentTab === 'network'" :config="config" :platform="platform" />
+          <Files v-if="currentTab === 'files'" :config="config" :platform="platform" />
+          <Advanced v-if="currentTab === 'advanced'" :config="config" :platform="platform" />
+          <ContainerEncoders
+            v-if="isEncoderCurrentTab"
+            :current-tab="currentTab"
+            :config="config"
+            :platform="platform"
+          />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, provide, computed, onUnmounted, nextTick, defineAsyncComponent } from 'vue'
+import { ref, watch, onMounted, provide, computed, onUnmounted, defineAsyncComponent } from 'vue'
 import Navbar from '../components/layout/Navbar.vue'
 import ConfirmDialog from '../components/common/ConfirmDialog.vue'
 import { getPreferredEncoderTab } from '../config/encoderTabs.js'
@@ -243,8 +225,6 @@ const Files = defineAsyncComponent(() => import('../configs/tabs/Files.vue'))
 const Advanced = defineAsyncComponent(() => import('../configs/tabs/Advanced.vue'))
 const AudioVideo = defineAsyncComponent(() => import('../configs/tabs/AudioVideo.vue'))
 const ContainerEncoders = defineAsyncComponent(() => import('../configs/tabs/ContainerEncoders.vue'))
-
-const ENCODER_TAB_IDS = new Set(['nv', 'qsv', 'amd', 'vt', 'sw'])
 
 const {
   platform,
@@ -268,12 +248,10 @@ const {
 
 const showSaveToast = ref(false)
 const showRestartToast = ref(false)
-const expandedDropdown = ref(null)
 const showRiskConfirm = ref(false)
 const riskAction = ref('save')
 const riskItems = ref([])
 const riskActionRunning = ref(false)
-const configTabsRef = ref(null)
 
 const hasUnsaved = computed(() => {
   if (!config.value) return false
@@ -285,9 +263,12 @@ const hasUnsaved = computed(() => {
   return hasUnsavedChanges()
 })
 
-const isEncoderCurrentTab = computed(() => ENCODER_TAB_IDS.has(currentTab.value))
-
-const isEncoderTabActive = (tab) => tab.type === 'group' && tab.children?.some((child) => child.id === currentTab.value)
+const isEncoderCurrentTab = computed(() =>
+  tabs.value.some(
+    (tab) =>
+      tab.type === 'group' && tab.children?.some((childTab) => childTab.id === currentTab.value),
+  ),
+)
 
 const preferredEncoderTab = (children = []) =>
   getPreferredEncoderTab({
@@ -298,36 +279,6 @@ const preferredEncoderTab = (children = []) =>
     platform: platform.value,
     availableTabIds: children.map((child) => child.id),
   })
-
-const scrollActiveTabIntoView = async () => {
-  await nextTick()
-  const activeTab = configTabsRef.value?.querySelector('.nav-link.active')
-  activeTab?.scrollIntoView?.({ behavior: 'auto', block: 'nearest', inline: 'center' })
-}
-
-const toggleEncoderDropdown = (tabId, event) => {
-  event.stopPropagation()
-
-  if (expandedDropdown.value === tabId) {
-    expandedDropdown.value = null
-    return
-  }
-
-  expandedDropdown.value = tabId
-
-  const encoderGroup = tabs.value.find((t) => t.id === tabId && t.type === 'group')
-  const children = encoderGroup?.children
-
-  if (children?.length && !children.some((child) => child.id === currentTab.value)) {
-    currentTab.value = preferredEncoderTab(children)
-  }
-}
-
-const selectEncoderTab = (childTabId, event) => {
-  event.stopPropagation()
-  currentTab.value = childTabId
-  expandedDropdown.value = null
-}
 
 const showToast = (toastRef, duration = 5000) => {
   toastRef.value = true
@@ -380,8 +331,6 @@ const confirmRiskAction = async () => {
   riskItems.value = []
 }
 
-watch(currentTab, scrollActiveTabIntoView)
-
 watch(saved, (newVal) => {
   if (newVal && !restarted.value) {
     showToast(showSaveToast)
@@ -400,12 +349,6 @@ provide(
   computed(() => platform.value)
 )
 
-const handleOutsideClick = (event) => {
-  if (expandedDropdown.value && !event.target.closest('.dropdown')) {
-    expandedDropdown.value = null
-  }
-}
-
 const handleConfigHash = () => {
   handleHash()
 
@@ -421,15 +364,11 @@ onMounted(async () => {
   await loadConfig()
   handleConfigHash()
 
-  await scrollActiveTabIntoView()
-
   window.addEventListener('hashchange', handleConfigHash)
-  document.addEventListener('click', handleOutsideClick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('hashchange', handleConfigHash)
-  document.removeEventListener('click', handleOutsideClick)
 })
 </script>
 
@@ -438,8 +377,8 @@ onUnmounted(() => {
 
 // Layout constants. Radii, easings and shadows are no longer declared here:
 // corners are square everywhere and only color transitions are permitted.
-@btn-size: 52px;
-@btn-size-mobile: 48px;
+@btn-size: var(--ui-control-height);
+@btn-size-mobile: var(--ui-control-height);
 
 // Mixins
 .flex-center() {
@@ -449,11 +388,10 @@ onUnmounted(() => {
 }
 
 .config-page {
-  padding: 1em;
-  border: 1px solid var(--ui-border);
-  border-top: none;
+  padding: var(--ui-space-4);
+  border: 0;
   border-radius: 0;
-  background: var(--ui-surface-strong);
+  background: transparent;
   color: var(--ui-text-primary);
 }
 
@@ -466,29 +404,35 @@ onUnmounted(() => {
     border-radius: 0;
   }
 
-  .skeleton-header {
-    background: var(--ui-surface-strong);
-    padding: 0.5rem 1rem;
-  }
-
-  .skeleton-tabs {
+  .skeleton-selector {
     display: flex;
-    gap: 0.5rem;
-    padding: 0.5rem 0;
+    align-items: center;
+    gap: var(--ui-space-3);
+    min-height: 44px;
+    padding: 5px var(--ui-space-4);
+    border-bottom: 1px solid var(--ui-border-soft);
+    background: var(--ui-panel-soft);
   }
 
-  .skeleton-tab {
-    width: 80px;
-    height: 38px;
+  .skeleton-selector-label {
+    width: 96px;
+    height: 14px;
+    .skeleton-block();
+  }
+
+  .skeleton-selector-control {
+    width: min(320px, 55%);
+    height: var(--ui-control-height);
+    margin-left: auto;
     .skeleton-block();
   }
 
   .skeleton-body {
-    padding: 1.5rem;
+    padding: var(--ui-space-4);
   }
 
   .skeleton-section {
-    margin-bottom: 2rem;
+    margin-bottom: var(--ui-space-4);
     &:last-child {
       margin-bottom: 0;
     }
@@ -504,10 +448,12 @@ onUnmounted(() => {
   .skeleton-row {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    margin-bottom: 1rem;
+    gap: var(--ui-space-4);
+    min-height: 44px;
+    padding-block: var(--ui-space-2);
+    border-bottom: 1px solid var(--ui-border-soft);
     &:last-child {
-      margin-bottom: 0;
+      border-bottom: 0;
     }
   }
 
@@ -520,7 +466,7 @@ onUnmounted(() => {
 
   .skeleton-input {
     flex: 1;
-    height: 38px;
+    height: var(--ui-control-height);
     .skeleton-block();
     max-width: 300px;
   }
@@ -531,7 +477,13 @@ onUnmounted(() => {
   padding-bottom: var(--spacing-xl);
   background: var(--ui-page-bg);
 
+  .container {
+    padding: var(--ui-space-4);
+  }
+
   .page-title {
+    margin-top: 0 !important;
+    margin-bottom: var(--ui-space-3) !important;
     color: var(--ui-text-primary) !important;
     font-weight: var(--ui-label-weight);
   }
@@ -540,21 +492,62 @@ onUnmounted(() => {
     overflow: visible;
     border: 1px solid var(--ui-border);
     border-radius: 0;
-    background: var(--ui-surface);
+    background: var(--ui-panel);
+    box-shadow: none;
+  }
+
+  .settings-section-selector {
+    display: flex;
+    align-items: center;
+    gap: var(--ui-space-3);
+    min-height: 44px;
+    padding: 5px var(--ui-space-4);
+    border: 0;
+    border-bottom: 1px solid var(--ui-border-soft);
+    border-radius: 0;
+    background: var(--ui-panel-soft);
+  }
+
+  .settings-section-selector__label {
+    flex: 0 0 auto;
+    margin: 0;
+    color: var(--ui-text-primary);
+    font-weight: var(--ui-label-weight);
+  }
+
+  .settings-section-selector__control {
+    width: min(320px, 100%);
+    height: var(--ui-control-height);
+    min-height: var(--ui-control-height);
+    margin-left: auto;
+    border-radius: 0;
+  }
+
+  .settings-section-selector--nested {
+    margin: 0 0 var(--ui-space-3);
+    padding-inline: 0;
+    background: transparent;
+  }
+
+  .config-section-content {
+    min-width: 0;
   }
 
   .config-page {
     .accordion-item {
-      overflow: hidden;
-      border: 1px solid var(--ui-border);
+      overflow: visible;
+      border: 0;
+      border-bottom: 1px solid var(--ui-border-soft);
       border-radius: 0;
-      background: var(--ui-surface);
+      background: transparent;
     }
 
     .accordion-button {
+      min-height: 44px;
+      padding: var(--ui-space-2) 0;
       border: 0;
       border-radius: 0;
-      background: var(--ui-surface-strong);
+      background: transparent;
       color: var(--ui-text-primary);
       font-weight: 600;
       transition: var(--transition-default);
@@ -572,6 +565,7 @@ onUnmounted(() => {
     }
 
     .accordion-body {
+      padding: var(--ui-space-3) 0;
       background: transparent;
     }
 
@@ -595,29 +589,55 @@ onUnmounted(() => {
     .settings-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0.85rem;
+      column-gap: var(--ui-space-4);
+      row-gap: 0;
+
+      &.mt-3 {
+        margin-top: 0 !important;
+      }
     }
 
     .settings-field,
     .settings-panel {
       min-width: 0;
-      padding: 0.9rem;
-      border: 1px solid var(--ui-border);
+      min-height: 44px;
+      margin-top: 0 !important;
+      padding: var(--ui-space-2) 0 var(--ui-space-3);
+      border: 0;
+      border-bottom: 1px solid var(--ui-border-soft);
       border-radius: 0;
-      background: var(--ui-surface);
+      background: transparent;
     }
 
     .settings-panel--accent {
-      border-left: 3px solid var(--ui-border-strong);
-      background: var(--ui-surface-strong);
+      border-left: 0;
+      background: transparent;
     }
 
     .settings-subpanel {
-      padding: 0.8rem;
-      border: 1px solid var(--ui-border);
-      border-left: 3px solid var(--ui-border-strong);
+      padding: var(--ui-space-3) 0 0;
+      border: 0;
+      border-top: 1px solid var(--ui-border-soft);
       border-radius: 0;
-      background: var(--ui-surface-strong);
+      background: transparent;
+    }
+
+    > .mb-3:not(.accordion) {
+      min-height: 44px;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      padding: var(--ui-space-2) 0 var(--ui-space-3);
+      border: 0;
+      border-bottom: 1px solid var(--ui-border-soft);
+      border-radius: 0;
+      background: transparent;
+    }
+
+    > .accordion.mb-3 {
+      margin: 0 !important;
+      padding: 0;
+      border: 0;
+      background: transparent;
     }
 
     .settings-toggle-field {
@@ -636,16 +656,7 @@ onUnmounted(() => {
       .settings-grid {
         grid-template-columns: minmax(0, 1fr);
       }
-
-      .settings-field,
-      .settings-panel {
-        padding: 0.75rem;
-      }
     }
-  }
-
-  .nav-tabs {
-    border: none;
   }
 
   .ms-item {
@@ -655,107 +666,6 @@ onUnmounted(() => {
     font-weight: 600;
   }
 
-  .config-tabs-shell {
-    position: relative;
-    z-index: 10;
-    background: var(--ui-surface-strong);
-  }
-
-  .config-tabs {
-    background: var(--ui-surface-strong);
-    padding: 0.5rem 1rem 0;
-    gap: 0.5rem;
-    border-bottom: 1px solid var(--ui-border);
-    position: relative;
-    z-index: 10;
-    overflow: visible;
-
-    .nav-item {
-      margin-bottom: -1px;
-
-      &.dropdown {
-        position: relative;
-        &.show .dropdown-menu {
-          display: block;
-        }
-      }
-    }
-
-    .nav-link {
-      border: 1px solid transparent;
-      border-radius: 0;
-      padding: 0.75rem 1.5rem;
-      font-weight: var(--ui-label-weight);
-      text-transform: var(--ui-label-transform);
-      letter-spacing: var(--ui-label-tracking);
-      color: var(--ui-text-secondary);
-      background: transparent;
-      position: relative;
-      transition: var(--transition-default);
-
-      &:hover {
-        color: var(--ui-text-primary);
-        background: var(--ui-surface-hover);
-      }
-
-      // The active tab is marked by a solid bar, not by a growing underline.
-      &.active {
-        color: var(--ui-text-primary);
-        background: var(--ui-surface);
-        border-color: var(--ui-border);
-        border-bottom-color: transparent;
-        font-weight: var(--ui-label-weight);
-
-        &::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 3px;
-          background: var(--ui-accent);
-        }
-      }
-    }
-
-    .dropdown-menu {
-      display: none;
-      position: absolute;
-      top: 100%;
-      left: 0;
-      z-index: 1050;
-      min-width: 200px;
-      margin-top: 0;
-      padding: 0.5rem 0;
-      border-radius: 0;
-      border: 1px solid var(--ui-border-strong);
-      background: var(--ui-surface-strong);
-
-      &.show {
-        display: block;
-      }
-
-      .dropdown-item {
-        display: flex;
-        align-items: center;
-        padding: 0.5rem 1.5rem;
-        font-weight: 500;
-        color: var(--ui-text-primary);
-        text-decoration: none;
-        transition: var(--transition-default);
-
-        &:hover {
-          background: var(--ui-surface-hover);
-        }
-
-        &.active {
-          background: var(--ui-accent);
-          color: var(--ui-accent-contrast);
-          font-weight: 600;
-        }
-      }
-    }
-  }
 }
 
 .toast.show {
@@ -971,23 +881,27 @@ onUnmounted(() => {
     }
   }
 
-  .page-config .config-tabs {
-    padding: 0.5rem 0.5rem 0;
-    gap: 0.35rem;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-wrap: nowrap;
-    scroll-padding-inline: 2rem;
-    scroll-snap-type: x proximity;
-    scrollbar-width: thin;
-    -webkit-overflow-scrolling: touch;
+  .page-config .settings-section-selector {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--ui-space-1);
+    padding: var(--ui-space-2) var(--ui-space-3);
 
-    .nav-link {
-      min-height: 44px;
-      padding: 0.625rem 1rem;
-      font-size: 0.875rem;
-      white-space: nowrap;
-      scroll-snap-align: center;
+    .settings-section-selector__control {
+      width: 100%;
+      margin-left: 0;
+    }
+  }
+
+  .page-config .config-skeleton .skeleton-selector {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--ui-space-1);
+    padding: var(--ui-space-2) var(--ui-space-3);
+
+    .skeleton-selector-control {
+      width: 100%;
+      margin-left: 0;
     }
   }
 }

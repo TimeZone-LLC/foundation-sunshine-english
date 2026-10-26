@@ -6,7 +6,7 @@
   border: 1px solid var(--ui-border);
   border-radius: 0;
   content-visibility: auto;
-  contain-intrinsic-size: auto 96px;
+  contain-intrinsic-size: auto 52px;
   overflow: hidden;
   .transition-default();
   touch-action: pan-y;
@@ -18,25 +18,29 @@
 }
 
 .app-list-item-inner {
-  display: flex;
+  display: grid;
+  grid-template-columns: 20px 40px minmax(0, 1fr) auto auto;
+  grid-template-areas: 'handle cover info actions search';
   align-items: center;
-  padding: 16px 20px;
-  gap: 16px;
+  min-height: 52px;
+  padding: var(--ui-space-2) var(--ui-space-3);
+  gap: var(--ui-space-3);
   position: relative;
 }
 
 .drag-handle-list {
+  grid-area: handle;
   color: var(--ui-text-muted);
   cursor: grab;
-  font-size: var(--font-size-lg);
+  font-size: var(--ui-font-size-base);
   padding: 0;
   border-radius: 0;
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 20px;
+  min-height: var(--ui-control-height);
   touch-action: none;
   .transition-default();
   .flex-center();
-  width: 44px;
+  width: 20px;
   flex-shrink: 0;
 
   &:hover {
@@ -46,75 +50,84 @@
 }
 
 .app-icon-container-list {
+  grid-area: cover;
   .flex-center();
-  width: 60px;
-  height: 60px;
+  width: 40px;
+  height: 40px;
   flex-shrink: 0;
 }
 
 .app-icon-list {
-  width: 60px;
-  height: 60px;
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--ui-border);
   border-radius: 0;
   object-fit: cover;
 }
 
 .app-icon-placeholder-list {
-  width: 60px;
-  height: 60px;
+  width: 40px;
+  height: 40px;
   background: var(--ui-surface-strong);
   border: 1px solid var(--ui-border);
   border-radius: 0;
   .flex-center();
   color: var(--ui-text-muted);
-  font-size: 1.5rem;
+  font-size: var(--ui-font-size-base);
 }
 
 .app-info-list {
-  flex: 1;
+  grid-area: info;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(140px, 0.55fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ui-space-3);
 }
 
 .app-name-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+  min-width: 0;
 }
 
 .app-name-list {
-  font-size: var(--font-size-lg);
+  font-size: var(--ui-font-size-base);
   font-weight: 600;
   color: var(--ui-text-primary);
   margin: 0;
   .text-ellipsis();
-  flex-shrink: 0;
+  flex: 0 1 auto;
+}
+
+.app-location-list {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
 }
 
 .app-command-list {
-  font-size: var(--font-size-sm);
+  gap: var(--ui-space-2);
+  min-width: 0;
+  padding: 0;
   color: var(--ui-text-secondary);
-  margin: 0;
+  background: transparent;
+  border: 0;
   font-family: var(--font-family-mono);
-  background: var(--ui-surface-strong);
-  border: 1px solid var(--ui-border);
-  padding: 6px 12px;
-  border-radius: 0;
-  .text-ellipsis();
+  font-size: var(--font-size-xs);
+  line-height: 1.25;
+  text-align: left;
+  cursor: copy;
+  appearance: none;
   .transition-default();
   display: flex;
   align-items: center;
-  width: 100%;
-  min-width: 0;
-  text-align: left;
-  font: inherit;
-  cursor: copy;
-  appearance: none;
+
+  > i:first-child {
+    flex: 0 0 auto;
+    color: var(--ui-text-muted);
+  }
 
   > span {
     min-width: 0;
@@ -131,32 +144,46 @@
   }
 
   &:hover {
-    background: var(--ui-surface-hover);
     color: var(--ui-text-primary);
   }
 }
 
 .app-working-dir-list {
-  font-size: var(--font-size-sm);
-  color: var(--ui-text-muted);
-  margin: 0;
   display: flex;
   align-items: center;
-  .text-ellipsis();
+  gap: var(--ui-space-2);
+  min-width: 0;
+  margin: 0;
+  color: var(--ui-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
+
+  i {
+    flex: 0 0 auto;
+  }
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
 .app-tags-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: var(--ui-space-1);
   align-items: center;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .app-tag-list {
-  background: var(--ui-surface-strong);
-  border: 1px solid var(--ui-border);
-  color: var(--ui-text-primary);
-  padding: 3px 8px;
+  color: var(--ui-text-secondary);
+  padding: 0;
+  border: 0;
+  background: transparent;
   border-radius: 0;
   font-size: var(--font-size-xs);
   font-weight: 500;
@@ -166,13 +193,16 @@
 }
 
 .app-actions-list {
+  grid-area: actions;
   display: flex;
-  gap: 8px;
+  gap: var(--ui-space-1);
   flex-shrink: 0;
 
   .btn {
-    .btn-square(38px);
-    font-size: var(--font-size-md);
+    .btn-square(var(--ui-control-height));
+    min-width: var(--ui-control-height);
+    min-height: var(--ui-control-height);
+    font-size: var(--ui-font-size-base);
   }
 }
 
@@ -199,41 +229,31 @@
 }
 
 .search-indicator-list {
-  position: absolute;
-  top: 10px;
-  right: 10px;
+  grid-area: search;
+  position: static;
   color: var(--ui-text-muted);
-  font-size: var(--font-size-sm);
-  padding: 4px 8px;
-  border-radius: 0;
-  background: var(--ui-surface-strong);
-  border: 1px solid var(--ui-border);
+  font-size: var(--font-size-xs);
+  padding: 0;
 }
 
 @media (max-width: 576px) {
   .app-list-item-inner {
     display: grid;
-    grid-template-columns: 44px 45px minmax(0, 1fr);
+    grid-template-columns: 20px 40px minmax(0, 1fr);
     grid-template-areas:
-      'handle icon actions'
-      'info info info';
+      'handle cover actions'
+      'info info info'
+      'search search search';
     align-items: center;
-    gap: 10px 12px;
-    padding: 12px;
-  }
-
-  .drag-handle-list {
-    grid-area: handle;
-  }
-
-  .app-icon-container-list {
-    grid-area: icon;
+    gap: var(--ui-space-2) var(--ui-space-3);
+    padding: var(--ui-space-2) var(--ui-space-3);
   }
 
   .app-info-list {
-    grid-area: info;
     width: 100%;
     min-width: 0;
+    grid-template-columns: 1fr;
+    gap: var(--ui-space-1);
   }
 
   .app-name-row {
@@ -254,10 +274,10 @@
   }
 
   .app-actions-list .btn {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-    min-height: 44px;
+    width: var(--ui-control-height);
+    height: var(--ui-control-height);
+    min-width: var(--ui-control-height);
+    min-height: var(--ui-control-height);
   }
 }
 

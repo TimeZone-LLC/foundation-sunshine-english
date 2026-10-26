@@ -31,17 +31,25 @@
 
 .empty-state {
   grid-column: 1 / -1;
-  text-align: center;
-  padding: 60px 20px;
+  display: grid;
+  justify-items: start;
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-3);
+  text-align: left;
   background: var(--ui-surface);
-  border: 1px dashed var(--ui-border-strong);
+  border: 1px solid var(--ui-border);
   border-radius: 0;
+
+  .empty-title,
+  .empty-subtitle {
+    margin: 0;
+  }
 }
 
 .empty-icon {
-  font-size: 4rem;
+  font-size: var(--ui-font-size-base);
   color: var(--ui-text-faint);
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 
 .empty-title {

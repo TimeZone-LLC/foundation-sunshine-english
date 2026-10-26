@@ -91,7 +91,7 @@ export function useApps() {
   const platform = ref('')
   const isSaving = ref(false)
   const isDragging = ref(false)
-  const viewMode = ref('grid')
+  const viewMode = ref('list')
   const message = ref('')
   const messageType = ref('success')
   const envVars = ref({})

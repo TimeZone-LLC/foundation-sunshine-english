@@ -41,22 +41,24 @@
             </span>
           </div>
         </div>
-        <button
-          v-if="app.cmd"
-          type="button"
-          class="app-command-list"
-          :title="`${$t('_common.copy')}: ${app.name}`"
-          :aria-label="`${$t('_common.copy')}: ${app.name}`"
-          @click="copyToClipboard(app.cmd, app.name, $event)"
-        >
-          <i class="fas fa-terminal me-2"></i>
-          <span>{{ app.cmd }}</span>
-          <i class="fas fa-copy app-command-copy-icon" aria-hidden="true"></i>
-        </button>
-        <p v-if="app['working-dir']" class="app-working-dir-list">
-          <i class="fas fa-folder me-2"></i>
-          <span>{{ app['working-dir'] }}</span>
-        </p>
+        <div class="app-location-list">
+          <button
+            v-if="app.cmd"
+            type="button"
+            class="app-command-list"
+            :title="`${$t('_common.copy')}: ${app.name}`"
+            :aria-label="`${$t('_common.copy')}: ${app.name}`"
+            @click="copyToClipboard(app.cmd, app.name, $event)"
+          >
+            <i class="fas fa-terminal" aria-hidden="true"></i>
+            <span>{{ app.cmd }}</span>
+            <i class="fas fa-copy app-command-copy-icon" aria-hidden="true"></i>
+          </button>
+          <p v-if="app['working-dir']" class="app-working-dir-list">
+            <i class="fas fa-folder" aria-hidden="true"></i>
+            <span>{{ app['working-dir'] }}</span>
+          </p>
+        </div>
       </div>
       
       <!-- 操作按钮 -->
